@@ -363,6 +363,32 @@ async def search_bloggers(category: str = None, target_audience: str = None,
         return results
 
 
+async def update_blogger(blogger_id: int, seller_id: int, **kwargs) -> bool:
+    """Обновление данных блогера"""
+    # Список полей, которые можно обновлять
+    allowed_fields = [
+        'name', 'url', 'platform', 'category', 'target_audience',
+        'has_reviews', 'price_min', 'price_max', 'description'
+    ]
+    
+    # Фильтруем только разрешенные поля
+    updates = {k: v for k, v in kwargs.items() if k in allowed_fields}
+    
+    if not updates:
+        return False
+    
+    # Строим SQL запрос
+    set_clause = ", ".join([f"{field} = ?" for field in updates.keys()])
+    query = f"UPDATE bloggers SET {set_clause}, updated_at = ? WHERE id = ? AND seller_id = ?"
+    
+    params = list(updates.values()) + [datetime.now().isoformat(), blogger_id, seller_id]
+    
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        cursor = await db.execute(query, params)
+        await db.commit()
+        return cursor.rowcount > 0
+
+
 async def delete_blogger(blogger_id: int, seller_id: int) -> bool:
     """Удаление блогера"""
     async with aiosqlite.connect(DATABASE_PATH) as db:

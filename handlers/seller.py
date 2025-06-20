@@ -5,7 +5,7 @@ from aiogram.fsm.context import FSMContext
 
 from database.database import (
     get_user, create_blogger, get_user_bloggers, 
-    get_blogger, delete_blogger
+    get_blogger, delete_blogger, update_blogger
 )
 from database.models import UserRole, SubscriptionStatus
 from bot.keyboards import (
@@ -412,4 +412,146 @@ async def back_to_bloggers_list(callback: CallbackQuery):
         "Выберите блогера для просмотра деталей:",
         reply_markup=get_blogger_list_keyboard(bloggers),
         parse_mode="HTML"
-    ) 
+    )
+
+
+# === ОБРАБОТЧИКИ ДЛЯ РЕДАКТИРОВАНИЯ БЛОГЕРА ===
+
+@router.callback_query(F.data.startswith("edit_blogger_"))
+async def start_edit_blogger(callback: CallbackQuery, state: FSMContext):
+    """Начать редактирование блогера"""
+    blogger_id = int(callback.data.split("_")[2])
+    blogger = await get_blogger(blogger_id)
+    
+    if not blogger:
+        await callback.answer("❌ Блогер не найден")
+        return
+    
+    # Проверяем, что это блогер текущего пользователя
+    user = await get_user(callback.from_user.id)
+    if not user or blogger.seller_id != user.id:
+        await callback.answer("❌ Нет доступа к этому блогеру")
+        return
+    
+    # Сохраняем ID блогера в состояние
+    await state.update_data(editing_blogger_id=blogger_id)
+    await state.set_state(SellerStates.editing_blogger)
+    
+    edit_menu = (
+        f"✏️ <b>Редактирование блогера: {blogger.name}</b>\n\n"
+        "Выберите, что хотите изменить:\n\n"
+        "1️⃣ Имя блогера\n"
+        "2️⃣ Ссылка на блогера\n"
+        "3️⃣ Платформа\n"
+        "4️⃣ Категория\n"
+        "5️⃣ Целевая аудитория\n"
+        "6️⃣ Минимальная цена\n"
+        "7️⃣ Максимальная цена\n"
+        "8️⃣ Описание\n\n"
+        "Введите номер поля (1-8) или 'отмена' для выхода:"
+    )
+    
+    await callback.answer()
+    await callback.message.edit_text(edit_menu, parse_mode="HTML")
+
+
+@router.message(SellerStates.editing_blogger)
+async def process_edit_field_selection(message: Message, state: FSMContext):
+    """Обработка выбора поля для редактирования"""
+    data = await state.get_data()
+    blogger_id = data.get('editing_blogger_id')
+    
+    if message.text.lower() in ['отмена', 'cancel', '/cancel']:
+        await state.clear()
+        await message.answer("❌ Редактирование отменено.")
+        return
+    
+    # Маппинг номеров на поля
+    field_mapping = {
+        '1': ('name', 'имя блогера'),
+        '2': ('url', 'ссылку на блогера'),
+        '3': ('platform', 'платформу'),
+        '4': ('category', 'категорию'),
+        '5': ('target_audience', 'целевую аудиторию'),
+        '6': ('price_min', 'минимальную цену'),
+        '7': ('price_max', 'максимальную цену'),
+        '8': ('description', 'описание')
+    }
+    
+    if message.text not in field_mapping:
+        await message.answer(
+            "❌ Неверный выбор. Введите номер от 1 до 8 или 'отмена'."
+        )
+        return
+    
+    field_name, field_display = field_mapping[message.text]
+    
+    # Получаем текущие данные блогера
+    blogger = await get_blogger(blogger_id)
+    current_value = getattr(blogger, field_name)
+    
+    await state.update_data(editing_field=field_name)
+    await state.set_state(SellerStates.waiting_for_new_value)
+    
+    await message.answer(
+        f"✏️ <b>Редактирование: {field_display}</b>\n\n"
+        f"Текущее значение: {current_value or 'Не указано'}\n\n"
+        "Введите новое значение или 'отмена' для выхода:"
+    )
+
+
+@router.message(SellerStates.waiting_for_new_value)
+async def process_new_value(message: Message, state: FSMContext):
+    """Обработка нового значения поля"""
+    if message.text.lower() in ['отмена', 'cancel', '/cancel']:
+        await state.clear()
+        await message.answer("❌ Редактирование отменено.")
+        return
+    
+    data = await state.get_data()
+    blogger_id = data.get('editing_blogger_id')
+    field_name = data.get('editing_field')
+    new_value = message.text
+    
+    # Специальная обработка для цен
+    if field_name in ['price_min', 'price_max']:
+        try:
+            new_value = int(new_value) if new_value != '0' else None
+        except ValueError:
+            await message.answer("❌ Введите корректное число или '0' для договорной цены.")
+            return
+    
+    # Обновляем блогера в базе данных
+    user = await get_user(message.from_user.id)
+    success = await update_blogger(blogger_id, user.id, **{field_name: new_value})
+    
+    if success:
+        await message.answer("✅ Поле успешно обновлено!")
+        
+        # Показываем обновленные детали блогера
+        blogger = await get_blogger(blogger_id)
+        details_text = (
+            f"📝 <b>Обновленные детали блогера</b>\n\n"
+            f"👤 <b>Имя:</b> {blogger.name}\n"
+            f"🔗 <b>Ссылка:</b> {blogger.url}\n"
+            f"📱 <b>Платформа:</b> {blogger.platform}\n"
+            f"🎯 <b>Категория:</b> {blogger.category}\n"
+            f"👥 <b>Аудитория:</b> {blogger.target_audience}\n"
+            f"🗣️ <b>Отзывы:</b> {'Есть' if blogger.has_reviews else 'Нет'}\n"
+            f"💰 <b>Цена:</b> {blogger.price_min or 'Договорная'}"
+            + (f" - {blogger.price_max}" if blogger.price_max else "") + " ₽\n"
+            f"📅 <b>Добавлен:</b> {blogger.created_at.strftime('%d.%m.%Y')}"
+        )
+        
+        if blogger.description:
+            details_text += f"\n📝 <b>Описание:</b> {blogger.description}"
+        
+        await message.answer(
+            details_text,
+            reply_markup=get_blogger_details_keyboard(blogger_id),
+            parse_mode="HTML"
+        )
+    else:
+        await message.answer("❌ Ошибка при обновлении данных.")
+    
+    await state.clear() 
