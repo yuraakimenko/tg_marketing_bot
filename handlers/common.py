@@ -194,6 +194,17 @@ async def help_command(message: Message):
     await show_help(message)
 
 
+@router.message(Command("menu"))
+async def menu_command(message: Message):
+    """Команда обновления главного меню"""
+    user = await get_user(message.from_user.id)
+    if not user:
+        await message.answer("❌ Пользователь не найден. Используйте /start для регистрации.")
+        return
+    
+    await update_main_menu_keyboard(message, user.id)
+
+
 async def show_main_menu(message: Message, user):
     """Показать главное меню для пользователя"""
     # Проверяем наличие активной подписки
@@ -218,4 +229,25 @@ async def show_main_menu(message: Message, user):
         )
         keyboard = get_main_menu_buyer(has_active_subscription)
     
-    await message.answer(greeting, reply_markup=keyboard) 
+    await message.answer(greeting, reply_markup=keyboard)
+
+
+async def update_main_menu_keyboard(message: Message, user_id: int):
+    """Обновить клавиатуру главного меню для пользователя"""
+    user = await get_user(user_id)
+    if not user:
+        return
+    
+    has_active_subscription = user.subscription_status in [
+        SubscriptionStatus.ACTIVE, 
+        SubscriptionStatus.AUTO_RENEWAL_OFF, 
+        SubscriptionStatus.CANCELLED
+    ]
+    
+    keyboard = get_main_menu_seller(has_active_subscription) if user.role == UserRole.SELLER else get_main_menu_buyer(has_active_subscription)
+    
+    await message.answer(
+        "🔄 Главное меню обновлено!\n\n"
+        "Теперь вам доступны актуальные функции.",
+        reply_markup=keyboard
+    ) 

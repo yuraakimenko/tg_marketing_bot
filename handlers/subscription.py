@@ -203,6 +203,29 @@ async def handle_mock_payment_success(callback: CallbackQuery):
             f"Используйте главное меню для начала работы.",
             parse_mode="HTML"
         )
+        
+        # Обновляем главное меню с новой клавиатурой
+        from bot.keyboards import get_main_menu_seller, get_main_menu_buyer
+        from database.models import UserRole
+        
+        # Получаем обновленные данные пользователя
+        updated_user = await get_user(callback.from_user.id)
+        if updated_user:
+            has_active_subscription = updated_user.subscription_status in [
+                SubscriptionStatus.ACTIVE, 
+                SubscriptionStatus.AUTO_RENEWAL_OFF, 
+                SubscriptionStatus.CANCELLED
+            ]
+            
+            keyboard = get_main_menu_seller(has_active_subscription) if updated_user.role == UserRole.SELLER else get_main_menu_buyer(has_active_subscription)
+            
+            # Отправляем новое сообщение с обновленной клавиатурой
+            await callback.message.answer(
+                "🏠 Главное меню обновлено!\n\n"
+                "Теперь вам доступна кнопка 'Управление подпиской'.",
+                reply_markup=keyboard
+            )
+        
         logger.info(f"Mock payment successful for user {user.telegram_id}, invoice {invoice_id}")
     else:
         await callback.answer("❌ Ошибка активации подписки")
@@ -258,6 +281,28 @@ async def check_payment_status(callback: CallbackQuery):
                     f"🚀 Теперь вам доступны все функции бота.",
                     parse_mode="HTML"
                 )
+                
+                # Обновляем главное меню с новой клавиатурой
+                from bot.keyboards import get_main_menu_seller, get_main_menu_buyer
+                from database.models import UserRole
+                
+                # Получаем обновленные данные пользователя
+                updated_user = await get_user(callback.from_user.id)
+                if updated_user:
+                    has_active_subscription = updated_user.subscription_status in [
+                        SubscriptionStatus.ACTIVE, 
+                        SubscriptionStatus.AUTO_RENEWAL_OFF, 
+                        SubscriptionStatus.CANCELLED
+                    ]
+                    
+                    keyboard = get_main_menu_seller(has_active_subscription) if updated_user.role == UserRole.SELLER else get_main_menu_buyer(has_active_subscription)
+                    
+                    # Отправляем новое сообщение с обновленной клавиатурой
+                    await callback.message.answer(
+                        "🏠 Главное меню обновлено!\n\n"
+                        "Теперь вам доступна кнопка 'Управление подпиской'.",
+                        reply_markup=keyboard
+                    )
             else:
                 await callback.answer("❌ Ошибка активации")
     elif status['status'] == 'pending':
@@ -649,9 +694,30 @@ async def back_to_main_menu(callback: CallbackQuery):
     await callback.answer("Возвращаемся в главное меню")
     await callback.message.delete()
     
-    # Отправляем сообщение о возврате в главное меню
-    await callback.message.answer(
-        "🏠 Вы вернулись в главное меню.\n\n"
-        "Используйте кнопки ниже для навигации.",
-        parse_mode="HTML"
-    ) 
+    # Получаем данные пользователя для правильной клавиатуры
+    user = await get_user(callback.from_user.id)
+    if user:
+        from bot.keyboards import get_main_menu_seller, get_main_menu_buyer
+        from database.models import UserRole
+        
+        has_active_subscription = user.subscription_status in [
+            SubscriptionStatus.ACTIVE, 
+            SubscriptionStatus.AUTO_RENEWAL_OFF, 
+            SubscriptionStatus.CANCELLED
+        ]
+        
+        keyboard = get_main_menu_seller(has_active_subscription) if user.role == UserRole.SELLER else get_main_menu_buyer(has_active_subscription)
+        
+        # Отправляем сообщение о возврате в главное меню с правильной клавиатурой
+        await callback.message.answer(
+            "🏠 Вы вернулись в главное меню.\n\n"
+            "Используйте кнопки ниже для навигации.",
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
+    else:
+        await callback.message.answer(
+            "🏠 Вы вернулись в главное меню.\n\n"
+            "Используйте кнопки ниже для навигации.",
+            parse_mode="HTML"
+        ) 
