@@ -1,6 +1,6 @@
 import logging
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 
@@ -96,11 +96,16 @@ async def change_role(callback: CallbackQuery, state: FSMContext):
         await callback.answer("❌ Пользователь не найден")
         return
     
+    current_role = "продажник" if user.role == UserRole.SELLER else "закупщик"
+    
     await callback.answer()
     await callback.message.edit_text(
-        "🔄 Выберите новую роль:\n\n"
-        "⚠️ Внимание: при смене роли вы потеряете доступ к функциям предыдущей роли.",
-        reply_markup=get_role_selection_keyboard()
+        f"🔄 <b>Смена роли</b>\n\n"
+        f"📋 Текущая роль: <b>{current_role}</b>\n\n"
+        f"Выберите новую роль:\n\n"
+        f"ℹ️ <b>Важно:</b> Подписка сохранится при смене роли.",
+        reply_markup=get_role_selection_keyboard(),
+        parse_mode="HTML"
     )
     await state.set_state(RegistrationStates.waiting_for_role)
 
@@ -111,11 +116,34 @@ async def handle_role_change(callback: CallbackQuery, state: FSMContext):
     role_str = callback.data.split("_")[1]
     new_role = UserRole.SELLER if role_str == "seller" else UserRole.BUYER
     
+    # Получаем текущие данные пользователя
+    user = await get_user(callback.from_user.id)
+    if not user:
+        await callback.answer("❌ Пользователь не найден")
+        await state.clear()
+        return
+    
+    # Проверяем, не выбрал ли пользователь ту же роль
+    if user.role == new_role:
+        role_name = "продажника" if new_role == UserRole.SELLER else "закупщика"
+        await callback.answer(f"ℹ️ Вы уже работаете в роли {role_name}")
+        await callback.message.edit_text(
+            f"ℹ️ <b>Роль не изменена</b>\n\n"
+            f"Вы уже работаете в роли <b>{role_name}</b>.\n\n"
+            f"Для возврата в настройки используйте кнопку ниже.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="⚙️ Вернуться в настройки", callback_data="back_to_settings")]
+            ]),
+            parse_mode="HTML"
+        )
+        await state.clear()
+        return
+    
     # Обновляем роль пользователя
     success = await update_user_role(callback.from_user.id, new_role)
     
     if success:
-        await callback.answer()
+        await callback.answer("✅ Роль успешно изменена!")
         await callback.message.delete()
         
         role_name = "продажник" if new_role == UserRole.SELLER else "закупщик"
@@ -128,11 +156,24 @@ async def handle_role_change(callback: CallbackQuery, state: FSMContext):
         ] if updated_user else False
         
         await callback.message.answer(
-            f"✅ Роль успешно изменена на {role_name}!",
-            reply_markup=get_main_menu_seller(has_active_subscription) if new_role == UserRole.SELLER else get_main_menu_buyer(has_active_subscription)
+            f"✅ <b>Роль успешно изменена!</b>\n\n"
+            f"🎭 Новая роль: <b>{role_name}</b>\n"
+            f"💳 Подписка: {'сохранена' if has_active_subscription else 'неактивна'}\n\n"
+            f"🚀 Теперь вам доступны функции для {role_name}а.",
+            reply_markup=get_main_menu_seller(has_active_subscription) if new_role == UserRole.SELLER else get_main_menu_buyer(has_active_subscription),
+            parse_mode="HTML"
         )
     else:
         await callback.answer("❌ Ошибка при смене роли")
+        await callback.message.edit_text(
+            "❌ <b>Ошибка при смене роли</b>\n\n"
+            "Попробуйте еще раз или обратитесь в поддержку.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🔄 Попробовать снова", callback_data="change_role")],
+                [InlineKeyboardButton(text="⚙️ Вернуться в настройки", callback_data="back_to_settings")]
+            ]),
+            parse_mode="HTML"
+        )
     
     await state.clear()
 
@@ -202,6 +243,29 @@ async def show_statistics_callback(callback: CallbackQuery):
     
     await callback.answer()
     await callback.message.edit_text(stats_text, parse_mode="HTML")
+
+
+@router.callback_query(F.data == "back_to_settings")
+async def back_to_settings(callback: CallbackQuery):
+    """Возврат в настройки"""
+    user = await get_user(callback.from_user.id)
+    if not user:
+        await callback.answer("❌ Пользователь не найден")
+        return
+    
+    role_name = "продажник" if user.role == UserRole.SELLER else "закупщик"
+    subscription_status = "активна" if user.subscription_status == SubscriptionStatus.ACTIVE else "неактивна"
+    
+    await callback.answer()
+    await callback.message.edit_text(
+        f"⚙️ <b>Настройки</b>\n\n"
+        f"👤 <b>Роль:</b> {role_name}\n"
+        f"💳 <b>Подписка:</b> {subscription_status}\n"
+        f"⭐ <b>Рейтинг:</b> {user.rating:.1f} ({user.reviews_count} отзывов)\n\n"
+        "Выберите действие:",
+        reply_markup=get_settings_keyboard(),
+        parse_mode="HTML"
+    )
 
 
 @router.callback_query(F.data == "help")
