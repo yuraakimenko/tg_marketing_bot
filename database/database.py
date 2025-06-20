@@ -405,12 +405,39 @@ async def get_user_subscription(user_id: int) -> Optional[Subscription]:
 async def toggle_auto_renewal(user_id: int, enable: bool) -> bool:
     """Включение/отключение автопродления подписки"""
     async with aiosqlite.connect(DATABASE_PATH) as db:
-        # Обновляем подписку
+        # Сначала пробуем обновить существующую подписку
         cursor = await db.execute("""
             UPDATE subscriptions 
             SET auto_renewal = ?
             WHERE user_id = ? AND status IN ('active', 'auto_renewal_off')
         """, (enable, user_id))
+        
+        updated_existing = cursor.rowcount > 0
+        
+        # Если не обновили существующую подписку, создаем новую запись для старой подписки
+        if not updated_existing:
+            # Получаем данные пользователя
+            user_cursor = await db.execute("""
+                SELECT subscription_end_date, created_at, subscription_status 
+                FROM users WHERE id = ?
+            """, (user_id,))
+            user_row = await user_cursor.fetchone()
+            
+            if user_row and user_row[0]:  # Если есть дата окончания подписки
+                # Создаем запись в subscriptions
+                await db.execute("""
+                    INSERT INTO subscriptions 
+                    (user_id, start_date, end_date, amount, status, auto_renewal, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    user_id,
+                    user_row[1],  # created_at как start_date
+                    user_row[0],  # subscription_end_date
+                    50000,        # стандартная цена 500₽
+                    user_row[2],  # subscription_status
+                    enable,
+                    user_row[1]   # created_at
+                ))
         
         # Обновляем статус пользователя
         new_status = SubscriptionStatus.ACTIVE if enable else SubscriptionStatus.AUTO_RENEWAL_OFF
@@ -421,7 +448,7 @@ async def toggle_auto_renewal(user_id: int, enable: bool) -> bool:
         """, (new_status.value, user_id))
         
         await db.commit()
-        return cursor.rowcount > 0
+        return True
 
 
 async def cancel_subscription(user_id: int, cancel_immediately: bool = False) -> bool:
@@ -429,6 +456,7 @@ async def cancel_subscription(user_id: int, cancel_immediately: bool = False) ->
     async with aiosqlite.connect(DATABASE_PATH) as db:
         now = datetime.now()
         
+        # Сначала пробуем обновить существующую подписку
         if cancel_immediately:
             # Немедленная отмена - обновляем дату окончания на текущую
             cursor = await db.execute("""
@@ -452,6 +480,34 @@ async def cancel_subscription(user_id: int, cancel_immediately: bool = False) ->
                 WHERE user_id = ? AND status IN ('active', 'auto_renewal_off')
             """, (now.isoformat(), user_id))
             
+            updated_existing = cursor.rowcount > 0
+            
+            # Если не обновили существующую подписку, создаем новую запись
+            if not updated_existing:
+                # Получаем данные пользователя
+                user_cursor = await db.execute("""
+                    SELECT subscription_end_date, created_at, subscription_status 
+                    FROM users WHERE id = ?
+                """, (user_id,))
+                user_row = await user_cursor.fetchone()
+                
+                if user_row and user_row[0]:  # Если есть дата окончания подписки
+                    # Создаем запись в subscriptions как отмененную
+                    await db.execute("""
+                        INSERT INTO subscriptions 
+                        (user_id, start_date, end_date, amount, status, auto_renewal, cancelled_at, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        user_id,
+                        user_row[1],  # created_at как start_date
+                        user_row[0],  # subscription_end_date
+                        50000,        # стандартная цена 500₽
+                        'cancelled',
+                        False,
+                        now.isoformat(),
+                        user_row[1]   # created_at
+                    ))
+            
             # Статус пользователя остается активным до окончания периода
             await db.execute("""
                 UPDATE users 
@@ -460,7 +516,7 @@ async def cancel_subscription(user_id: int, cancel_immediately: bool = False) ->
             """, (user_id,))
         
         await db.commit()
-        return cursor.rowcount > 0
+        return True
 
 
 async def get_user_payment_history(user_id: int, limit: int = 10) -> List[Subscription]:

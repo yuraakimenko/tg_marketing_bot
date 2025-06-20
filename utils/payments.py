@@ -54,7 +54,7 @@ class RobokassaPayment:
             params['IsTest'] = '1'
         
         # Формируем URL
-        url_params = '&'.join([f"{k}={v}" for k, v in params.items()])
+        url_params = ';'.join([f"{k}={v}" for k, v in params.items()])
         payment_url = f"{ROBOKASSA_BASE_URL}?{url_params}"
         
         logger.info(f"Generated payment URL for user {user_id}, invoice {invoice_id}")
@@ -120,7 +120,7 @@ def create_mock_payment(user_id: int, amount: float, description: str) -> Dict:
     logger.info(f"Created mock payment for user {user_id}: {amount}₽")
     
     return {
-        'payment_url': f"https://mock-payment.test?amount={amount}&user={user_id}",
+        'payment_url': f"https://mock-payment.test?amount={amount};user={user_id}",
         'invoice_id': invoice_id,
         'amount': amount,
         'signature': 'mock_signature',

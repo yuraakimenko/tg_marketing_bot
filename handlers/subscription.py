@@ -348,6 +348,26 @@ async def subscription_management_menu(message: Message):
     
     # Получаем подробную информацию о подписке
     subscription = await get_user_subscription(user.id)
+    
+    # Если подписки нет в таблице subscriptions, но пользователь имеет активную подписку,
+    # создаем объект подписки на основе данных из таблицы users
+    if not subscription and user.subscription_end_date:
+        from database.models import Subscription
+        from datetime import datetime
+        
+        # Создаем временный объект подписки для управления
+        subscription = Subscription(
+            id=0,  # Временный ID
+            user_id=user.id,
+            start_date=user.created_at,  # Используем дату регистрации как начало
+            end_date=user.subscription_end_date,
+            amount=50000,  # Стандартная цена 500₽
+            status=user.subscription_status,
+            auto_renewal=True,  # По умолчанию включено
+            cancelled_at=None,
+            created_at=user.created_at
+        )
+    
     if not subscription:
         await message.answer("❌ Информация о подписке не найдена.")
         return
@@ -380,6 +400,10 @@ async def subscription_management_menu(message: Message):
     if subscription.cancelled_at:
         cancelled_date = subscription.cancelled_at.strftime('%d.%m.%Y %H:%M')
         management_text += f"⚠️ <b>Отменена:</b> {cancelled_date}\n\n"
+    
+    # Если это временная подписка (без записи в БД), добавляем примечание
+    if subscription.id == 0:
+        management_text += "ℹ️ <i>Для полного управления рекомендуется продлить подписку через новую систему.</i>\n\n"
     
     management_text += "Выберите действие:"
     
