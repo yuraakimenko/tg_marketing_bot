@@ -183,7 +183,8 @@ def get_platform_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="📸 Instagram", callback_data="platform_instagram")],
         [InlineKeyboardButton(text="🎵 TikTok", callback_data="platform_tiktok")],
         [InlineKeyboardButton(text="📱 Telegram", callback_data="platform_telegram")],
-        [InlineKeyboardButton(text="🌐 Другое", callback_data="platform_other")]
+        [InlineKeyboardButton(text="🌐 Другое", callback_data="platform_other")],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_action")]
     ])
 
 
@@ -199,7 +200,8 @@ def get_category_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="🎮 Развлечения", callback_data="category_развлечения")],
         [InlineKeyboardButton(text="📚 Образование", callback_data="category_образование")],
         [InlineKeyboardButton(text="💼 Бизнес", callback_data="category_бизнес")],
-        [InlineKeyboardButton(text="🌐 Другое", callback_data="category_other")]
+        [InlineKeyboardButton(text="🌐 Другое", callback_data="category_other")],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_action")]
     ])
 
 

@@ -216,6 +216,90 @@ async def process_blogger_description(message: Message, state: FSMContext):
     await state.clear()
 
 
+# === ОБРАБОТЧИКИ ДЛЯ ПРЕРЫВАНИЯ ПРОЦЕССА ДОБАВЛЕНИЯ БЛОГЕРА ===
+
+@router.message(F.text == "📝 Мои блогеры", SellerStates())
+async def interrupt_with_my_bloggers(message: Message, state: FSMContext):
+    """Прерывание добавления блогера и переход к списку блогеров"""
+    await state.clear()
+    await show_my_bloggers(message)
+
+
+@router.message(F.text == "💳 Подписка", SellerStates())
+async def interrupt_with_subscription(message: Message, state: FSMContext):
+    """Прерывание добавления блогера и переход к подписке"""
+    await state.clear()
+    await message.answer(
+        "❌ Добавление блогера отменено.\n\n"
+        "Переходим к разделу подписки..."
+    )
+    # Будет обработано в handlers/subscription.py
+
+
+@router.message(F.text == "🔧 Управление подпиской", SellerStates())
+async def interrupt_with_subscription_management(message: Message, state: FSMContext):
+    """Прерывание добавления блогера и переход к управлению подпиской"""
+    await state.clear()
+    await message.answer(
+        "❌ Добавление блогера отменено.\n\n"
+        "Переходим к управлению подпиской..."
+    )
+    # Будет обработано в handlers/subscription.py
+
+
+@router.message(F.text == "⚙️ Настройки", SellerStates())
+async def interrupt_with_settings(message: Message, state: FSMContext):
+    """Прерывание добавления блогера и переход к настройкам"""
+    await state.clear()
+    await message.answer(
+        "❌ Добавление блогера отменено.\n\n"
+        "Переходим к настройкам..."
+    )
+    # Будет обработано в handlers/common.py
+
+
+@router.message(F.text == "📊 Статистика", SellerStates())
+async def interrupt_with_statistics(message: Message, state: FSMContext):
+    """Прерывание добавления блогера и переход к статистике"""
+    await state.clear()
+    await message.answer(
+        "❌ Добавление блогера отменено.\n\n"
+        "Переходим к статистике..."
+    )
+    # Будет обработано в handlers/subscription.py
+
+
+@router.message(F.text == "➕ Добавить блогера", SellerStates())
+async def restart_add_blogger(message: Message, state: FSMContext):
+    """Перезапуск добавления блогера если уже в процессе"""
+    await state.clear()
+    await message.answer("🔄 Перезапускаем добавление блогера...")
+    await add_blogger_start(message, state)
+
+
+# Обработчик для команды отмены
+@router.message(F.text.in_({"❌ Отмена", "/cancel", "отмена", "Отмена"}), SellerStates())
+async def cancel_adding_blogger(message: Message, state: FSMContext):
+    """Отмена добавления блогера"""
+    await state.clear()
+    await message.answer(
+        "❌ Добавление блогера отменено.\n\n"
+        "Вы можете начать заново или воспользоваться другими функциями."
+    )
+
+
+# Обработчик кнопки "Отмена" в inline клавиатурах
+@router.callback_query(F.data == "cancel_action", SellerStates())
+async def cancel_action_callback(callback: CallbackQuery, state: FSMContext):
+    """Отмена действия через inline кнопку"""
+    await state.clear()
+    await callback.answer("❌ Действие отменено")
+    await callback.message.edit_text(
+        "❌ Добавление блогера отменено.\n\n"
+        "Вы можете начать заново или воспользоваться другими функциями."
+    )
+
+
 @router.message(F.text == "📝 Мои блогеры")
 async def show_my_bloggers(message: Message):
     """Показать список блогеров пользователя"""

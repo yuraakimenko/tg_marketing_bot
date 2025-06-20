@@ -343,9 +343,94 @@ async def search_pagination(callback: CallbackQuery, state: FSMContext):
     )
 
 
+# === ОБРАБОТЧИКИ ДЛЯ ПРЕРЫВАНИЯ ПРОЦЕССА ПОИСКА ===
+
+@router.message(F.text == "📋 История поиска", BuyerStates())
+async def interrupt_with_history(message: Message, state: FSMContext):
+    """Прерывание поиска и переход к истории"""
+    await state.clear()
+    await message.answer(
+        "❌ Поиск отменен.\n\n"
+        "📋 История поиска пока не реализована.\n"
+        "Эта функция будет добавлена в следующих обновлениях."
+    )
+
+
+@router.message(F.text == "💳 Подписка", BuyerStates())
+async def interrupt_with_subscription_buyer(message: Message, state: FSMContext):
+    """Прерывание поиска и переход к подписке"""
+    await state.clear()
+    await message.answer(
+        "❌ Поиск отменен.\n\n"
+        "Переходим к разделу подписки..."
+    )
+
+
+@router.message(F.text == "🔧 Управление подпиской", BuyerStates())
+async def interrupt_with_subscription_management_buyer(message: Message, state: FSMContext):
+    """Прерывание поиска и переход к управлению подпиской"""
+    await state.clear()
+    await message.answer(
+        "❌ Поиск отменен.\n\n"
+        "Переходим к управлению подпиской..."
+    )
+
+
+@router.message(F.text == "⚙️ Настройки", BuyerStates())
+async def interrupt_with_settings_buyer(message: Message, state: FSMContext):
+    """Прерывание поиска и переход к настройкам"""
+    await state.clear()
+    await message.answer(
+        "❌ Поиск отменен.\n\n"
+        "Переходим к настройкам..."
+    )
+
+
+@router.message(F.text == "📊 Статистика", BuyerStates())
+async def interrupt_with_statistics_buyer(message: Message, state: FSMContext):
+    """Прерывание поиска и переход к статистике"""
+    await state.clear()
+    await message.answer(
+        "❌ Поиск отменен.\n\n"
+        "Переходим к статистике..."
+    )
+
+
+@router.message(F.text == "🔍 Поиск блогеров", BuyerStates())
+async def restart_search(message: Message, state: FSMContext):
+    """Перезапуск поиска если уже в процессе"""
+    await state.clear()
+    await message.answer("🔄 Перезапускаем поиск...")
+    await start_search(message, state)
+
+
+# Обработчик для команды отмены
+@router.message(F.text.in_({"❌ Отмена", "/cancel", "отмена", "Отмена"}), BuyerStates())
+async def cancel_search(message: Message, state: FSMContext):
+    """Отмена поиска"""
+    await state.clear()
+    await message.answer(
+        "❌ Поиск отменен.\n\n"
+        "Вы можете начать заново или воспользоваться другими функциями."
+    )
+
+
+# Обработчик кнопки "Отмена" в inline клавиатурах
+@router.callback_query(F.data == "cancel_action", BuyerStates())
+async def cancel_action_callback_buyer(callback: CallbackQuery, state: FSMContext):
+    """Отмена действия через inline кнопку"""
+    await state.clear()
+    await callback.answer("❌ Действие отменено")
+    await callback.message.edit_text(
+        "❌ Поиск отменен.\n\n"
+        "Вы можете начать заново или воспользоваться другими функциями."
+    )
+
+
 @router.callback_query(F.data == "new_search")
 async def new_search(callback: CallbackQuery, state: FSMContext):
     """Начать новый поиск"""
+    await state.clear()
     await callback.answer()
     await callback.message.edit_text(
         "🔍 <b>Новый поиск блогеров</b>\n\n"
