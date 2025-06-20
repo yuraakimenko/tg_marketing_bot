@@ -1,6 +1,7 @@
 import aiosqlite
 import os
 import json
+import logging
 from typing import List, Optional, Tuple
 from datetime import datetime
 
@@ -8,6 +9,7 @@ from .models import User, Blogger, Review, Subscription, Contact, SearchFilter
 from .models import UserRole, SubscriptionStatus
 
 DATABASE_PATH = "bot_database.db"
+logger = logging.getLogger(__name__)
 
 
 async def init_db():
@@ -79,6 +81,8 @@ async def init_db():
                 amount INTEGER NOT NULL,
                 status TEXT NOT NULL,
                 payment_id TEXT,
+                auto_renewal BOOLEAN DEFAULT 1,
+                cancelled_at TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users (id)
             )
@@ -103,6 +107,23 @@ async def init_db():
         await db.execute("CREATE INDEX IF NOT EXISTS idx_bloggers_seller_id ON bloggers (seller_id)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_bloggers_category ON bloggers (category)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_reviews_reviewed_id ON reviews (reviewed_id)")
+        
+        # Миграция: добавляем новые поля в subscriptions если их нет
+        try:
+            # Проверяем, есть ли поле auto_renewal
+            cursor = await db.execute("PRAGMA table_info(subscriptions)")
+            columns = [row[1] for row in await cursor.fetchall()]
+            
+            if 'auto_renewal' not in columns:
+                await db.execute("ALTER TABLE subscriptions ADD COLUMN auto_renewal BOOLEAN DEFAULT 1")
+                logger.info("Added auto_renewal column to subscriptions table")
+            
+            if 'cancelled_at' not in columns:
+                await db.execute("ALTER TABLE subscriptions ADD COLUMN cancelled_at TIMESTAMP")
+                logger.info("Added cancelled_at column to subscriptions table")
+                
+        except Exception as e:
+            logger.error(f"Error during migration: {e}")
         
         await db.commit()
 
@@ -350,4 +371,123 @@ async def delete_blogger(blogger_id: int, seller_id: int) -> bool:
             (blogger_id, seller_id)
         )
         await db.commit()
-        return cursor.rowcount > 0 
+        return cursor.rowcount > 0
+
+
+# Функции управления подпиской
+async def get_user_subscription(user_id: int) -> Optional[Subscription]:
+    """Получение активной подписки пользователя"""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("""
+            SELECT * FROM subscriptions 
+            WHERE user_id = ? AND status IN ('active', 'auto_renewal_off')
+            ORDER BY created_at DESC LIMIT 1
+        """, (user_id,))
+        row = await cursor.fetchone()
+        
+        if row:
+            return Subscription(
+                id=row['id'],
+                user_id=row['user_id'],
+                start_date=datetime.fromisoformat(row['start_date']),
+                end_date=datetime.fromisoformat(row['end_date']),
+                amount=row['amount'],
+                status=SubscriptionStatus(row['status']),
+                payment_id=row.get('payment_id'),
+                auto_renewal=bool(row.get('auto_renewal', True)),
+                cancelled_at=datetime.fromisoformat(row['cancelled_at']) if row.get('cancelled_at') else None,
+                created_at=datetime.fromisoformat(row['created_at'])
+            )
+        return None
+
+
+async def toggle_auto_renewal(user_id: int, enable: bool) -> bool:
+    """Включение/отключение автопродления подписки"""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        # Обновляем подписку
+        cursor = await db.execute("""
+            UPDATE subscriptions 
+            SET auto_renewal = ?
+            WHERE user_id = ? AND status IN ('active', 'auto_renewal_off')
+        """, (enable, user_id))
+        
+        # Обновляем статус пользователя
+        new_status = SubscriptionStatus.ACTIVE if enable else SubscriptionStatus.AUTO_RENEWAL_OFF
+        await db.execute("""
+            UPDATE users 
+            SET subscription_status = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (new_status.value, user_id))
+        
+        await db.commit()
+        return cursor.rowcount > 0
+
+
+async def cancel_subscription(user_id: int, cancel_immediately: bool = False) -> bool:
+    """Отмена подписки"""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        now = datetime.now()
+        
+        if cancel_immediately:
+            # Немедленная отмена - обновляем дату окончания на текущую
+            cursor = await db.execute("""
+                UPDATE subscriptions 
+                SET status = 'cancelled', cancelled_at = ?, end_date = ?
+                WHERE user_id = ? AND status IN ('active', 'auto_renewal_off')
+            """, (now.isoformat(), now.isoformat(), user_id))
+            
+            # Обновляем статус пользователя
+            await db.execute("""
+                UPDATE users 
+                SET subscription_status = 'inactive', subscription_end_date = ?, 
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (now.isoformat(), user_id))
+        else:
+            # Отмена до конца периода - только помечаем как отмененную
+            cursor = await db.execute("""
+                UPDATE subscriptions 
+                SET status = 'cancelled', cancelled_at = ?, auto_renewal = 0
+                WHERE user_id = ? AND status IN ('active', 'auto_renewal_off')
+            """, (now.isoformat(), user_id))
+            
+            # Статус пользователя остается активным до окончания периода
+            await db.execute("""
+                UPDATE users 
+                SET subscription_status = 'cancelled', updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (user_id,))
+        
+        await db.commit()
+        return cursor.rowcount > 0
+
+
+async def get_user_payment_history(user_id: int, limit: int = 10) -> List[Subscription]:
+    """Получение истории платежей пользователя"""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("""
+            SELECT * FROM subscriptions 
+            WHERE user_id = ? 
+            ORDER BY created_at DESC 
+            LIMIT ?
+        """, (user_id, limit))
+        rows = await cursor.fetchall()
+        
+        history = []
+        for row in rows:
+            history.append(Subscription(
+                id=row['id'],
+                user_id=row['user_id'],
+                start_date=datetime.fromisoformat(row['start_date']),
+                end_date=datetime.fromisoformat(row['end_date']),
+                amount=row['amount'],
+                status=SubscriptionStatus(row['status']),
+                payment_id=row.get('payment_id'),
+                auto_renewal=bool(row.get('auto_renewal', True)),
+                cancelled_at=datetime.fromisoformat(row['cancelled_at']) if row.get('cancelled_at') else None,
+                created_at=datetime.fromisoformat(row['created_at'])
+            ))
+        
+        return history 

@@ -11,7 +11,18 @@ from database.database import init_db
 from handlers import common, seller, buyer, subscription
 
 # Загрузка переменных окружения
-load_dotenv()
+env_loaded = load_dotenv()
+print(f"🔧 .env файл загружен: {env_loaded}")
+
+# Проверяем наличие .env файла
+env_file_path = os.path.join(os.getcwd(), '.env')
+env_exists = os.path.exists(env_file_path)
+print(f"🔧 .env файл существует: {env_exists}")
+if env_exists:
+    print(f"🔧 Путь к .env: {env_file_path}")
+else:
+    print(f"🔧 Текущая директория: {os.getcwd()}")
+    print(f"🔧 Файлы в директории: {os.listdir('.')}")
 
 # Настройка логирования
 logging.basicConfig(
@@ -20,11 +31,41 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Токен бота
-BOT_TOKEN = os.getenv('BOT_TOKEN')
+# Проверяем все переменные окружения
+print("=== ДИАГНОСТИКА ПЕРЕМЕННЫХ ОКРУЖЕНИЯ ===")
+print(f"Все переменные: {list(os.environ.keys())}")
+logger.info("=== ДИАГНОСТИКА ПЕРЕМЕННЫХ ОКРУЖЕНИЯ ===")
+logger.info(f"Все переменные: {list(os.environ.keys())}")
 
-if not BOT_TOKEN:
+# Ищем переменные, связанные с ботом
+bot_vars = {k: v for k, v in os.environ.items() if 'BOT' in k.upper() or 'TOKEN' in k.upper()}
+print(f"Переменные с BOT/TOKEN: {bot_vars}")
+logger.info(f"Переменные с BOT/TOKEN: {bot_vars}")
+
+# Токен бота - пробуем разные способы
+BOT_TOKEN = os.getenv('BOT_TOKEN')
+print(f"os.getenv('BOT_TOKEN'): {'Найден' if BOT_TOKEN else 'НЕ НАЙДЕН'}")
+logger.info(f"os.getenv('BOT_TOKEN'): {'Найден' if BOT_TOKEN else 'НЕ НАЙДЕН'}")
+
+# Пробуем environ напрямую
+BOT_TOKEN_DIRECT = os.environ.get('BOT_TOKEN')
+print(f"os.environ.get('BOT_TOKEN'): {'Найден' if BOT_TOKEN_DIRECT else 'НЕ НАЙДЕН'}")
+logger.info(f"os.environ.get('BOT_TOKEN'): {'Найден' if BOT_TOKEN_DIRECT else 'НЕ НАЙДЕН'}")
+
+# Если не нашли, используем тестовый
+if not BOT_TOKEN and not BOT_TOKEN_DIRECT:
+    print("❌ BOT_TOKEN не найден ни одним способом!")
+    print("Доступные переменные окружения:")
+    for key in sorted(os.environ.keys()):
+        print(f"  {key}")
+    logger.error("❌ BOT_TOKEN не найден ни одним способом!")
+    logger.info("Доступные переменные окружения:")
+    for key in sorted(os.environ.keys()):
+        logger.info(f"  {key}")
     raise ValueError("BOT_TOKEN не найден в переменных окружения")
+
+# Используем найденный токен
+BOT_TOKEN = BOT_TOKEN or BOT_TOKEN_DIRECT
 
 # Диагностика токена
 logger.info(f"Токен получен, длина: {len(BOT_TOKEN) if BOT_TOKEN else 0}")

@@ -9,27 +9,45 @@ def get_role_selection_keyboard() -> InlineKeyboardMarkup:
     ])
 
 
-def get_main_menu_seller() -> ReplyKeyboardMarkup:
+def get_main_menu_seller(has_active_subscription: bool = False) -> ReplyKeyboardMarkup:
     """Главное меню для продажника"""
+    keyboard = [
+        [KeyboardButton(text="➕ Добавить блогера")],
+        [KeyboardButton(text="📝 Мои блогеры"), KeyboardButton(text="📊 Статистика")]
+    ]
+    
+    # Если есть активная подписка, добавляем кнопку управления
+    if has_active_subscription:
+        keyboard.append([KeyboardButton(text="💳 Подписка"), KeyboardButton(text="🔧 Управление подпиской")])
+    else:
+        keyboard.append([KeyboardButton(text="💳 Подписка")])
+    
+    keyboard.append([KeyboardButton(text="⚙️ Настройки")])
+    
     return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="➕ Добавить блогера")],
-            [KeyboardButton(text="📝 Мои блогеры"), KeyboardButton(text="📊 Статистика")],
-            [KeyboardButton(text="💳 Подписка"), KeyboardButton(text="⚙️ Настройки")]
-        ],
+        keyboard=keyboard,
         resize_keyboard=True,
         persistent=True
     )
 
 
-def get_main_menu_buyer() -> ReplyKeyboardMarkup:
+def get_main_menu_buyer(has_active_subscription: bool = False) -> ReplyKeyboardMarkup:
     """Главное меню для закупщика"""
+    keyboard = [
+        [KeyboardButton(text="🔍 Поиск блогеров")],
+        [KeyboardButton(text="📋 История поиска"), KeyboardButton(text="📊 Статистика")]
+    ]
+    
+    # Если есть активная подписка, добавляем кнопку управления
+    if has_active_subscription:
+        keyboard.append([KeyboardButton(text="💳 Подписка"), KeyboardButton(text="🔧 Управление подпиской")])
+    else:
+        keyboard.append([KeyboardButton(text="💳 Подписка")])
+    
+    keyboard.append([KeyboardButton(text="⚙️ Настройки")])
+    
     return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="🔍 Поиск блогеров")],
-            [KeyboardButton(text="📋 История поиска"), KeyboardButton(text="📊 Статистика")],
-            [KeyboardButton(text="💳 Подписка"), KeyboardButton(text="⚙️ Настройки")]
-        ],
+        keyboard=keyboard,
         resize_keyboard=True,
         persistent=True
     )
@@ -195,6 +213,57 @@ def get_rating_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="4⭐", callback_data="rating_4"),
             InlineKeyboardButton(text="5⭐", callback_data="rating_5")
         ]
+    ])
+
+
+def get_subscription_management_keyboard(auto_renewal: bool = True) -> InlineKeyboardMarkup:
+    """Клавиатура управления подпиской"""
+    keyboard = []
+    
+    if auto_renewal:
+        keyboard.append([InlineKeyboardButton(
+            text="🔄 Отключить автообновление", 
+            callback_data="disable_auto_renewal"
+        )])
+    else:
+        keyboard.append([InlineKeyboardButton(
+            text="🔄 Включить автообновление", 
+            callback_data="enable_auto_renewal"
+        )])
+    
+    keyboard.extend([
+        [InlineKeyboardButton(
+            text="⏸️ Приостановить до окончания", 
+            callback_data="suspend_subscription"
+        )],
+        [InlineKeyboardButton(
+            text="❌ Отменить подписку полностью", 
+            callback_data="cancel_subscription_full"
+        )],
+        [InlineKeyboardButton(
+            text="📊 История платежей", 
+            callback_data="payment_history"
+        )],
+        [InlineKeyboardButton(
+            text="⬅️ Назад", 
+            callback_data="back_to_main"
+        )]
+    ])
+    
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
+def get_subscription_cancel_confirmation_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура подтверждения отмены подписки"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text="✅ Да, отменить подписку", 
+            callback_data="confirm_cancel_subscription"
+        )],
+        [InlineKeyboardButton(
+            text="❌ Нет, оставить как есть", 
+            callback_data="cancel_subscription_cancel"
+        )]
     ])
 
 

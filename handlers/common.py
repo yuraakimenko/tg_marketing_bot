@@ -60,7 +60,7 @@ async def handle_role_selection(callback: CallbackQuery, state: FSMContext):
         f"✅ Отлично! Вы зарегистрированы как {role_name}.\n\n"
         f"📋 Теперь вам доступны функции {'для размещения блогеров' if role == UserRole.SELLER else 'для поиска блогеров'}.\n\n"
         "💡 Для полного доступа к функциям бота необходима подписка 500₽/мес.",
-        reply_markup=get_main_menu_seller() if role == UserRole.SELLER else get_main_menu_buyer()
+        reply_markup=get_main_menu_seller(False) if role == UserRole.SELLER else get_main_menu_buyer(False)
     )
     
     await state.clear()
@@ -119,9 +119,17 @@ async def handle_role_change(callback: CallbackQuery, state: FSMContext):
         await callback.message.delete()
         
         role_name = "продажник" if new_role == UserRole.SELLER else "закупщик"
+        # Получаем обновленные данные пользователя для проверки подписки
+        updated_user = await get_user(callback.from_user.id)
+        has_active_subscription = updated_user.subscription_status in [
+            SubscriptionStatus.ACTIVE, 
+            SubscriptionStatus.AUTO_RENEWAL_OFF, 
+            SubscriptionStatus.CANCELLED
+        ] if updated_user else False
+        
         await callback.message.answer(
             f"✅ Роль успешно изменена на {role_name}!",
-            reply_markup=get_main_menu_seller() if new_role == UserRole.SELLER else get_main_menu_buyer()
+            reply_markup=get_main_menu_seller(has_active_subscription) if new_role == UserRole.SELLER else get_main_menu_buyer(has_active_subscription)
         )
     else:
         await callback.answer("❌ Ошибка при смене роли")
@@ -188,19 +196,26 @@ async def help_command(message: Message):
 
 async def show_main_menu(message: Message, user):
     """Показать главное меню для пользователя"""
+    # Проверяем наличие активной подписки
+    has_active_subscription = user.subscription_status in [
+        SubscriptionStatus.ACTIVE, 
+        SubscriptionStatus.AUTO_RENEWAL_OFF, 
+        SubscriptionStatus.CANCELLED
+    ]
+    
     if user.role == UserRole.SELLER:
         greeting = (
             f"👋 Добро пожаловать, {user.first_name or 'Продажник'}!\n\n"
             "📋 Здесь вы можете управлять своими блогерами.\n"
             "Выберите действие:"
         )
-        keyboard = get_main_menu_seller()
+        keyboard = get_main_menu_seller(has_active_subscription)
     else:
         greeting = (
             f"👋 Добро пожаловать, {user.first_name or 'Закупщик'}!\n\n"
             "🔍 Здесь вы можете найти подходящих блогеров.\n"
             "Выберите действие:"
         )
-        keyboard = get_main_menu_buyer()
+        keyboard = get_main_menu_buyer(has_active_subscription)
     
     await message.answer(greeting, reply_markup=keyboard) 

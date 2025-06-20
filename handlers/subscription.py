@@ -1,13 +1,15 @@
 import logging
 from datetime import datetime, timedelta
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 import os
 
-from database.database import get_user, update_subscription_status
+from database.database import (get_user, update_subscription_status, get_user_subscription, 
+                                    toggle_auto_renewal, cancel_subscription, get_user_payment_history)
 from database.models import SubscriptionStatus
-from bot.keyboards import get_subscription_keyboard, get_payment_confirmation_keyboard
+from bot.keyboards import (get_subscription_keyboard, get_payment_confirmation_keyboard,
+                          get_subscription_management_keyboard, get_subscription_cancel_confirmation_keyboard)
 from utils.payments import create_subscription_payment
 
 router = Router()
@@ -323,4 +325,309 @@ async def show_statistics(message: Message):
     if user.subscription_end_date:
         stats_text += f"🗓️ <b>Подписка до:</b> {user.subscription_end_date.strftime('%d.%m.%Y')}"
     
-    await message.answer(stats_text, parse_mode="HTML") 
+    await message.answer(stats_text, parse_mode="HTML")
+
+
+# === ОБРАБОТЧИКИ УПРАВЛЕНИЯ ПОДПИСКОЙ ===
+
+@router.message(F.text == "🔧 Управление подпиской")
+async def subscription_management_menu(message: Message):
+    """Меню управления подпиской"""
+    user = await get_user(message.from_user.id)
+    if not user:
+        await message.answer("❌ Пользователь не найден. Используйте /start для регистрации.")
+        return
+    
+    # Проверяем наличие активной подписки
+    if user.subscription_status not in [SubscriptionStatus.ACTIVE, SubscriptionStatus.AUTO_RENEWAL_OFF, SubscriptionStatus.CANCELLED]:
+        await message.answer(
+            "❌ У вас нет активной подписки.\n\n"
+            "Для управления подпиской сначала оформите её в разделе '💳 Подписка'."
+        )
+        return
+    
+    # Получаем подробную информацию о подписке
+    subscription = await get_user_subscription(user.id)
+    if not subscription:
+        await message.answer("❌ Информация о подписке не найдена.")
+        return
+    
+    # Определяем статус автопродления
+    auto_renewal_status = "включено" if subscription.auto_renewal else "отключено"
+    status_emoji = "✅" if subscription.auto_renewal else "⏸️"
+    
+    # Формируем текст с информацией
+    end_date = subscription.end_date.strftime('%d.%m.%Y %H:%M')
+    amount = subscription.amount / 100  # из копеек в рубли
+    
+    # Статус подписки
+    status_text = ""
+    if subscription.status == SubscriptionStatus.ACTIVE:
+        status_text = "✅ Активна"
+    elif subscription.status == SubscriptionStatus.AUTO_RENEWAL_OFF:
+        status_text = "⏸️ Активна (без автопродления)"
+    elif subscription.status == SubscriptionStatus.CANCELLED:
+        status_text = "❌ Отменена (действует до окончания)"
+    
+    management_text = (
+        f"🔧 <b>Управление подпиской</b>\n\n"
+        f"📊 <b>Статус:</b> {status_text}\n"
+        f"📅 <b>Действует до:</b> {end_date}\n"
+        f"💰 <b>Сумма:</b> {amount}₽\n"
+        f"🔄 <b>Автопродление:</b> {status_emoji} {auto_renewal_status}\n\n"
+    )
+    
+    if subscription.cancelled_at:
+        cancelled_date = subscription.cancelled_at.strftime('%d.%m.%Y %H:%M')
+        management_text += f"⚠️ <b>Отменена:</b> {cancelled_date}\n\n"
+    
+    management_text += "Выберите действие:"
+    
+    await message.answer(
+        management_text,
+        reply_markup=get_subscription_management_keyboard(subscription.auto_renewal),
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data == "disable_auto_renewal")
+async def disable_auto_renewal(callback: CallbackQuery):
+    """Отключение автопродления"""
+    user = await get_user(callback.from_user.id)
+    if not user:
+        await callback.answer("❌ Пользователь не найден")
+        return
+    
+    success = await toggle_auto_renewal(user.id, False)
+    
+    if success:
+        await callback.answer("✅ Автопродление отключено")
+        await callback.message.edit_text(
+            "✅ <b>Автопродление отключено</b>\n\n"
+            "📋 Ваша подписка будет действовать до окончания текущего периода, "
+            "после чего автоматически не продлится.\n\n"
+            "💡 Вы всегда можете включить автопродление обратно или "
+            "продлить подписку вручную в любое время.",
+            reply_markup=get_subscription_management_keyboard(False),
+            parse_mode="HTML"
+        )
+    else:
+        await callback.answer("❌ Ошибка при отключении автопродления")
+
+
+@router.callback_query(F.data == "enable_auto_renewal")
+async def enable_auto_renewal(callback: CallbackQuery):
+    """Включение автопродления"""
+    user = await get_user(callback.from_user.id)
+    if not user:
+        await callback.answer("❌ Пользователь не найден")
+        return
+    
+    success = await toggle_auto_renewal(user.id, True)
+    
+    if success:
+        await callback.answer("✅ Автопродление включено")
+        await callback.message.edit_text(
+            "✅ <b>Автопродление включено</b>\n\n"
+            "🔄 Ваша подписка будет автоматически продлеваться за 3 дня до окончания "
+            "на тот же период по той же цене.\n\n"
+            "💳 Убедитесь, что способ оплаты действителен для автоматического списания.",
+            reply_markup=get_subscription_management_keyboard(True),
+            parse_mode="HTML"
+        )
+    else:
+        await callback.answer("❌ Ошибка при включении автопродления")
+
+
+@router.callback_query(F.data == "suspend_subscription")
+async def suspend_subscription(callback: CallbackQuery):
+    """Приостановка подписки до окончания периода"""
+    user = await get_user(callback.from_user.id)
+    if not user:
+        await callback.answer("❌ Пользователь не найден")
+        return
+    
+    success = await cancel_subscription(user.id, cancel_immediately=False)
+    
+    if success:
+        await callback.answer("✅ Подписка приостановлена")
+        await callback.message.edit_text(
+            "⏸️ <b>Подписка приостановлена</b>\n\n"
+            "📋 Ваша подписка будет действовать до окончания текущего периода, "
+            "после чего будет деактивирована.\n\n"
+            "🔄 Автопродление отключено.\n\n"
+            "💡 Для возобновления подписки используйте раздел '💳 Подписка'.",
+            reply_markup=get_subscription_management_keyboard(False),
+            parse_mode="HTML"
+        )
+    else:
+        await callback.answer("❌ Ошибка при приостановке подписки")
+
+
+@router.callback_query(F.data == "cancel_subscription_full")
+async def request_full_cancellation(callback: CallbackQuery):
+    """Запрос полной отмены подписки"""
+    await callback.answer()
+    await callback.message.edit_text(
+        "⚠️ <b>Полная отмена подписки</b>\n\n"
+        "❗ Внимание! При полной отмене подписки:\n"
+        "• Доступ к функциям бота будет немедленно прекращен\n"
+        "• Возврат средств за неиспользованный период не предусмотрен\n"
+        "• Все ваши данные сохранятся для возможного восстановления\n\n"
+        "🤔 Вы уверены, что хотите полностью отменить подписку?",
+        reply_markup=get_subscription_cancel_confirmation_keyboard(),
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data == "confirm_cancel_subscription")
+async def confirm_full_cancellation(callback: CallbackQuery):
+    """Подтверждение полной отмены подписки"""
+    user = await get_user(callback.from_user.id)
+    if not user:
+        await callback.answer("❌ Пользователь не найден")
+        return
+    
+    success = await cancel_subscription(user.id, cancel_immediately=True)
+    
+    if success:
+        await callback.answer("✅ Подписка отменена")
+        await callback.message.edit_text(
+            "❌ <b>Подписка полностью отменена</b>\n\n"
+            "📋 Доступ к премиум-функциям деактивирован.\n"
+            "💾 Ваши данные сохранены.\n\n"
+            "💡 Для восстановления доступа оформите новую подписку "
+            "в разделе '💳 Подписка'.\n\n"
+            "🙏 Спасибо за использование нашего сервиса!",
+            parse_mode="HTML"
+        )
+    else:
+        await callback.answer("❌ Ошибка при отмене подписки")
+
+
+@router.callback_query(F.data == "cancel_subscription_cancel")
+async def cancel_cancellation(callback: CallbackQuery):
+    """Отмена процесса отмены подписки"""
+    await callback.answer("Отмена отменена 😊")
+    
+    # Возвращаемся к меню управления
+    user = await get_user(callback.from_user.id)
+    subscription = await get_user_subscription(user.id)
+    
+    await callback.message.edit_text(
+        "🔧 <b>Управление подпиской</b>\n\n"
+        "Выберите действие:",
+        reply_markup=get_subscription_management_keyboard(subscription.auto_renewal if subscription else True),
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data == "payment_history")
+async def show_payment_history(callback: CallbackQuery):
+    """Показать историю платежей"""
+    user = await get_user(callback.from_user.id)
+    if not user:
+        await callback.answer("❌ Пользователь не найден")
+        return
+    
+    history = await get_user_payment_history(user.id, limit=10)
+    
+    if not history:
+        await callback.answer("📋 История платежей пуста")
+        return
+    
+    history_text = "📊 <b>История платежей</b>\n\n"
+    
+    for i, payment in enumerate(history, 1):
+        amount = payment.amount / 100  # из копеек в рубли
+        start_date = payment.start_date.strftime('%d.%m.%Y')
+        end_date = payment.end_date.strftime('%d.%m.%Y')
+        
+        status_emoji = {
+            SubscriptionStatus.ACTIVE: "✅",
+            SubscriptionStatus.EXPIRED: "⏰",
+            SubscriptionStatus.CANCELLED: "❌",
+            SubscriptionStatus.INACTIVE: "💤"
+        }.get(payment.status, "❓")
+        
+        history_text += (
+            f"{i}. {status_emoji} <b>{amount}₽</b>\n"
+            f"   📅 {start_date} - {end_date}\n"
+            f"   📝 {payment.status.value}\n"
+        )
+        
+        if payment.payment_id:
+            history_text += f"   🆔 {payment.payment_id}\n"
+        
+        history_text += "\n"
+    
+    await callback.answer()
+    await callback.message.edit_text(
+        history_text,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_subscription_management")]
+        ]),
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data == "back_to_subscription_management")
+async def back_to_subscription_management(callback: CallbackQuery):
+    """Возврат к меню управления подпиской"""
+    user = await get_user(callback.from_user.id)
+    subscription = await get_user_subscription(user.id)
+    
+    if not subscription:
+        await callback.answer("❌ Подписка не найдена")
+        return
+    
+    await callback.answer()
+    
+    # Повторяем логику из subscription_management_menu
+    auto_renewal_status = "включено" if subscription.auto_renewal else "отключено"
+    status_emoji = "✅" if subscription.auto_renewal else "⏸️"
+    
+    end_date = subscription.end_date.strftime('%d.%m.%Y %H:%M')
+    amount = subscription.amount / 100
+    
+    status_text = ""
+    if subscription.status == SubscriptionStatus.ACTIVE:
+        status_text = "✅ Активна"
+    elif subscription.status == SubscriptionStatus.AUTO_RENEWAL_OFF:
+        status_text = "⏸️ Активна (без автопродления)"
+    elif subscription.status == SubscriptionStatus.CANCELLED:
+        status_text = "❌ Отменена (действует до окончания)"
+    
+    management_text = (
+        f"🔧 <b>Управление подпиской</b>\n\n"
+        f"📊 <b>Статус:</b> {status_text}\n"
+        f"📅 <b>Действует до:</b> {end_date}\n"
+        f"💰 <b>Сумма:</b> {amount}₽\n"
+        f"🔄 <b>Автопродление:</b> {status_emoji} {auto_renewal_status}\n\n"
+    )
+    
+    if subscription.cancelled_at:
+        cancelled_date = subscription.cancelled_at.strftime('%d.%m.%Y %H:%M')
+        management_text += f"⚠️ <b>Отменена:</b> {cancelled_date}\n\n"
+    
+    management_text += "Выберите действие:"
+    
+    await callback.message.edit_text(
+        management_text,
+        reply_markup=get_subscription_management_keyboard(subscription.auto_renewal),
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data == "back_to_main")
+async def back_to_main_menu(callback: CallbackQuery):
+    """Возврат в главное меню"""
+    await callback.answer("Возвращаемся в главное меню")
+    await callback.message.delete()
+    
+    # Отправляем сообщение о возврате в главное меню
+    await callback.message.answer(
+        "🏠 Вы вернулись в главное меню.\n\n"
+        "Используйте кнопки ниже для навигации.",
+        parse_mode="HTML"
+    ) 

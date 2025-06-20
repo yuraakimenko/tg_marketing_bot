@@ -13,6 +13,8 @@ class SubscriptionStatus(Enum):
     ACTIVE = "active"
     INACTIVE = "inactive"
     EXPIRED = "expired"
+    CANCELLED = "cancelled"  # Отменена пользователем
+    AUTO_RENEWAL_OFF = "auto_renewal_off"  # Активна, но без автопродления
 
 
 @dataclass
@@ -87,6 +89,8 @@ class Subscription:
     amount: int  # в копейках
     status: SubscriptionStatus
     payment_id: Optional[str] = None
+    auto_renewal: bool = True  # Автопродление включено по умолчанию
+    cancelled_at: Optional[datetime] = None  # Дата отмены
     created_at: datetime = field(default_factory=datetime.now)
 
 
