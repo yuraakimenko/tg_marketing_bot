@@ -166,6 +166,44 @@ async def show_profile(callback: CallbackQuery):
     await callback.message.edit_text(profile_text, parse_mode="HTML")
 
 
+@router.callback_query(F.data == "statistics")
+async def show_statistics_callback(callback: CallbackQuery):
+    """Показать статистику пользователя (через callback)"""
+    user = await get_user(callback.from_user.id)
+    if not user:
+        await callback.answer("❌ Пользователь не найден")
+        return
+    
+    role_name = "продажник" if user.role == UserRole.SELLER else "закупщик"
+    subscription_status = "активна" if user.subscription_status == SubscriptionStatus.ACTIVE else "неактивна"
+    
+    stats_text = (
+        f"📊 <b>Ваша статистика</b>\n\n"
+        f"👤 <b>Роль:</b> {role_name}\n"
+        f"💳 <b>Подписка:</b> {subscription_status}\n"
+        f"⭐ <b>Рейтинг:</b> {user.rating:.1f}\n"
+        f"📝 <b>Отзывов:</b> {user.reviews_count}\n"
+        f"📅 <b>В боте с:</b> {user.created_at.strftime('%d.%m.%Y')}\n"
+    )
+    
+    if user.role == UserRole.SELLER:
+        # Статистика для продажника
+        from database.database import get_user_bloggers
+        bloggers = await get_user_bloggers(user.id)
+        stats_text += f"\n📝 <b>Добавлено блогеров:</b> {len(bloggers)}\n"
+        
+        # Можно добавить больше статистики:
+        # - Количество просмотров блогеров
+        # - Количество переходов к контактам
+        # - etc.
+    
+    if user.subscription_end_date:
+        stats_text += f"🗓️ <b>Подписка до:</b> {user.subscription_end_date.strftime('%d.%m.%Y')}"
+    
+    await callback.answer()
+    await callback.message.edit_text(stats_text, parse_mode="HTML")
+
+
 @router.callback_query(F.data == "help")
 async def show_help(callback: CallbackQuery):
     """Показать справку"""
