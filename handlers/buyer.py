@@ -15,6 +15,60 @@ router = Router()
 logger = logging.getLogger(__name__)
 
 
+# === ОБРАБОТЧИКИ ОСНОВНОГО МЕНЮ ЗАКУПЩИКА ===
+
+@router.message(F.text == "📋 История поиска")
+async def show_search_history(message: Message):
+    """Показать историю поиска (основное меню)"""
+    user = await get_user(message.from_user.id)
+    if not user or user.role != UserRole.BUYER:
+        await message.answer("❌ Эта функция доступна только закупщикам.")
+        return
+    
+    await message.answer(
+        "📋 <b>История поиска</b>\n\n"
+        "📊 Функция находится в разработке.\n\n"
+        "Скоро здесь будет отображаться:\n"
+        "• История ваших поисков\n"
+        "• Сохраненные результаты\n"
+        "• Избранные блогеры\n\n"
+        "🔍 Пока вы можете использовать поиск блогеров.",
+        parse_mode="HTML"
+    )
+
+
+@router.message(F.text == "📊 Статистика")
+async def show_statistics(message: Message):
+    """Показать статистику закупщика"""
+    user = await get_user(message.from_user.id)
+    if not user or user.role != UserRole.BUYER:
+        await message.answer("❌ Эта функция доступна только закупщикам.")
+        return
+    
+    subscription_status = "активна" if user.subscription_status == SubscriptionStatus.ACTIVE else "неактивна"
+    
+    stats_text = (
+        f"📊 <b>Ваша статистика</b>\n\n"
+        f"👤 <b>Роль:</b> закупщик\n"
+        f"💳 <b>Подписка:</b> {subscription_status}\n"
+        f"⭐ <b>Рейтинг:</b> {user.rating:.1f}\n"
+        f"📝 <b>Отзывов:</b> {user.reviews_count}\n"
+        f"📅 <b>В боте с:</b> {user.created_at.strftime('%d.%m.%Y')}\n"
+    )
+    
+    if user.subscription_end_date:
+        stats_text += f"\n🗓️ <b>Подписка до:</b> {user.subscription_end_date.strftime('%d.%m.%Y')}"
+    
+    stats_text += (
+        f"\n\n🔍 <b>Статистика поиска:</b>\n"
+        f"• Поисков выполнено: В разработке\n"
+        f"• Контактов получено: В разработке\n"
+        f"• Избранных блогеров: В разработке"
+    )
+    
+    await message.answer(stats_text, parse_mode="HTML")
+
+
 @router.message(F.text == "🔍 Поиск блогеров")
 async def start_search(message: Message, state: FSMContext):
     """Начать поиск блогеров"""

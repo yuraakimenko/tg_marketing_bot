@@ -336,41 +336,7 @@ async def cancel_payment(callback: CallbackQuery):
 # Старые функции Telegram Payments удалены - теперь используем Robokassa
 
 
-@router.message(F.text == "📊 Статистика")
-async def show_statistics(message: Message):
-    """Показать статистику пользователя"""
-    user = await get_user(message.from_user.id)
-    if not user:
-        await message.answer("❌ Пользователь не найден.")
-        return
-    
-    role_name = "продажник" if user.role.value == "seller" else "закупщик"
-    subscription_status = "активна" if user.subscription_status == SubscriptionStatus.ACTIVE else "неактивна"
-    
-    stats_text = (
-        f"📊 <b>Ваша статистика</b>\n\n"
-        f"👤 <b>Роль:</b> {role_name}\n"
-        f"💳 <b>Подписка:</b> {subscription_status}\n"
-        f"⭐ <b>Рейтинг:</b> {user.rating:.1f}\n"
-        f"📝 <b>Отзывов:</b> {user.reviews_count}\n"
-        f"📅 <b>В боте с:</b> {user.created_at.strftime('%d.%m.%Y')}\n"
-    )
-    
-    if user.role.value == "seller":
-        # Статистика для продажника
-        from database.database import get_user_bloggers
-        bloggers = await get_user_bloggers(user.id)
-        stats_text += f"\n📝 <b>Добавлено блогеров:</b> {len(bloggers)}\n"
-        
-        # Можно добавить больше статистики:
-        # - Количество просмотров блогеров
-        # - Количество переходов к контактам
-        # - etc.
-    
-    if user.subscription_end_date:
-        stats_text += f"🗓️ <b>Подписка до:</b> {user.subscription_end_date.strftime('%d.%m.%Y')}"
-    
-    await message.answer(stats_text, parse_mode="HTML")
+
 
 
 # === ОБРАБОТЧИКИ УПРАВЛЕНИЯ ПОДПИСКОЙ ===

@@ -19,6 +19,57 @@ router = Router()
 logger = logging.getLogger(__name__)
 
 
+# === ОБРАБОТЧИКИ ОСНОВНОГО МЕНЮ ПРОДАЖНИКА ===
+
+@router.message(F.text == "📊 Статистика")
+async def show_statistics(message: Message):
+    """Показать статистику продажника"""
+    user = await get_user(message.from_user.id)
+    if not user or user.role != UserRole.SELLER:
+        await message.answer("❌ Эта функция доступна только продажникам.")
+        return
+    
+    subscription_status = "активна" if user.subscription_status == SubscriptionStatus.ACTIVE else "неактивна"
+    
+    # Получаем список блогеров
+    bloggers = await get_user_bloggers(user.id)
+    
+    stats_text = (
+        f"📊 <b>Ваша статистика</b>\n\n"
+        f"👤 <b>Роль:</b> продажник\n"
+        f"💳 <b>Подписка:</b> {subscription_status}\n"
+        f"⭐ <b>Рейтинг:</b> {user.rating:.1f}\n"
+        f"📝 <b>Отзывов:</b> {user.reviews_count}\n"
+        f"📅 <b>В боте с:</b> {user.created_at.strftime('%d.%m.%Y')}\n"
+        f"\n📝 <b>Добавлено блогеров:</b> {len(bloggers)}\n"
+    )
+    
+    if user.subscription_end_date:
+        stats_text += f"🗓️ <b>Подписка до:</b> {user.subscription_end_date.strftime('%d.%m.%Y')}"
+    
+    # Статистика по блогерам
+    if bloggers:
+        categories = {}
+        platforms = {}
+        for blogger in bloggers:
+            categories[blogger.category] = categories.get(blogger.category, 0) + 1
+            platforms[blogger.platform] = platforms.get(blogger.platform, 0) + 1
+        
+        # Топ категории
+        top_category = max(categories.items(), key=lambda x: x[1])
+        top_platform = max(platforms.items(), key=lambda x: x[1])
+        
+        stats_text += (
+            f"\n\n🎯 <b>Статистика блогеров:</b>\n"
+            f"• Топ категория: {top_category[0]} ({top_category[1]})\n"
+            f"• Топ платформа: {top_platform[0]} ({top_platform[1]})\n"
+            f"• С отзывами: {sum(1 for b in bloggers if b.has_reviews)}\n"
+            f"• Без отзывов: {sum(1 for b in bloggers if not b.has_reviews)}"
+        )
+    
+    await message.answer(stats_text, parse_mode="HTML")
+
+
 @router.message(F.text == "➕ Добавить блогера")
 async def add_blogger_start(message: Message, state: FSMContext):
     """Начать добавление блогера"""
