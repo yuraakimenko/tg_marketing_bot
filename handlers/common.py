@@ -39,7 +39,13 @@ async def start_command(message: Message, state: FSMContext):
 
 @router.callback_query(F.data.startswith("role_"))
 async def handle_role_selection(callback: CallbackQuery, state: FSMContext):
-    """Обработка выбора роли"""
+    """Обработка выбора роли при первичной регистрации"""
+    # Проверяем, не находимся ли мы в состоянии смены роли
+    current_state = await state.get_state()
+    if current_state == RegistrationStates.waiting_for_role:
+        # Если мы в состоянии смены роли, пропускаем этот обработчик
+        return
+    
     role_str = callback.data.split("_")[1]  # seller или buyer
     role = UserRole.SELLER if role_str == "seller" else UserRole.BUYER
     

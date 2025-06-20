@@ -529,6 +529,29 @@ async def suspend_subscription(callback: CallbackQuery):
             reply_markup=get_subscription_management_keyboard(False),
             parse_mode="HTML"
         )
+        
+        # Обновляем главное меню - подписка все еще активна, но приостановлена
+        from bot.keyboards import get_main_menu_seller, get_main_menu_buyer
+        from database.models import UserRole
+        
+        # Получаем обновленные данные пользователя
+        updated_user = await get_user(callback.from_user.id)
+        if updated_user:
+            # Подписка приостановлена, но все еще считается активной до окончания периода
+            has_active_subscription = updated_user.subscription_status in [
+                SubscriptionStatus.ACTIVE, 
+                SubscriptionStatus.AUTO_RENEWAL_OFF, 
+                SubscriptionStatus.CANCELLED
+            ]
+            
+            keyboard = get_main_menu_seller(has_active_subscription) if updated_user.role == UserRole.SELLER else get_main_menu_buyer(has_active_subscription)
+            
+            # Отправляем новое сообщение с обновленной клавиатурой
+            await callback.message.answer(
+                "🏠 Главное меню обновлено.\n\n"
+                "Управление подпиской доступно до окончания текущего периода.",
+                reply_markup=keyboard
+            )
     else:
         await callback.answer("❌ Ошибка при приостановке подписки")
 
@@ -570,6 +593,25 @@ async def confirm_full_cancellation(callback: CallbackQuery):
             "🙏 Спасибо за использование нашего сервиса!",
             parse_mode="HTML"
         )
+        
+        # Обновляем главное меню без кнопки управления подпиской
+        from bot.keyboards import get_main_menu_seller, get_main_menu_buyer
+        from database.models import UserRole
+        
+        # Получаем обновленные данные пользователя
+        updated_user = await get_user(callback.from_user.id)
+        if updated_user:
+            # После полной отмены подписки has_active_subscription = False
+            has_active_subscription = False
+            
+            keyboard = get_main_menu_seller(has_active_subscription) if updated_user.role == UserRole.SELLER else get_main_menu_buyer(has_active_subscription)
+            
+            # Отправляем новое сообщение с обновленной клавиатурой
+            await callback.message.answer(
+                "🏠 Главное меню обновлено.\n\n"
+                "Кнопка 'Управление подпиской' удалена, так как подписка отменена.",
+                reply_markup=keyboard
+            )
     else:
         await callback.answer("❌ Ошибка при отмене подписки")
 
