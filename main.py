@@ -26,6 +26,38 @@ BOT_TOKEN = os.getenv('BOT_TOKEN')
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN не найден в переменных окружения")
 
+# Диагностика токена
+logger.info(f"Токен получен, длина: {len(BOT_TOKEN) if BOT_TOKEN else 0}")
+if BOT_TOKEN:
+    # Проверяем на пробелы и невидимые символы
+    logger.info(f"Первые 10 символов: '{BOT_TOKEN[:10]}'")
+    logger.info(f"Последние 10 символов: '{BOT_TOKEN[-10:]}'")
+    logger.info(f"Содержит пробелы в начале/конце: {BOT_TOKEN != BOT_TOKEN.strip()}")
+    
+    # Очищаем токен от возможных пробелов и невидимых символов
+    BOT_TOKEN = BOT_TOKEN.strip().replace('\n', '').replace('\r', '').replace('\t', '')
+    logger.info(f"После очистки, длина: {len(BOT_TOKEN)}")
+    
+    # Проверим формат токена
+    if ':' not in BOT_TOKEN:
+        logger.error("❌ Токен не содержит ':' - неверный формат!")
+    else:
+        parts = BOT_TOKEN.split(':')
+        logger.info(f"Токен разделен на части: {len(parts[0])} символов до ':' и {len(parts[1])} после")
+        if not parts[0].isdigit():
+            logger.error(f"❌ Первая часть токена не является числом: '{parts[0]}'")
+    
+    # Проверим каждый символ на невидимые
+    invisible_chars = []
+    for i, char in enumerate(BOT_TOKEN):
+        if not char.isprintable() and char not in [':']:
+            invisible_chars.append(f"позиция {i}: код {ord(char)}")
+    
+    if invisible_chars:
+        logger.error(f"❌ Найдены невидимые символы: {invisible_chars}")
+    else:
+        logger.info("✅ Невидимых символов не найдено")
+
 
 async def main():
     """Главная функция запуска бота"""
