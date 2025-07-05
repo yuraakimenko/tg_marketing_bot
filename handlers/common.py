@@ -40,11 +40,27 @@ async def start_command(message: Message, state: FSMContext):
 @router.callback_query(F.data.startswith("role_"))
 async def handle_role_selection(callback: CallbackQuery, state: FSMContext):
     """Обработка выбора роли при первичной регистрации"""
+    logger.info(f"Получен callback для выбора роли: {callback.data} от пользователя {callback.from_user.id}")
+    
     # Проверяем, не находимся ли мы в состоянии смены роли
     current_state = await state.get_state()
+    logger.info(f"Текущее состояние: {current_state}")
+    
     if current_state == RegistrationStates.waiting_for_role:
         # Если мы в состоянии смены роли, пропускаем этот обработчик
+        # Его обработает handle_role_change
+        logger.info("Пропускаем обработчик - пользователь в состоянии смены роли")
         return
+    
+    # Проверяем, что пользователь не существует (первичная регистрация)
+    user = await get_user(callback.from_user.id)
+    if user:
+        # Пользователь уже существует, не обрабатываем здесь
+        logger.info(f"Пользователь {callback.from_user.id} уже существует")
+        await callback.answer("❌ Вы уже зарегистрированы")
+        return
+    
+    logger.info(f"Создаем нового пользователя с ролью: {callback.data}")
     
     role_str = callback.data.split("_")[1]  # seller или buyer
     role = UserRole.SELLER if role_str == "seller" else UserRole.BUYER
@@ -58,6 +74,8 @@ async def handle_role_selection(callback: CallbackQuery, state: FSMContext):
         role=role
     )
     
+    logger.info(f"Пользователь создан: {user}")
+    
     await callback.answer()
     await callback.message.delete()
     
@@ -70,6 +88,7 @@ async def handle_role_selection(callback: CallbackQuery, state: FSMContext):
     )
     
     await state.clear()
+    logger.info("Регистрация завершена успешно")
 
 
 @router.message(F.text == "⚙️ Настройки")
