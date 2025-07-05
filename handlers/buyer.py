@@ -7,7 +7,8 @@ from database.database import get_user, search_bloggers
 from database.models import UserRole, SubscriptionStatus
 from bot.keyboards import (
     get_category_keyboard, get_yes_no_keyboard, 
-    get_search_results_keyboard, get_blogger_selection_keyboard
+    get_search_results_keyboard, get_blogger_selection_keyboard,
+    get_main_menu_buyer
 )
 from bot.states import BuyerStates
 
@@ -509,6 +510,34 @@ async def back_to_results(callback: CallbackQuery, state: FSMContext):
     
     await callback.answer()
     await show_search_results(callback.message, results, page)
+
+
+@router.callback_query(F.data == "yes_new_search", BuyerStates.viewing_results)
+async def yes_new_search(callback: CallbackQuery, state: FSMContext):
+    """Начать новый поиск (кнопка Да)"""
+    await state.clear()
+    await callback.answer()
+    await callback.message.edit_text(
+        "🔍 <b>Новый поиск блогеров</b>\n\n"
+        "Шаг 1 из 4\n"
+        "🎯 Выберите интересующую категорию:",
+        reply_markup=get_category_keyboard(),
+        parse_mode="HTML"
+    )
+    await state.set_state(BuyerStates.waiting_for_category)
+
+
+@router.callback_query(F.data == "no_new_search", BuyerStates.viewing_results)
+async def no_new_search(callback: CallbackQuery, state: FSMContext):
+    """Отказ от нового поиска (кнопка Нет) — возврат в главное меню покупателя"""
+    await state.clear()
+    user = await get_user(callback.from_user.id)
+    await callback.answer()
+    await callback.message.edit_text(
+        "🏠 <b>Главное меню</b>",
+        reply_markup=get_main_menu_buyer(user.subscription_status == SubscriptionStatus.ACTIVE),
+        parse_mode="HTML"
+    )
 
 
 # Вспомогательная функция для получения пользователя по ID
