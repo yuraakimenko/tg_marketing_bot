@@ -643,14 +643,14 @@ async def universal_show_statistics_seller(message: Message, state: FSMContext):
 @router.message(F.text == "💳 Подписка", StateFilter("*"))
 async def universal_subscription_seller(message: Message, state: FSMContext):
     await state.clear()
-    from handlers.subscription import show_subscription_info
-    await show_subscription_info(message)
+    from handlers.subscription import subscription_menu
+    await subscription_menu(message)
 
 @router.message(F.text == "🔧 Управление подпиской", StateFilter("*"))
 async def universal_subscription_management_seller(message: Message, state: FSMContext):
     await state.clear()
-    from handlers.subscription import show_subscription_management
-    await show_subscription_management(message)
+    from handlers.subscription import subscription_management_menu
+    await subscription_management_menu(message)
 
 @router.message(F.text == "⚙️ Настройки", StateFilter("*"))
 async def universal_settings_seller(message: Message, state: FSMContext):

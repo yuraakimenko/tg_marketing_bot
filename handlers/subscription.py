@@ -23,10 +23,15 @@ PAYMENT_PROVIDER_TOKEN = os.getenv('PAYMENT_PROVIDER_TOKEN', 'TEST_TOKEN')
 @router.message(F.text == "💳 Подписка")
 async def subscription_menu(message: Message):
     """Меню подписки"""
+    logger.info(f"Получен запрос на подписку от пользователя {message.from_user.id}")
+    
     user = await get_user(message.from_user.id)
     if not user:
+        logger.error(f"Пользователь {message.from_user.id} не найден при запросе подписки")
         await message.answer("❌ Пользователь не найден. Используйте /start для регистрации.")
         return
+    
+    logger.info(f"Статус подписки пользователя {message.from_user.id}: {user.subscription_status}")
     
     if user.subscription_status == SubscriptionStatus.ACTIVE:
         # Активная подписка
@@ -42,6 +47,7 @@ async def subscription_menu(message: Message):
             f"• Система рейтингов\n\n"
             f"💡 Подписка продлевается автоматически за 3 дня до окончания."
         )
+        logger.info(f"Показываем активную подписку для пользователя {message.from_user.id}")
     else:
         # Неактивная подписка
         subscription_text = (
@@ -55,12 +61,14 @@ async def subscription_menu(message: Message):
             f"• Приоритетное отображение в результатах\n\n"
             f"💡 Без подписки доступен только просмотр профиля и настройки."
         )
+        logger.info(f"Показываем неактивную подписку для пользователя {message.from_user.id}")
     
     await message.answer(
         subscription_text,
         reply_markup=get_subscription_keyboard() if user.subscription_status != SubscriptionStatus.ACTIVE else None,
         parse_mode="HTML"
     )
+    logger.info(f"Сообщение о подписке отправлено пользователю {message.from_user.id}")
 
 
 @router.callback_query(F.data == "subscription_info")
