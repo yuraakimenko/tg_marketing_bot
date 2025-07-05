@@ -4,4 +4,7 @@ builder = "nixpacks"
 [deploy]
 startCommand = "python main.py"
 restartPolicyType = "on_failure"
-restartPolicyMaxRetries = 10 
+restartPolicyMaxRetries = 10
+
+[variables]
+PYTHONUNBUFFERED = "1" 
