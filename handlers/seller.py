@@ -2,6 +2,7 @@ import logging
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
+from aiogram.filters import StateFilter
 
 from database.database import (
     get_user, create_blogger, get_user_bloggers, 
@@ -609,7 +610,7 @@ async def process_new_value(message: Message, state: FSMContext):
 
 
 # Универсальные хэндлеры для меню продавца (работают из любого состояния)
-@router.message(F.text == "➕ Добавить блогера", state="*")
+@router.message(F.text == "➕ Добавить блогера", StateFilter("*"))
 async def universal_add_blogger(message: Message, state: FSMContext):
     await state.clear()
     user = await get_user(message.from_user.id)
@@ -619,7 +620,7 @@ async def universal_add_blogger(message: Message, state: FSMContext):
     from handlers.seller import start_add_blogger
     await start_add_blogger(message, state)
 
-@router.message(F.text == "📝 Мои блогеры", state="*")
+@router.message(F.text == "📝 Мои блогеры", StateFilter("*"))
 async def universal_my_bloggers(message: Message, state: FSMContext):
     await state.clear()
     user = await get_user(message.from_user.id)
@@ -629,7 +630,7 @@ async def universal_my_bloggers(message: Message, state: FSMContext):
     from handlers.seller import show_my_bloggers
     await show_my_bloggers(message)
 
-@router.message(F.text == "📊 Статистика", state="*")
+@router.message(F.text == "📊 Статистика", StateFilter("*"))
 async def universal_show_statistics_seller(message: Message, state: FSMContext):
     await state.clear()
     user = await get_user(message.from_user.id)
@@ -639,19 +640,19 @@ async def universal_show_statistics_seller(message: Message, state: FSMContext):
     from handlers.seller import show_statistics
     await show_statistics(message)
 
-@router.message(F.text == "💳 Подписка", state="*")
+@router.message(F.text == "💳 Подписка", StateFilter("*"))
 async def universal_subscription_seller(message: Message, state: FSMContext):
     await state.clear()
     from handlers.subscription import show_subscription_info
     await show_subscription_info(message)
 
-@router.message(F.text == "🔧 Управление подпиской", state="*")
+@router.message(F.text == "🔧 Управление подпиской", StateFilter("*"))
 async def universal_subscription_management_seller(message: Message, state: FSMContext):
     await state.clear()
     from handlers.subscription import show_subscription_management
     await show_subscription_management(message)
 
-@router.message(F.text == "⚙️ Настройки", state="*")
+@router.message(F.text == "⚙️ Настройки", StateFilter("*"))
 async def universal_settings_seller(message: Message, state: FSMContext):
     await state.clear()
     from handlers.common import settings_menu

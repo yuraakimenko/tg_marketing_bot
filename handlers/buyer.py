@@ -2,6 +2,7 @@ import logging
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
+from aiogram.filters import StateFilter
 
 from database.database import get_user, search_bloggers, get_blogger, create_complaint
 from database.models import UserRole, SubscriptionStatus
@@ -19,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 # === ОБРАБОТЧИКИ ОСНОВНОГО МЕНЮ ЗАКУПЩИКА ===
 
-@router.message(F.text == "📋 История поиска", state="*")
+@router.message(F.text == "📋 История поиска", StateFilter("*"))
 async def universal_show_search_history(message: Message, state: FSMContext):
     await state.clear()
     user = await get_user(message.from_user.id)
@@ -38,7 +39,7 @@ async def universal_show_search_history(message: Message, state: FSMContext):
     )
 
 
-@router.message(F.text == "📊 Статистика", state="*")
+@router.message(F.text == "📊 Статистика", StateFilter("*"))
 async def universal_show_statistics(message: Message, state: FSMContext):
     await state.clear()
     user = await get_user(message.from_user.id)
@@ -65,7 +66,7 @@ async def universal_show_statistics(message: Message, state: FSMContext):
     await message.answer(stats_text, parse_mode="HTML")
 
 
-@router.message(F.text == "🔍 Поиск блогеров", state="*")
+@router.message(F.text == "🔍 Поиск блогеров", StateFilter("*"))
 async def universal_start_search(message: Message, state: FSMContext):
     await state.clear()
     user = await get_user(message.from_user.id)
