@@ -80,6 +80,14 @@ python main.py
 - `PAYMENT_PROVIDER_TOKEN` - Токен платежной системы (для продакшена)
 - `ADMIN_ID` - ID администратора бота
 
+### Google Sheets интеграция (для жалоб):
+1. Создайте проект в Google Cloud Console
+2. Включите Google Sheets API
+3. Создайте сервисный аккаунт и скачайте credentials JSON
+4. Поместите файл credentials в `secrets/google-credentials.json`
+5. Поделитесь Google-таблицей с email из credentials файла
+6. Установите зависимости: `pip install gspread google-auth`
+
 ### База данных:
 Бот использует SQLite для хранения данных. База создается автоматически при первом запуске.
 

@@ -11,6 +11,7 @@ from bot.keyboards import (
     get_main_menu_buyer
 )
 from bot.states import BuyerStates, ComplaintStates
+from utils.google_sheets import log_complaint_to_sheets
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -630,12 +631,23 @@ async def process_complaint_reason(message: Message, state: FSMContext):
     await state.clear()
     
     if success:
+        # Также записываем в Google Sheets
+        sheets_success = await log_complaint_to_sheets(
+            blogger_id=blogger_id,
+            blogger_name=blogger_name,
+            user_id=user.id,
+            username=username,
+            reason=reason
+        )
+        
+        sheets_status = "✅ записана в Google Sheets" if sheets_success else "⚠️ не удалось записать в Google Sheets"
+        
         await message.answer(
             f"✅ <b>Жалоба успешно отправлена!</b>\n\n"
             f"📝 <b>Блогер:</b> {blogger_name}\n"
             f"💬 <b>Причина:</b> {reason[:100]}{'...' if len(reason) > 100 else ''}\n\n"
             f"🔍 Ваша жалоба будет рассмотрена модератором в ближайшее время.\n"
-            f"📊 Все жалобы автоматически записываются в систему учета для анализа.",
+            f"📊 Жалоба сохранена в базе данных и {sheets_status}.",
             parse_mode="HTML"
         )
     else:
