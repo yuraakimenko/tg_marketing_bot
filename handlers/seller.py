@@ -605,4 +605,54 @@ async def process_new_value(message: Message, state: FSMContext):
     else:
         await message.answer("❌ Ошибка при обновлении данных.")
     
-    await state.clear() 
+    await state.clear()
+
+
+# Универсальные хэндлеры для меню продавца (работают из любого состояния)
+@router.message(F.text == "➕ Добавить блогера", state="*")
+async def universal_add_blogger(message: Message, state: FSMContext):
+    await state.clear()
+    user = await get_user(message.from_user.id)
+    if not user or user.role != UserRole.SELLER:
+        await message.answer("❌ Эта функция доступна только продажникам.")
+        return
+    from handlers.seller import start_add_blogger
+    await start_add_blogger(message, state)
+
+@router.message(F.text == "📝 Мои блогеры", state="*")
+async def universal_my_bloggers(message: Message, state: FSMContext):
+    await state.clear()
+    user = await get_user(message.from_user.id)
+    if not user or user.role != UserRole.SELLER:
+        await message.answer("❌ Эта функция доступна только продажникам.")
+        return
+    from handlers.seller import show_my_bloggers
+    await show_my_bloggers(message)
+
+@router.message(F.text == "📊 Статистика", state="*")
+async def universal_show_statistics_seller(message: Message, state: FSMContext):
+    await state.clear()
+    user = await get_user(message.from_user.id)
+    if not user or user.role != UserRole.SELLER:
+        await message.answer("❌ Эта функция доступна только продажникам.")
+        return
+    from handlers.seller import show_statistics
+    await show_statistics(message)
+
+@router.message(F.text == "💳 Подписка", state="*")
+async def universal_subscription_seller(message: Message, state: FSMContext):
+    await state.clear()
+    from handlers.subscription import show_subscription_info
+    await show_subscription_info(message)
+
+@router.message(F.text == "🔧 Управление подпиской", state="*")
+async def universal_subscription_management_seller(message: Message, state: FSMContext):
+    await state.clear()
+    from handlers.subscription import show_subscription_management
+    await show_subscription_management(message)
+
+@router.message(F.text == "⚙️ Настройки", state="*")
+async def universal_settings_seller(message: Message, state: FSMContext):
+    await state.clear()
+    from handlers.common import settings_menu
+    await settings_menu(message) 
