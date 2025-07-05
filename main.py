@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import signal
 from dotenv import load_dotenv
 
 from aiogram import Bot, Dispatcher
@@ -113,6 +114,22 @@ async def main():
     )
     dp = Dispatcher()
     
+    # Флаг для корректного завершения
+    shutdown_event = asyncio.Event()
+    
+    def signal_handler(signum, frame):
+        logger.info(f"Получен сигнал {signum}, завершаем работу...")
+        shutdown_event.set()
+    
+    # Регистрируем обработчики сигналов
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+    
+    # Очищаем webhook перед запуском polling
+    logger.info("Очищаем webhook...")
+    await bot.delete_webhook(drop_pending_updates=True)
+    logger.info("Webhook очищен")
+    
     # Регистрация обработчиков
     dp.include_router(common.router)
     dp.include_router(seller.router)
@@ -122,9 +139,29 @@ async def main():
     logger.info("Бот запущен")
     
     try:
-        # Запуск бота
-        await dp.start_polling(bot)
+        # Запуск бота с увеличенным timeout
+        logger.info("Запускаем polling...")
+        
+        # Создаем задачу для polling
+        polling_task = asyncio.create_task(
+            dp.start_polling(bot, timeout=60, drop_pending_updates=True)
+        )
+        
+        # Ждем либо завершения polling, либо сигнала остановки
+        done, pending = await asyncio.wait(
+            [polling_task, asyncio.create_task(shutdown_event.wait())],
+            return_when=asyncio.FIRST_COMPLETED
+        )
+        
+        # Отменяем оставшиеся задачи
+        for task in pending:
+            task.cancel()
+            
+    except Exception as e:
+        logger.error(f"Ошибка при запуске polling: {e}")
+        raise
     finally:
+        logger.info("Закрываем сессию бота...")
         await bot.session.close()
 
 
