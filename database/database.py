@@ -102,6 +102,22 @@ async def init_db():
             )
         """)
         
+        # Создание таблицы жалоб
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS complaints (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                blogger_id INTEGER NOT NULL,
+                blogger_name TEXT,
+                user_id INTEGER NOT NULL,
+                username TEXT,
+                reason TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                status TEXT DEFAULT 'open',
+                FOREIGN KEY (blogger_id) REFERENCES bloggers (id),
+                FOREIGN KEY (user_id) REFERENCES users (id)
+            )
+        """)
+        
         # Создание индексов для оптимизации поиска
         await db.execute("CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users (telegram_id)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_bloggers_seller_id ON bloggers (seller_id)")
