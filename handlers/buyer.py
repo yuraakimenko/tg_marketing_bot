@@ -512,9 +512,9 @@ async def back_to_results(callback: CallbackQuery, state: FSMContext):
     await show_search_results(callback.message, results, page)
 
 
-@router.callback_query(F.data == "yes_new_search", BuyerStates.viewing_results)
+@router.callback_query(F.data == "yes_new_search")
 async def yes_new_search(callback: CallbackQuery, state: FSMContext):
-    """Начать новый поиск (кнопка Да)"""
+    logger.info(f"[DEBUG] yes_new_search handler called. callback.data={callback.data}, user_id={callback.from_user.id}")
     await state.clear()
     await callback.answer()
     await callback.message.edit_text(
@@ -527,9 +527,9 @@ async def yes_new_search(callback: CallbackQuery, state: FSMContext):
     await state.set_state(BuyerStates.waiting_for_category)
 
 
-@router.callback_query(F.data == "no_new_search", BuyerStates.viewing_results)
+@router.callback_query(F.data == "no_new_search")
 async def no_new_search(callback: CallbackQuery, state: FSMContext):
-    """Отказ от нового поиска (кнопка Нет) — возврат в главное меню покупателя"""
+    logger.info(f"[DEBUG] no_new_search handler called. callback.data={callback.data}, user_id={callback.from_user.id}")
     await state.clear()
     user = await get_user(callback.from_user.id)
     await callback.answer()
