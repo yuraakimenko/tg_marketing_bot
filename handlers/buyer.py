@@ -3,14 +3,14 @@ from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 
-from database.database import get_user, search_bloggers
+from database.database import get_user, search_bloggers, get_blogger, create_complaint
 from database.models import UserRole, SubscriptionStatus
 from bot.keyboards import (
     get_category_keyboard, get_yes_no_keyboard, 
     get_search_results_keyboard, get_blogger_selection_keyboard,
     get_main_menu_buyer
 )
-from bot.states import BuyerStates
+from bot.states import BuyerStates, ComplaintStates
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -563,4 +563,84 @@ async def get_user_by_id(user_id: int):
                 created_at=datetime.fromisoformat(row['created_at']),
                 updated_at=datetime.fromisoformat(row['updated_at'])
             )
-        return None 
+        return None
+
+
+@router.callback_query(F.data.startswith("complaint_"))
+async def start_complaint(callback: CallbackQuery, state: FSMContext):
+    """Начать процесс подачи жалобы на блогера"""
+    blogger_id = int(callback.data.split("_")[1])
+    
+    # Получаем информацию о блогере
+    blogger = await get_blogger(blogger_id)
+    if not blogger:
+        await callback.answer("❌ Блогер не найден")
+        return
+    
+    # Сохраняем ID блогера в состояние
+    await state.update_data(complaint_blogger_id=blogger_id, complaint_blogger_name=blogger.name)
+    await state.set_state(ComplaintStates.waiting_for_complaint_reason)
+    
+    await callback.answer()
+    await callback.message.edit_text(
+        f"⚠️ <b>Подача жалобы на блогера</b>\n\n"
+        f"📝 <b>Блогер:</b> {blogger.name}\n"
+        f"📱 <b>Платформа:</b> {blogger.platform}\n\n"
+        f"💬 <b>Напишите причину жалобы:</b>\n"
+        f"Опишите подробно, что вас беспокоит в этом блогере "
+        f"(например: подозрение на накрутку, фейковые подписчики, неактуальная информация и т.д.)\n\n"
+        f"Или напишите 'отмена' для выхода.",
+        parse_mode="HTML"
+    )
+
+
+@router.message(ComplaintStates.waiting_for_complaint_reason)
+async def process_complaint_reason(message: Message, state: FSMContext):
+    """Обработка причины жалобы"""
+    if message.text.lower() in ['отмена', 'cancel', '/cancel']:
+        await state.clear()
+        await message.answer("❌ Подача жалобы отменена.")
+        return
+    
+    reason = message.text.strip()
+    if len(reason) < 10:
+        await message.answer(
+            "⚠️ Причина жалобы слишком короткая. "
+            "Пожалуйста, опишите проблему подробнее (минимум 10 символов)."
+        )
+        return
+    
+    # Получаем данные из состояния
+    data = await state.get_data()
+    blogger_id = data.get('complaint_blogger_id')
+    blogger_name = data.get('complaint_blogger_name')
+    
+    user = await get_user(message.from_user.id)
+    username = message.from_user.username or f"{message.from_user.first_name or 'Пользователь'}"
+    
+    # Сохраняем жалобу в базу данных
+    success = await create_complaint(
+        blogger_id=blogger_id,
+        blogger_name=blogger_name,
+        user_id=user.id,
+        username=username,
+        reason=reason
+    )
+    
+    await state.clear()
+    
+    if success:
+        await message.answer(
+            f"✅ <b>Жалоба успешно отправлена!</b>\n\n"
+            f"📝 <b>Блогер:</b> {blogger_name}\n"
+            f"💬 <b>Причина:</b> {reason[:100]}{'...' if len(reason) > 100 else ''}\n\n"
+            f"🔍 Ваша жалоба будет рассмотрена модератором в ближайшее время.\n"
+            f"📊 Все жалобы автоматически записываются в систему учета для анализа.",
+            parse_mode="HTML"
+        )
+    else:
+        await message.answer(
+            "❌ <b>Ошибка при отправке жалобы</b>\n\n"
+            "Попробуйте еще раз позже или обратитесь в поддержку.",
+            parse_mode="HTML"
+        ) 

@@ -40,4 +40,9 @@ class BuyerStates(StatesGroup):
 class ReviewStates(StatesGroup):
     """Состояния для отзывов"""
     waiting_for_rating = State()
-    waiting_for_comment = State() 
+    waiting_for_comment = State()
+
+
+class ComplaintStates(StatesGroup):
+    """Состояния для жалоб"""
+    waiting_for_complaint_reason = State() 

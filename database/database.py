@@ -588,4 +588,56 @@ async def get_user_payment_history(user_id: int, limit: int = 10) -> List[Subscr
                 created_at=datetime.fromisoformat(row['created_at'])
             ))
         
-        return history 
+        return history
+
+
+# Функции для работы с жалобами
+async def create_complaint(blogger_id: int, blogger_name: str, user_id: int, 
+                          username: str, reason: str) -> bool:
+    """Создать жалобу на блогера"""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        try:
+            await db.execute("""
+                INSERT INTO complaints (blogger_id, blogger_name, user_id, username, reason)
+                VALUES (?, ?, ?, ?, ?)
+            """, (blogger_id, blogger_name, user_id, username, reason))
+            await db.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error creating complaint: {e}")
+            return False
+
+
+async def get_complaints(limit: int = 50, status: str = None) -> List[dict]:
+    """Получить список жалоб"""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        
+        query = "SELECT * FROM complaints"
+        params = []
+        
+        if status:
+            query += " WHERE status = ?"
+            params.append(status)
+        
+        query += " ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
+        
+        cursor = await db.execute(query, params)
+        rows = await cursor.fetchall()
+        
+        return [dict(row) for row in rows]
+
+
+async def update_complaint_status(complaint_id: int, status: str) -> bool:
+    """Обновить статус жалобы"""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        try:
+            cursor = await db.execute("""
+                UPDATE complaints SET status = ? WHERE id = ?
+            """, (status, complaint_id))
+            await db.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f"Error updating complaint status: {e}")
+            return False 

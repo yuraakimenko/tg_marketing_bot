@@ -162,6 +162,7 @@ def get_blogger_selection_keyboard(blogger_id: int, seller_id: int) -> InlineKey
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📞 Получить контакты", callback_data=f"get_contacts_{blogger_id}_{seller_id}")],
         [InlineKeyboardButton(text="⭐ Оставить отзыв", callback_data=f"review_{seller_id}")],
+        [InlineKeyboardButton(text="⚠️ Пожаловаться", callback_data=f"complaint_{blogger_id}")],
         [InlineKeyboardButton(text="⬅️ Назад к результатам", callback_data="back_to_results")]
     ])
 
