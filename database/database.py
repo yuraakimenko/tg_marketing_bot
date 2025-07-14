@@ -6,7 +6,7 @@ from typing import List, Optional, Tuple
 from datetime import datetime
 
 from .models import User, Blogger, Review, Subscription, Contact, SearchFilter
-from .models import UserRole, SubscriptionStatus
+from .models import UserRole, SubscriptionStatus, Platform, BlogCategory
 
 DATABASE_PATH = "bot_database.db"
 logger = logging.getLogger(__name__)
@@ -28,6 +28,9 @@ async def init_db():
                 subscription_end_date TIMESTAMP,
                 rating REAL DEFAULT 0.0,
                 reviews_count INTEGER DEFAULT 0,
+                is_vip BOOLEAN DEFAULT FALSE,
+                penalty_amount INTEGER DEFAULT 0,
+                is_blocked BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -41,17 +44,60 @@ async def init_db():
                 name TEXT NOT NULL,
                 url TEXT NOT NULL,
                 platform TEXT NOT NULL,
-                category TEXT NOT NULL,
-                target_audience TEXT NOT NULL,
+                
+                -- Демография аудитории
+                audience_13_17_percent INTEGER,
+                audience_18_24_percent INTEGER,
+                audience_25_35_percent INTEGER,
+                audience_35_plus_percent INTEGER,
+                
+                -- Пол аудитории
+                female_percent INTEGER,
+                male_percent INTEGER,
+                
+                -- Категории (JSON массив)
+                categories TEXT,
+                
+                -- Цены
+                price_stories INTEGER,
+                price_post INTEGER,
+                price_video INTEGER,
+                
+                -- Дополнительная информация
                 has_reviews BOOLEAN DEFAULT FALSE,
-                review_categories TEXT,
+                is_registered_rkn BOOLEAN DEFAULT FALSE,
+                official_payment_possible BOOLEAN DEFAULT FALSE,
+                
+                -- Статистика
                 subscribers_count INTEGER,
-                price_min INTEGER,
-                price_max INTEGER,
+                avg_views INTEGER,
+                avg_likes INTEGER,
+                engagement_rate REAL,
+                
                 description TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (seller_id) REFERENCES users (id)
+            )
+        """)
+        
+        # Создание таблицы фильтров поиска
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS search_filters (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                buyer_id INTEGER NOT NULL,
+                platforms TEXT,  -- JSON массив платформ
+                target_age_min INTEGER,
+                target_age_max INTEGER,
+                target_gender TEXT,
+                categories TEXT,  -- JSON массив категорий
+                budget_min INTEGER,
+                budget_max INTEGER,
+                has_reviews BOOLEAN,
+                is_registered_rkn BOOLEAN,
+                official_payment_required BOOLEAN,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (buyer_id) REFERENCES users (id)
             )
         """)
         
@@ -83,6 +129,7 @@ async def init_db():
                 payment_id TEXT,
                 auto_renewal BOOLEAN DEFAULT 1,
                 cancelled_at TIMESTAMP,
+                promo_code TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users (id)
             )
@@ -95,6 +142,8 @@ async def init_db():
                 buyer_id INTEGER NOT NULL,
                 seller_id INTEGER NOT NULL,
                 blogger_id INTEGER NOT NULL,
+                deal_completed BOOLEAN,
+                rating_given INTEGER,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (buyer_id) REFERENCES users (id),
                 FOREIGN KEY (seller_id) REFERENCES users (id),
@@ -107,12 +156,13 @@ async def init_db():
             CREATE TABLE IF NOT EXISTS complaints (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 blogger_id INTEGER NOT NULL,
-                blogger_name TEXT,
+                blogger_name TEXT NOT NULL,
                 user_id INTEGER NOT NULL,
-                username TEXT,
+                username TEXT NOT NULL,
                 reason TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 status TEXT DEFAULT 'open',
+                penalty_applied BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (blogger_id) REFERENCES bloggers (id),
                 FOREIGN KEY (user_id) REFERENCES users (id)
             )
@@ -121,22 +171,99 @@ async def init_db():
         # Создание индексов для оптимизации поиска
         await db.execute("CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users (telegram_id)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_bloggers_seller_id ON bloggers (seller_id)")
-        await db.execute("CREATE INDEX IF NOT EXISTS idx_bloggers_category ON bloggers (category)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_bloggers_platform ON bloggers (platform)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_reviews_reviewed_id ON reviews (reviewed_id)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_complaints_blogger_id ON complaints (blogger_id)")
         
-        # Миграция: добавляем новые поля в subscriptions если их нет
+        # Миграция: добавляем новые поля в существующие таблицы
         try:
-            # Проверяем, есть ли поле auto_renewal
+            # Проверяем и добавляем новые поля в users
+            cursor = await db.execute("PRAGMA table_info(users)")
+            columns = [row[1] for row in await cursor.fetchall()]
+            
+            if 'is_vip' not in columns:
+                await db.execute("ALTER TABLE users ADD COLUMN is_vip BOOLEAN DEFAULT FALSE")
+                logger.info("Added is_vip column to users table")
+            
+            if 'penalty_amount' not in columns:
+                await db.execute("ALTER TABLE users ADD COLUMN penalty_amount INTEGER DEFAULT 0")
+                logger.info("Added penalty_amount column to users table")
+            
+            if 'is_blocked' not in columns:
+                await db.execute("ALTER TABLE users ADD COLUMN is_blocked BOOLEAN DEFAULT FALSE")
+                logger.info("Added is_blocked column to users table")
+            
+            # Проверяем и добавляем новые поля в bloggers
+            cursor = await db.execute("PRAGMA table_info(bloggers)")
+            columns = [row[1] for row in await cursor.fetchall()]
+            
+            if 'audience_13_17_percent' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN audience_13_17_percent INTEGER")
+                logger.info("Added audience_13_17_percent column to bloggers table")
+            
+            if 'audience_18_24_percent' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN audience_18_24_percent INTEGER")
+                logger.info("Added audience_18_24_percent column to bloggers table")
+            
+            if 'audience_25_35_percent' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN audience_25_35_percent INTEGER")
+                logger.info("Added audience_25_35_percent column to bloggers table")
+            
+            if 'audience_35_plus_percent' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN audience_35_plus_percent INTEGER")
+                logger.info("Added audience_35_plus_percent column to bloggers table")
+            
+            if 'female_percent' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN female_percent INTEGER")
+                logger.info("Added female_percent column to bloggers table")
+            
+            if 'male_percent' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN male_percent INTEGER")
+                logger.info("Added male_percent column to bloggers table")
+            
+            if 'categories' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN categories TEXT")
+                logger.info("Added categories column to bloggers table")
+            
+            if 'price_stories' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN price_stories INTEGER")
+                logger.info("Added price_stories column to bloggers table")
+            
+            if 'price_post' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN price_post INTEGER")
+                logger.info("Added price_post column to bloggers table")
+            
+            if 'price_video' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN price_video INTEGER")
+                logger.info("Added price_video column to bloggers table")
+            
+            if 'is_registered_rkn' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN is_registered_rkn BOOLEAN DEFAULT FALSE")
+                logger.info("Added is_registered_rkn column to bloggers table")
+            
+            if 'official_payment_possible' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN official_payment_possible BOOLEAN DEFAULT FALSE")
+                logger.info("Added official_payment_possible column to bloggers table")
+            
+            if 'avg_views' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN avg_views INTEGER")
+                logger.info("Added avg_views column to bloggers table")
+            
+            if 'avg_likes' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN avg_likes INTEGER")
+                logger.info("Added avg_likes column to bloggers table")
+            
+            if 'engagement_rate' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN engagement_rate REAL")
+                logger.info("Added engagement_rate column to bloggers table")
+            
+            # Проверяем и добавляем новые поля в subscriptions
             cursor = await db.execute("PRAGMA table_info(subscriptions)")
             columns = [row[1] for row in await cursor.fetchall()]
             
-            if 'auto_renewal' not in columns:
-                await db.execute("ALTER TABLE subscriptions ADD COLUMN auto_renewal BOOLEAN DEFAULT 1")
-                logger.info("Added auto_renewal column to subscriptions table")
-            
-            if 'cancelled_at' not in columns:
-                await db.execute("ALTER TABLE subscriptions ADD COLUMN cancelled_at TIMESTAMP")
-                logger.info("Added cancelled_at column to subscriptions table")
+            if 'promo_code' not in columns:
+                await db.execute("ALTER TABLE subscriptions ADD COLUMN promo_code TEXT")
+                logger.info("Added promo_code column to subscriptions table")
                 
         except Exception as e:
             logger.error(f"Error during migration: {e}")
@@ -155,9 +282,9 @@ async def create_user(telegram_id: int, username: str = None, first_name: str = 
             logger.info(f"Подключение к базе данных: {DATABASE_PATH}")
             
             cursor = await db.execute("""
-                INSERT INTO users (telegram_id, username, first_name, last_name, role)
-                VALUES (?, ?, ?, ?, ?)
-            """, (telegram_id, username, first_name, last_name, role.value))
+                INSERT INTO users (telegram_id, username, first_name, last_name, role, is_vip, penalty_amount, is_blocked)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (telegram_id, username, first_name, last_name, role.value, False, 0, False))
             
             user_id = cursor.lastrowid
             logger.info(f"Пользователь создан с ID: {user_id}")
@@ -197,6 +324,9 @@ async def get_user(telegram_id: int) -> Optional[User]:
                 subscription_end_date=datetime.fromisoformat(row['subscription_end_date']) if row['subscription_end_date'] else None,
                 rating=row['rating'],
                 reviews_count=row['reviews_count'],
+                is_vip=bool(row.get('is_vip', False)),
+                penalty_amount=row.get('penalty_amount', 0),
+                is_blocked=bool(row.get('is_blocked', False)),
                 created_at=datetime.fromisoformat(row['created_at']),
                 updated_at=datetime.fromisoformat(row['updated_at'])
             )
@@ -230,22 +360,42 @@ async def update_subscription_status(user_id: int, status: SubscriptionStatus,
 
 
 # Функции для работы с блогерами
-async def create_blogger(seller_id: int, name: str, url: str, platform: str,
-                        category: str, target_audience: str, **kwargs) -> Blogger:
+async def create_blogger(seller_id: int, name: str, url: str, platform: Platform,
+                        categories: List[BlogCategory], **kwargs) -> Blogger:
     """Создание нового блогера"""
     async with aiosqlite.connect(DATABASE_PATH) as db:
+        # Преобразуем категории в JSON
+        categories_json = json.dumps([cat.value for cat in categories]) if categories else None
+        
         cursor = await db.execute("""
-            INSERT INTO bloggers (seller_id, name, url, platform, category, target_audience,
-                                has_reviews, review_categories, subscribers_count, 
-                                price_min, price_max, description)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO bloggers (
+                seller_id, name, url, platform, categories,
+                audience_13_17_percent, audience_18_24_percent, audience_25_35_percent, audience_35_plus_percent,
+                female_percent, male_percent,
+                price_stories, price_post, price_video,
+                has_reviews, is_registered_rkn, official_payment_possible,
+                subscribers_count, avg_views, avg_likes, engagement_rate,
+                description
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            seller_id, name, url, platform, category, target_audience,
+            seller_id, name, url, platform.value, categories_json,
+            kwargs.get('audience_13_17_percent'),
+            kwargs.get('audience_18_24_percent'),
+            kwargs.get('audience_25_35_percent'),
+            kwargs.get('audience_35_plus_percent'),
+            kwargs.get('female_percent'),
+            kwargs.get('male_percent'),
+            kwargs.get('price_stories'),
+            kwargs.get('price_post'),
+            kwargs.get('price_video'),
             kwargs.get('has_reviews', False),
-            json.dumps(kwargs.get('review_categories', [])) if kwargs.get('review_categories') else None,
+            kwargs.get('is_registered_rkn', False),
+            kwargs.get('official_payment_possible', False),
             kwargs.get('subscribers_count'),
-            kwargs.get('price_min'),
-            kwargs.get('price_max'),
+            kwargs.get('avg_views'),
+            kwargs.get('avg_likes'),
+            kwargs.get('engagement_rate'),
             kwargs.get('description')
         ))
         
@@ -607,7 +757,7 @@ async def get_user_payment_history(user_id: int, limit: int = 10) -> List[Subscr
         return history
 
 
-# Функции для работы с жалобами
+# Функции для работы с жалобами и штрафами
 async def create_complaint(blogger_id: int, blogger_name: str, user_id: int, 
                           username: str, reason: str) -> bool:
     """Создать жалобу на блогера"""
@@ -624,36 +774,118 @@ async def create_complaint(blogger_id: int, blogger_name: str, user_id: int,
             return False
 
 
-async def get_complaints(limit: int = 50, status: str = None) -> List[dict]:
-    """Получить список жалоб"""
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        
-        query = "SELECT * FROM complaints"
-        params = []
-        
-        if status:
-            query += " WHERE status = ?"
-            params.append(status)
-        
-        query += " ORDER BY created_at DESC LIMIT ?"
-        params.append(limit)
-        
-        cursor = await db.execute(query, params)
-        rows = await cursor.fetchall()
-        
-        return [dict(row) for row in rows]
-
-
-async def update_complaint_status(complaint_id: int, status: str) -> bool:
-    """Обновить статус жалобы"""
+async def apply_penalty_to_seller(seller_id: int, amount: int = 100) -> bool:
+    """Применить штраф к продавцу"""
     async with aiosqlite.connect(DATABASE_PATH) as db:
         try:
-            cursor = await db.execute("""
-                UPDATE complaints SET status = ? WHERE id = ?
-            """, (status, complaint_id))
+            # Увеличиваем сумму штрафов
+            await db.execute("""
+                UPDATE users 
+                SET penalty_amount = penalty_amount + ?, 
+                    is_blocked = CASE 
+                        WHEN penalty_amount + ? > 0 THEN 1 
+                        ELSE is_blocked 
+                    END,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (amount, amount, seller_id))
+            
             await db.commit()
-            return cursor.rowcount > 0
+            return True
         except Exception as e:
-            logger.error(f"Error updating complaint status: {e}")
+            logger.error(f"Error applying penalty: {e}")
+            return False
+
+
+async def pay_penalty(user_id: int, amount: int) -> bool:
+    """Оплатить штраф"""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        try:
+            await db.execute("""
+                UPDATE users 
+                SET penalty_amount = CASE 
+                        WHEN penalty_amount - ? <= 0 THEN 0 
+                        ELSE penalty_amount - ? 
+                    END,
+                    is_blocked = CASE 
+                        WHEN penalty_amount - ? <= 0 THEN 0 
+                        ELSE is_blocked 
+                    END,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (amount, amount, amount, user_id))
+            
+            await db.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error paying penalty: {e}")
+            return False
+
+
+async def set_vip_status(user_id: int, is_vip: bool) -> bool:
+    """Установить VIP статус пользователя"""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        try:
+            await db.execute("""
+                UPDATE users 
+                SET is_vip = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (is_vip, user_id))
+            
+            await db.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error setting VIP status: {e}")
+            return False
+
+
+async def get_top_sellers(limit: int = 10) -> List[User]:
+    """Получить топ продавцов по рейтингу"""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("""
+            SELECT * FROM users 
+            WHERE role = 'seller' AND is_blocked = 0
+            ORDER BY is_vip DESC, rating DESC, reviews_count DESC
+            LIMIT ?
+        """, (limit,))
+        
+        rows = await cursor.fetchall()
+        sellers = []
+        for row in rows:
+            sellers.append(User(
+                id=row['id'],
+                telegram_id=row['telegram_id'],
+                username=row['username'],
+                first_name=row['first_name'],
+                last_name=row['last_name'],
+                role=UserRole(row['role']),
+                subscription_status=SubscriptionStatus(row['subscription_status']),
+                subscription_end_date=datetime.fromisoformat(row['subscription_end_date']) if row['subscription_end_date'] else None,
+                rating=row['rating'],
+                reviews_count=row['reviews_count'],
+                is_vip=bool(row.get('is_vip', False)),
+                penalty_amount=row.get('penalty_amount', 0),
+                is_blocked=bool(row.get('is_blocked', False)),
+                created_at=datetime.fromisoformat(row['created_at']),
+                updated_at=datetime.fromisoformat(row['updated_at'])
+            ))
+        
+        return sellers
+
+
+async def update_user_rating(user_id: int, new_rating: float) -> bool:
+    """Обновить рейтинг пользователя"""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        try:
+            await db.execute("""
+                UPDATE users 
+                SET rating = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (new_rating, user_id))
+            
+            await db.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error updating user rating: {e}")
             return False 
