@@ -86,10 +86,10 @@ async def universal_start_search(message: Message, state: FSMContext):
         reply_markup=get_category_keyboard(),
         parse_mode="HTML"
     )
-    await state.set_state(BuyerStates.waiting_for_category)
+    await state.set_state(BuyerStates.waiting_for_categories)
 
 
-@router.callback_query(F.data.startswith("category_"), BuyerStates.waiting_for_category)
+@router.callback_query(F.data.startswith("category_"), BuyerStates.waiting_for_categories)
 async def process_search_category(callback: CallbackQuery, state: FSMContext):
     """Обработка выбора категории для поиска"""
     category = callback.data.split("_", 1)[1]
@@ -110,10 +110,10 @@ async def process_search_category(callback: CallbackQuery, state: FSMContext):
         "👥 Опишите целевую аудиторию:\n"
         "Например: 'женщины 25-35 лет' или введите 'любая' для пропуска"
     )
-    await state.set_state(BuyerStates.waiting_for_audience)
+    await state.set_state(BuyerStates.waiting_for_additional_criteria)
 
 
-@router.message(BuyerStates.waiting_for_audience)
+@router.message(BuyerStates.waiting_for_additional_criteria)
 async def process_search_audience(message: Message, state: FSMContext):
     """Обработка целевой аудитории для поиска"""
     audience = None if message.text.lower() == "любая" else message.text
@@ -124,11 +124,11 @@ async def process_search_audience(message: Message, state: FSMContext):
         "🗣️ Важно ли наличие отзывов у блогера?",
         reply_markup=get_yes_no_keyboard("reviews_important")
     )
-    await state.set_state(BuyerStates.waiting_for_reviews_preference)
+    await state.set_state(BuyerStates.waiting_for_budget)
 
 
 @router.callback_query(F.data.startswith("yes_reviews_important") | F.data.startswith("no_reviews_important"), 
-                      BuyerStates.waiting_for_reviews_preference)
+                      BuyerStates.waiting_for_budget)
 async def process_reviews_preference(callback: CallbackQuery, state: FSMContext):
     """Обработка важности отзывов"""
     has_reviews = callback.data.startswith("yes_") if not callback.data.endswith("no_reviews_important") else None
@@ -488,7 +488,7 @@ async def new_search(callback: CallbackQuery, state: FSMContext):
         reply_markup=get_category_keyboard(),
         parse_mode="HTML"
     )
-    await state.set_state(BuyerStates.waiting_for_category)
+    await state.set_state(BuyerStates.waiting_for_categories)
 
 
 @router.callback_query(F.data == "back_to_results")
@@ -518,7 +518,7 @@ async def yes_new_search(callback: CallbackQuery, state: FSMContext):
         reply_markup=get_category_keyboard(),
         parse_mode="HTML"
     )
-    await state.set_state(BuyerStates.waiting_for_category)
+    await state.set_state(BuyerStates.waiting_for_categories)
 
 
 @router.callback_query(F.data == "no_new_search")

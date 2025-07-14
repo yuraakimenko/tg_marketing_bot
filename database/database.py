@@ -415,19 +415,38 @@ async def get_blogger(blogger_id: int) -> Optional[Blogger]:
         row = await cursor.fetchone()
         
         if row:
+            # Парсим категории из JSON
+            categories = []
+            if row['categories']:
+                try:
+                    category_values = json.loads(row['categories'])
+                    categories = [BlogCategory(cat) for cat in category_values]
+                except (json.JSONDecodeError, ValueError):
+                    pass
+            
             return Blogger(
                 id=row['id'],
                 seller_id=row['seller_id'],
                 name=row['name'],
                 url=row['url'],
-                platform=row['platform'],
-                category=row['category'],
-                target_audience=row['target_audience'],
+                platform=Platform(row['platform']),
+                audience_13_17_percent=row['audience_13_17_percent'],
+                audience_18_24_percent=row['audience_18_24_percent'],
+                audience_25_35_percent=row['audience_25_35_percent'],
+                audience_35_plus_percent=row['audience_35_plus_percent'],
+                female_percent=row['female_percent'],
+                male_percent=row['male_percent'],
+                categories=categories,
+                price_stories=row['price_stories'],
+                price_post=row['price_post'],
+                price_video=row['price_video'],
                 has_reviews=bool(row['has_reviews']),
-                review_categories=row['review_categories'],
+                is_registered_rkn=bool(row['is_registered_rkn']),
+                official_payment_possible=bool(row['official_payment_possible']),
                 subscribers_count=row['subscribers_count'],
-                price_min=row['price_min'],
-                price_max=row['price_max'],
+                avg_views=row['avg_views'],
+                avg_likes=row['avg_likes'],
+                engagement_rate=row['engagement_rate'],
                 description=row['description'],
                 created_at=datetime.fromisoformat(row['created_at']),
                 updated_at=datetime.fromisoformat(row['updated_at'])
@@ -447,19 +466,38 @@ async def get_user_bloggers(seller_id: int) -> List[Blogger]:
         
         bloggers = []
         for row in rows:
+            # Парсим категории из JSON
+            categories = []
+            if row['categories']:
+                try:
+                    category_values = json.loads(row['categories'])
+                    categories = [BlogCategory(cat) for cat in category_values]
+                except (json.JSONDecodeError, ValueError):
+                    pass
+            
             bloggers.append(Blogger(
                 id=row['id'],
                 seller_id=row['seller_id'],
                 name=row['name'],
                 url=row['url'],
-                platform=row['platform'],
-                category=row['category'],
-                target_audience=row['target_audience'],
+                platform=Platform(row['platform']),
+                audience_13_17_percent=row['audience_13_17_percent'],
+                audience_18_24_percent=row['audience_18_24_percent'],
+                audience_25_35_percent=row['audience_25_35_percent'],
+                audience_35_plus_percent=row['audience_35_plus_percent'],
+                female_percent=row['female_percent'],
+                male_percent=row['male_percent'],
+                categories=categories,
+                price_stories=row['price_stories'],
+                price_post=row['price_post'],
+                price_video=row['price_video'],
                 has_reviews=bool(row['has_reviews']),
-                review_categories=row['review_categories'],
+                is_registered_rkn=bool(row['is_registered_rkn']),
+                official_payment_possible=bool(row['official_payment_possible']),
                 subscribers_count=row['subscribers_count'],
-                price_min=row['price_min'],
-                price_max=row['price_max'],
+                avg_views=row['avg_views'],
+                avg_likes=row['avg_likes'],
+                engagement_rate=row['engagement_rate'],
                 description=row['description'],
                 created_at=datetime.fromisoformat(row['created_at']),
                 updated_at=datetime.fromisoformat(row['updated_at'])

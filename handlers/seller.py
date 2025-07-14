@@ -8,11 +8,12 @@ from database.database import (
     get_user, create_blogger, get_user_bloggers, 
     get_blogger, delete_blogger, update_blogger
 )
-from database.models import UserRole, SubscriptionStatus
+from database.models import UserRole, SubscriptionStatus, Platform, BlogCategory
 from bot.keyboards import (
     get_platform_keyboard, get_category_keyboard, 
     get_yes_no_keyboard, get_blogger_list_keyboard,
-    get_blogger_details_keyboard
+    get_blogger_details_keyboard, get_price_stories_keyboard,
+    get_price_post_keyboard, get_price_video_keyboard
 )
 from bot.states import SellerStates
 
@@ -50,19 +51,15 @@ async def show_statistics(message: Message):
     
     # Статистика по блогерам
     if bloggers:
-        categories = {}
         platforms = {}
         for blogger in bloggers:
-            categories[blogger.category] = categories.get(blogger.category, 0) + 1
             platforms[blogger.platform] = platforms.get(blogger.platform, 0) + 1
         
-        # Топ категории
-        top_category = max(categories.items(), key=lambda x: x[1])
+        # Топ платформа
         top_platform = max(platforms.items(), key=lambda x: x[1])
         
         stats_text += (
             f"\n\n🎯 <b>Статистика блогеров:</b>\n"
-            f"• Топ категория: {top_category[0]} ({top_category[1]})\n"
             f"• Топ платформа: {top_platform[0]} ({top_platform[1]})\n"
             f"• С отзывами: {sum(1 for b in bloggers if b.has_reviews)}\n"
             f"• Без отзывов: {sum(1 for b in bloggers if not b.has_reviews)}"
@@ -73,7 +70,7 @@ async def show_statistics(message: Message):
 
 @router.message(F.text == "➕ Добавить блогера")
 async def add_blogger_start(message: Message, state: FSMContext):
-    """Начать добавление блогера"""
+    """Начать добавление блогера (новый порядок: сначала платформа)"""
     user = await get_user(message.from_user.id)
     if not user or user.role != UserRole.SELLER:
         await message.answer("❌ Эта функция доступна только продажникам.")
@@ -88,21 +85,46 @@ async def add_blogger_start(message: Message, state: FSMContext):
     
     await message.answer(
         "➕ <b>Добавление блогера</b>\n\n"
-        "Шаг 1 из 8\n"
-        "📝 Введите имя блогера:",
+        "Шаг 1 из 15\n"
+        "📱 Выберите платформу блогера:",
+        reply_markup=get_platform_keyboard(),
         parse_mode="HTML"
     )
-    await state.set_state(SellerStates.waiting_for_blogger_name)
+    await state.set_state(SellerStates.waiting_for_platform)
 
 
-@router.message(SellerStates.waiting_for_blogger_name)
-async def process_blogger_name(message: Message, state: FSMContext):
-    """Обработка имени блогера"""
-    await state.update_data(name=message.text)
+@router.callback_query(F.data.startswith("platform_"), SellerStates.waiting_for_platform)
+async def process_platform(callback: CallbackQuery, state: FSMContext):
+    """Обработка выбора платформы"""
+    platform_str = callback.data.split("_")[1]
     
-    await message.answer(
-        "Шаг 2 из 8\n"
-        "🔗 Введите ссылку на блогера (канал, профиль):"
+    # Преобразуем строку в enum
+    platform_map = {
+        "instagram": Platform.INSTAGRAM,
+        "youtube": Platform.YOUTUBE,
+        "telegram": Platform.TELEGRAM,
+        "tiktok": Platform.TIKTOK,
+        "vk": Platform.VK
+    }
+    
+    if platform_str not in platform_map:
+        await callback.answer("❌ Неизвестная платформа")
+        return
+    
+    platform = platform_map[platform_str]
+    await state.update_data(platform=platform)
+    await callback.answer()
+    
+    await callback.message.edit_text(
+        "Шаг 2 из 15\n"
+        "🔗 Введите ссылку на блогера (чистую, без символов после ника):\n\n"
+        f"<b>Пример для {platform.value}:</b>\n"
+        f"{'https://instagram.com/username' if platform == Platform.INSTAGRAM else ''}"
+        f"{'https://youtube.com/@username' if platform == Platform.YOUTUBE else ''}"
+        f"{'https://t.me/username' if platform == Platform.TELEGRAM else ''}"
+        f"{'https://tiktok.com/@username' if platform == Platform.TIKTOK else ''}"
+        f"{'https://vk.com/username' if platform == Platform.VK else ''}",
+        parse_mode="HTML"
     )
     await state.set_state(SellerStates.waiting_for_blogger_url)
 
@@ -113,123 +135,359 @@ async def process_blogger_url(message: Message, state: FSMContext):
     await state.update_data(url=message.text)
     
     await message.answer(
-        "Шаг 3 из 8\n"
-        "📱 Выберите платформу блогера:",
-        reply_markup=get_platform_keyboard()
+        "Шаг 3 из 15\n"
+        "📝 Введите имя блогера:"
     )
-    await state.set_state(SellerStates.waiting_for_blogger_platform)
+    await state.set_state(SellerStates.waiting_for_blogger_name)
 
 
-@router.callback_query(F.data.startswith("platform_"), SellerStates.waiting_for_blogger_platform)
-async def process_blogger_platform(callback: CallbackQuery, state: FSMContext):
-    """Обработка выбора платформы"""
-    platform = callback.data.split("_")[1]
-    
-    if platform == "other":
-        await callback.answer()
-        await callback.message.edit_text(
-            "Шаг 3 из 8\n"
-            "📱 Введите название платформы:"
-        )
-        return
-    
-    await state.update_data(platform=platform)
-    await callback.answer()
-    
-    await callback.message.edit_text(
-        "Шаг 4 из 8\n"
-        "🎯 Выберите категорию блогера:",
-        reply_markup=get_category_keyboard()
-    )
-    await state.set_state(SellerStates.waiting_for_blogger_category)
-
-
-@router.callback_query(F.data.startswith("category_"), SellerStates.waiting_for_blogger_category)
-async def process_blogger_category(callback: CallbackQuery, state: FSMContext):
-    """Обработка выбора категории"""
-    category = callback.data.split("_", 1)[1]
-    
-    if category == "other":
-        await callback.answer()
-        await callback.message.edit_text(
-            "Шаг 4 из 8\n"
-            "🎯 Введите категорию блога:"
-        )
-        return
-    
-    await state.update_data(category=category)
-    await callback.answer()
-    
-    await callback.message.edit_text(
-        "Шаг 5 из 8\n"
-        "👥 Опишите целевую аудиторию блогера:\n"
-        "Например: 'Женщины 25-35 лет, интересующиеся здоровьем'"
-    )
-    await state.set_state(SellerStates.waiting_for_blogger_audience)
-
-
-@router.message(SellerStates.waiting_for_blogger_audience)
-async def process_blogger_audience(message: Message, state: FSMContext):
-    """Обработка целевой аудитории"""
-    await state.update_data(target_audience=message.text)
+@router.message(SellerStates.waiting_for_blogger_name)
+async def process_blogger_name(message: Message, state: FSMContext):
+    """Обработка имени блогера"""
+    await state.update_data(name=message.text)
     
     await message.answer(
-        "Шаг 6 из 8\n"
-        "🗣️ Есть ли у блогера отзывы от рекламодателей?",
-        reply_markup=get_yes_no_keyboard("reviews")
+        "Шаг 4 из 15\n"
+        "👥 Демография аудитории\n\n"
+        "Укажите % аудитории 13-17 лет:\n"
+        "(введите число от 0 до 100)"
     )
-    await state.set_state(SellerStates.waiting_for_blogger_reviews)
+    await state.set_state(SellerStates.waiting_for_audience_13_17)
+
+
+@router.message(SellerStates.waiting_for_audience_13_17)
+async def process_audience_13_17(message: Message, state: FSMContext):
+    """Обработка % аудитории 13-17 лет"""
+    try:
+        percent = int(message.text)
+        if percent < 0 or percent > 100:
+            await message.answer("❌ Введите число от 0 до 100")
+            return
+        
+        await state.update_data(audience_13_17_percent=percent)
+        
+        await message.answer(
+            "Шаг 5 из 15\n"
+            "👥 Укажите % аудитории 18-24 лет:\n"
+            "(введите число от 0 до 100)"
+        )
+        await state.set_state(SellerStates.waiting_for_audience_18_24)
+    except ValueError:
+        await message.answer("❌ Введите корректное число")
+
+
+@router.message(SellerStates.waiting_for_audience_18_24)
+async def process_audience_18_24(message: Message, state: FSMContext):
+    """Обработка % аудитории 18-24 лет"""
+    try:
+        percent = int(message.text)
+        if percent < 0 or percent > 100:
+            await message.answer("❌ Введите число от 0 до 100")
+            return
+        
+        await state.update_data(audience_18_24_percent=percent)
+        
+        await message.answer(
+            "Шаг 6 из 15\n"
+            "👥 Укажите % аудитории 25-35 лет:\n"
+            "(введите число от 0 до 100)"
+        )
+        await state.set_state(SellerStates.waiting_for_audience_25_35)
+    except ValueError:
+        await message.answer("❌ Введите корректное число")
+
+
+@router.message(SellerStates.waiting_for_audience_25_35)
+async def process_audience_25_35(message: Message, state: FSMContext):
+    """Обработка % аудитории 25-35 лет"""
+    try:
+        percent = int(message.text)
+        if percent < 0 or percent > 100:
+            await message.answer("❌ Введите число от 0 до 100")
+            return
+        
+        await state.update_data(audience_25_35_percent=percent)
+        
+        await message.answer(
+            "Шаг 7 из 15\n"
+            "👥 Укажите % аудитории 35+ лет:\n"
+            "(введите число от 0 до 100)"
+        )
+        await state.set_state(SellerStates.waiting_for_audience_35_plus)
+    except ValueError:
+        await message.answer("❌ Введите корректное число")
+
+
+@router.message(SellerStates.waiting_for_audience_35_plus)
+async def process_audience_35_plus(message: Message, state: FSMContext):
+    """Обработка % аудитории 35+ лет"""
+    try:
+        percent = int(message.text)
+        if percent < 0 or percent > 100:
+            await message.answer("❌ Введите число от 0 до 100")
+            return
+        
+        await state.update_data(audience_35_plus_percent=percent)
+        
+        await message.answer(
+            "Шаг 8 из 15\n"
+            "👥 Пол аудитории\n\n"
+            "Укажите % женской аудитории:\n"
+            "(введите число от 0 до 100)"
+        )
+        await state.set_state(SellerStates.waiting_for_female_percent)
+    except ValueError:
+        await message.answer("❌ Введите корректное число")
+
+
+@router.message(SellerStates.waiting_for_female_percent)
+async def process_female_percent(message: Message, state: FSMContext):
+    """Обработка % женской аудитории"""
+    try:
+        percent = int(message.text)
+        if percent < 0 or percent > 100:
+            await message.answer("❌ Введите число от 0 до 100")
+            return
+        
+        await state.update_data(female_percent=percent)
+        
+        await message.answer(
+            "Шаг 9 из 15\n"
+            "👥 Укажите % мужской аудитории:\n"
+            "(введите число от 0 до 100)"
+        )
+        await state.set_state(SellerStates.waiting_for_male_percent)
+    except ValueError:
+        await message.answer("❌ Введите корректное число")
+
+
+@router.message(SellerStates.waiting_for_male_percent)
+async def process_male_percent(message: Message, state: FSMContext):
+    """Обработка % мужской аудитории"""
+    try:
+        percent = int(message.text)
+        if percent < 0 or percent > 100:
+            await message.answer("❌ Введите число от 0 до 100")
+            return
+        
+        await state.update_data(male_percent=percent)
+        
+        await message.answer(
+            "Шаг 10 из 15\n"
+            "🎯 Выберите основную категорию блога:",
+            reply_markup=get_category_keyboard()
+        )
+        await state.set_state(SellerStates.waiting_for_categories)
+    except ValueError:
+        await message.answer("❌ Введите корректное число")
+
+
+@router.callback_query(F.data.startswith("category_"), SellerStates.waiting_for_categories)
+async def process_categories(callback: CallbackQuery, state: FSMContext):
+    """Обработка выбора категорий"""
+    category_str = callback.data.split("_", 1)[1]
+    
+    # Преобразуем строку в enum
+    category_map = {
+        "lifestyle": BlogCategory.LIFESTYLE,
+        "sport": BlogCategory.SPORT,
+        "nutrition": BlogCategory.NUTRITION,
+        "medicine": BlogCategory.MEDICINE,
+        "relationships": BlogCategory.RELATIONSHIPS,
+        "beauty": BlogCategory.BEAUTY,
+        "fashion": BlogCategory.FASHION,
+        "travel": BlogCategory.TRAVEL,
+        "business": BlogCategory.BUSINESS,
+        "education": BlogCategory.EDUCATION,
+        "entertainment": BlogCategory.ENTERTAINMENT,
+        "technology": BlogCategory.TECHNOLOGY,
+        "parenting": BlogCategory.PARENTING,
+        "finance": BlogCategory.FINANCE,
+        "not_important": BlogCategory.NOT_IMPORTANT
+    }
+    
+    if category_str not in category_map:
+        await callback.answer("❌ Неизвестная категория")
+        return
+    
+    category = category_map[category_str]
+    await state.update_data(categories=[category])
+    await callback.answer()
+    
+    await callback.message.edit_text(
+        "Шаг 11 из 15\n"
+        "💰 Выберите цену за 4 истории (кратную 1000):",
+        reply_markup=get_price_stories_keyboard()
+    )
+    await state.set_state(SellerStates.waiting_for_price_stories)
+
+
+@router.callback_query(F.data.startswith("price_stories_"), SellerStates.waiting_for_price_stories)
+async def process_price_stories(callback: CallbackQuery, state: FSMContext):
+    """Обработка цены за 4 истории"""
+    price_str = callback.data.split("_")[2]
+    
+    if price_str == "custom":
+        await callback.answer()
+        await callback.message.edit_text(
+            "💰 Введите цену за 4 истории (кратную 1000):\n"
+            "Например: 4000, 10000, 20000"
+        )
+        return
+    
+    try:
+        price = int(price_str)
+        await state.update_data(price_stories=price)
+        await callback.answer()
+        
+        await callback.message.edit_text(
+            "Шаг 12 из 15\n"
+            "💰 Выберите цену за пост (кратную 1000):",
+            reply_markup=get_price_post_keyboard()
+        )
+        await state.set_state(SellerStates.waiting_for_price_post)
+    except ValueError:
+        await callback.answer("❌ Неверная цена")
+
+
+@router.callback_query(F.data.startswith("price_post_"), SellerStates.waiting_for_price_post)
+async def process_price_post(callback: CallbackQuery, state: FSMContext):
+    """Обработка цены за пост"""
+    price_str = callback.data.split("_")[2]
+    
+    if price_str == "custom":
+        await callback.answer()
+        await callback.message.edit_text(
+            "💰 Введите цену за пост (кратную 1000):\n"
+            "Например: 4000, 10000, 20000"
+        )
+        return
+    
+    try:
+        price = int(price_str)
+        await state.update_data(price_post=price)
+        await callback.answer()
+        
+        await callback.message.edit_text(
+            "Шаг 13 из 15\n"
+            "💰 Выберите цену за видео (кратную 1000):",
+            reply_markup=get_price_video_keyboard()
+        )
+        await state.set_state(SellerStates.waiting_for_price_video)
+    except ValueError:
+        await callback.answer("❌ Неверная цена")
+
+
+@router.callback_query(F.data.startswith("price_video_"), SellerStates.waiting_for_price_video)
+async def process_price_video(callback: CallbackQuery, state: FSMContext):
+    """Обработка цены за видео"""
+    price_str = callback.data.split("_")[2]
+    
+    if price_str == "custom":
+        await callback.answer()
+        await callback.message.edit_text(
+            "💰 Введите цену за видео (кратную 1000):\n"
+            "Например: 4000, 10000, 20000"
+        )
+        return
+    
+    try:
+        price = int(price_str)
+        await state.update_data(price_video=price)
+        await callback.answer()
+        
+        await callback.message.edit_text(
+            "Шаг 14 из 15\n"
+            "🗣️ Есть ли у блогера отзывы от рекламодателей?",
+            reply_markup=get_yes_no_keyboard("reviews")
+        )
+        await state.set_state(SellerStates.waiting_for_has_reviews)
+    except ValueError:
+        await callback.answer("❌ Неверная цена")
 
 
 @router.callback_query(F.data.startswith("yes_reviews") | F.data.startswith("no_reviews"), 
-                      SellerStates.waiting_for_blogger_reviews)
-async def process_blogger_reviews(callback: CallbackQuery, state: FSMContext):
+                      SellerStates.waiting_for_has_reviews)
+async def process_has_reviews(callback: CallbackQuery, state: FSMContext):
     """Обработка наличия отзывов"""
     has_reviews = callback.data.startswith("yes_")
     await state.update_data(has_reviews=has_reviews)
     
     await callback.answer()
     await callback.message.edit_text(
-        "Шаг 7 из 8\n"
-        "💰 Введите минимальную цену за рекламу (в рублях):\n"
-        "Или введите '0' если цена договорная:"
+        "Шаг 15 из 15\n"
+        "📝 Введите дополнительное описание блогера (необязательно):\n"
+        "Или введите 'пропустить' чтобы завершить:"
     )
-    await state.set_state(SellerStates.waiting_for_blogger_price_min)
+    await state.set_state(SellerStates.waiting_for_blogger_description)
 
 
-@router.message(SellerStates.waiting_for_blogger_price_min)
-async def process_blogger_price_min(message: Message, state: FSMContext):
-    """Обработка минимальной цены"""
+# === ОБРАБОТЧИКИ ДЛЯ КАСТОМНЫХ ЦЕН ===
+
+@router.message(SellerStates.waiting_for_price_stories)
+async def process_custom_price_stories(message: Message, state: FSMContext):
+    """Обработка кастомной цены за 4 истории"""
     try:
-        price_min = int(message.text)
-        await state.update_data(price_min=price_min if price_min > 0 else None)
+        price = int(message.text)
+        if price % 1000 != 0:
+            await message.answer("❌ Цена должна быть кратна 1000")
+            return
+        
+        await state.update_data(price_stories=price)
         
         await message.answer(
-            "Шаг 8 из 8\n"
-            "💰 Введите максимальную цену за рекламу (в рублях):\n"
-            "Или введите '0' если цена договорная:"
+            "Шаг 12 из 15\n"
+            "💰 Выберите цену за пост (кратную 1000):",
+            reply_markup=get_price_post_keyboard()
         )
-        await state.set_state(SellerStates.waiting_for_blogger_price_max)
+        await state.set_state(SellerStates.waiting_for_price_post)
     except ValueError:
-        await message.answer("❌ Введите корректное число.")
+        await message.answer("❌ Введите корректное число")
 
 
-@router.message(SellerStates.waiting_for_blogger_price_max)
-async def process_blogger_price_max(message: Message, state: FSMContext):
-    """Обработка максимальной цены"""
+@router.message(SellerStates.waiting_for_price_post)
+async def process_custom_price_post(message: Message, state: FSMContext):
+    """Обработка кастомной цены за пост"""
     try:
-        price_max = int(message.text)
-        await state.update_data(price_max=price_max if price_max > 0 else None)
+        price = int(message.text)
+        if price % 1000 != 0:
+            await message.answer("❌ Цена должна быть кратна 1000")
+            return
+        
+        await state.update_data(price_post=price)
         
         await message.answer(
-            "Финальный шаг!\n"
-            "📝 Введите дополнительное описание блогера (необязательно):\n"
-            "Или введите 'пропустить' чтобы завершить:"
+            "Шаг 13 из 15\n"
+            "💰 Выберите цену за видео (кратную 1000):",
+            reply_markup=get_price_video_keyboard()
         )
-        await state.set_state(SellerStates.waiting_for_blogger_description)
+        await state.set_state(SellerStates.waiting_for_price_video)
     except ValueError:
-        await message.answer("❌ Введите корректное число.")
+        await message.answer("❌ Введите корректное число")
 
+
+@router.message(SellerStates.waiting_for_price_video)
+async def process_custom_price_video(message: Message, state: FSMContext):
+    """Обработка кастомной цены за видео"""
+    try:
+        price = int(message.text)
+        if price % 1000 != 0:
+            await message.answer("❌ Цена должна быть кратна 1000")
+            return
+        
+        await state.update_data(price_video=price)
+        
+        await message.answer(
+            "Шаг 14 из 15\n"
+            "🗣️ Есть ли у блогера отзывы от рекламодателей?",
+            reply_markup=get_yes_no_keyboard("reviews")
+        )
+        await state.set_state(SellerStates.waiting_for_has_reviews)
+    except ValueError:
+        await message.answer("❌ Введите корректное число")
+
+
+# === ФИНАЛЬНЫЙ ОБРАБОТЧИК СОЗДАНИЯ БЛОГЕРА ===
 
 @router.message(SellerStates.waiting_for_blogger_description)
 async def process_blogger_description(message: Message, state: FSMContext):
@@ -239,29 +497,37 @@ async def process_blogger_description(message: Message, state: FSMContext):
     data = await state.get_data()
     user = await get_user(message.from_user.id)
     
-    # Создаем блогера
+    # Создаем блогера с новыми полями
     blogger = await create_blogger(
         seller_id=user.id,
         name=data['name'],
         url=data['url'],
         platform=data['platform'],
-        category=data['category'],
-        target_audience=data['target_audience'],
+        categories=data['categories'],
+        audience_13_17_percent=data['audience_13_17_percent'],
+        audience_18_24_percent=data['audience_18_24_percent'],
+        audience_25_35_percent=data['audience_25_35_percent'],
+        audience_35_plus_percent=data['audience_35_plus_percent'],
+        female_percent=data['female_percent'],
+        male_percent=data['male_percent'],
+        price_stories=data['price_stories'],
+        price_post=data['price_post'],
+        price_video=data['price_video'],
         has_reviews=data['has_reviews'],
-        price_min=data.get('price_min'),
-        price_max=data.get('price_max'),
         description=description
     )
     
     await message.answer(
         f"✅ <b>Блогер успешно добавлен!</b>\n\n"
         f"📝 <b>Имя:</b> {blogger.name}\n"
-        f"📱 <b>Платформа:</b> {blogger.platform}\n"
-        f"🎯 <b>Категория:</b> {blogger.category}\n"
-        f"👥 <b>Аудитория:</b> {blogger.target_audience}\n"
+        f"📱 <b>Платформа:</b> {blogger.platform.value}\n"
+        f"🎯 <b>Категория:</b> {', '.join([cat.value for cat in blogger.categories])}\n"
+        f"👥 <b>Аудитория:</b> {blogger.female_percent}%♀️ {blogger.male_percent}%♂️\n"
         f"🗣️ <b>Отзывы:</b> {'Есть' if blogger.has_reviews else 'Нет'}\n"
-        f"💰 <b>Цена:</b> {blogger.price_min or 'Договорная'}"
-        + (f" - {blogger.price_max}" if blogger.price_max else "") + " ₽",
+        f"💰 <b>Цены:</b>\n"
+        f"• 4 истории: {blogger.price_stories}₽\n"
+        f"• Пост: {blogger.price_post}₽\n"
+        f"• Видео: {blogger.price_video}₽",
         parse_mode="HTML"
     )
     
@@ -617,8 +883,8 @@ async def universal_add_blogger(message: Message, state: FSMContext):
     if not user or user.role != UserRole.SELLER:
         await message.answer("❌ Эта функция доступна только продажникам.")
         return
-    from handlers.seller import start_add_blogger
-    await start_add_blogger(message, state)
+    from handlers.seller import add_blogger_start
+    await add_blogger_start(message, state)
 
 @router.message(F.text == "📝 Мои блогеры", StateFilter("*"))
 async def universal_my_bloggers(message: Message, state: FSMContext):
