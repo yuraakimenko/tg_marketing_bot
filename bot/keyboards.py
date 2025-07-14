@@ -63,34 +63,218 @@ def get_subscription_keyboard() -> InlineKeyboardMarkup:
     ])
 
 
-def get_payment_confirmation_keyboard(payment_data: dict) -> InlineKeyboardMarkup:
-    """Клавиатура подтверждения платежа"""
+def get_subscription_management_keyboard(auto_renewal: bool = True) -> InlineKeyboardMarkup:
+    """Клавиатура управления подпиской (обновленная - только автопродление)"""
     keyboard = []
     
-    # Если это mock-платеж, добавляем кнопку имитации оплаты
-    if payment_data.get('is_mock'):
+    if auto_renewal:
         keyboard.append([InlineKeyboardButton(
-            text="✅ Имитировать успешную оплату", 
-            callback_data=f"mock_payment_success_{payment_data['invoice_id']}"
-        )])
-        keyboard.append([InlineKeyboardButton(
-            text="❌ Имитировать неудачную оплату", 
-            callback_data=f"mock_payment_failure_{payment_data['invoice_id']}"
+            text="🔄 Отключить автоПРОДЛЕНИЕ", 
+            callback_data="toggle_auto_renewal"
         )])
     else:
-        # Для реальных платежей - ссылка на оплату
         keyboard.append([InlineKeyboardButton(
-            text="💳 Перейти к оплате", 
-            url=payment_data['payment_url']
-        )])
-        keyboard.append([InlineKeyboardButton(
-            text="🔄 Проверить статус", 
-            callback_data=f"check_payment_{payment_data['invoice_id']}"
+            text="🔄 Включить автоПРОДЛЕНИЕ", 
+            callback_data="toggle_auto_renewal"
         )])
     
-    keyboard.append([InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_payment")])
+    keyboard.append([InlineKeyboardButton(text="📊 История платежей", callback_data="payment_history")])
+    keyboard.append([InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_main")])
     
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
+def get_platform_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура выбора платформы (обновленная)"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📸 Instagram", callback_data="platform_instagram")],
+        [InlineKeyboardButton(text="📺 YouTube", callback_data="platform_youtube")],
+        [InlineKeyboardButton(text="📱 Telegram", callback_data="platform_telegram")],
+        [InlineKeyboardButton(text="🎵 TikTok", callback_data="platform_tiktok")],
+        [InlineKeyboardButton(text="🌐 VK", callback_data="platform_vk")],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_action")]
+    ])
+
+
+def get_platforms_selection_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура выбора платформ для поиска (множественный выбор)"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📸 Instagram", callback_data="select_platform_instagram")],
+        [InlineKeyboardButton(text="📺 YouTube", callback_data="select_platform_youtube")],
+        [InlineKeyboardButton(text="📱 Telegram", callback_data="select_platform_telegram")],
+        [InlineKeyboardButton(text="🎵 TikTok", callback_data="select_platform_tiktok")],
+        [InlineKeyboardButton(text="🌐 VK", callback_data="select_platform_vk")],
+        [InlineKeyboardButton(text="✅ Завершить выбор", callback_data="finish_platforms_selection")],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_action")]
+    ])
+
+
+def get_category_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура выбора категории (обновленная с новыми категориями)"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💃 Лайфстайл", callback_data="category_lifestyle")],
+        [InlineKeyboardButton(text="🏃‍♀️ Спорт", callback_data="category_sport")],
+        [InlineKeyboardButton(text="🥗 Питание", callback_data="category_nutrition")],
+        [InlineKeyboardButton(text="🏥 Медицина", callback_data="category_medicine")],
+        [InlineKeyboardButton(text="💕 Отношения", callback_data="category_relationships")],
+        [InlineKeyboardButton(text="💄 Красота", callback_data="category_beauty")],
+        [InlineKeyboardButton(text="👗 Мода", callback_data="category_fashion")],
+        [InlineKeyboardButton(text="✈️ Путешествия", callback_data="category_travel")],
+        [InlineKeyboardButton(text="💼 Бизнес", callback_data="category_business")],
+        [InlineKeyboardButton(text="📚 Образование", callback_data="category_education")],
+        [InlineKeyboardButton(text="🎬 Развлечения", callback_data="category_entertainment")],
+        [InlineKeyboardButton(text="💻 Технологии", callback_data="category_technology")],
+        [InlineKeyboardButton(text="👶 Родительство", callback_data="category_parenting")],
+        [InlineKeyboardButton(text="💰 Финансы", callback_data="category_finance")],
+        [InlineKeyboardButton(text="❓ Неважно", callback_data="category_not_important")],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_action")]
+    ])
+
+
+def get_categories_selection_keyboard(selected_categories: list = None) -> InlineKeyboardMarkup:
+    """Клавиатура выбора категорий для поиска (множественный выбор)"""
+    if selected_categories is None:
+        selected_categories = []
+    
+    keyboard = []
+    categories = [
+        ("💃 Лайфстайл", "category_lifestyle"),
+        ("🏃‍♀️ Спорт", "category_sport"),
+        ("🥗 Питание", "category_nutrition"),
+        ("🏥 Медицина", "category_medicine"),
+        ("💕 Отношения", "category_relationships"),
+        ("💄 Красота", "category_beauty"),
+        ("👗 Мода", "category_fashion"),
+        ("✈️ Путешествия", "category_travel"),
+        ("💼 Бизнес", "category_business"),
+        ("📚 Образование", "category_education"),
+        ("🎬 Развлечения", "category_entertainment"),
+        ("💻 Технологии", "category_technology"),
+        ("👶 Родительство", "category_parenting"),
+        ("💰 Финансы", "category_finance"),
+        ("❓ Неважно", "category_not_important")
+    ]
+    
+    for name, value in categories:
+        if value in selected_categories:
+            keyboard.append([InlineKeyboardButton(text=f"✅ {name}", callback_data=f"toggle_category_{value}")])
+        else:
+            keyboard.append([InlineKeyboardButton(text=f"⬜ {name}", callback_data=f"toggle_category_{value}")])
+    
+    keyboard.append([InlineKeyboardButton(text="✅ Завершить выбор", callback_data="finish_categories_selection")])
+    keyboard.append([InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_action")])
+    
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
+def get_budget_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура выбора бюджета (кратный 1000)"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💰 4,000₽", callback_data="budget_4000")],
+        [InlineKeyboardButton(text="💰 10,000₽", callback_data="budget_10000")],
+        [InlineKeyboardButton(text="💰 20,000₽", callback_data="budget_20000")],
+        [InlineKeyboardButton(text="💰 50,000₽", callback_data="budget_50000")],
+        [InlineKeyboardButton(text="💰 100,000₽", callback_data="budget_100000")],
+        [InlineKeyboardButton(text="📝 Ввести вручную", callback_data="budget_custom")],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_action")]
+    ])
+
+
+def get_budget_range_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура выбора диапазона бюджета"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💰 4,000₽ - 10,000₽", callback_data="budget_range_4000_10000")],
+        [InlineKeyboardButton(text="💰 10,000₽ - 20,000₽", callback_data="budget_range_10000_20000")],
+        [InlineKeyboardButton(text="💰 20,000₽ - 50,000₽", callback_data="budget_range_20000_50000")],
+        [InlineKeyboardButton(text="💰 50,000₽ - 100,000₽", callback_data="budget_range_50000_100000")],
+        [InlineKeyboardButton(text="💰 100,000₽+", callback_data="budget_range_100000_plus")],
+        [InlineKeyboardButton(text="📝 Ввести вручную", callback_data="budget_range_custom")],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_action")]
+    ])
+
+
+def get_price_stories_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура выбора цены за 4 истории (кратная 1000)"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💰 4,000₽", callback_data="price_stories_4000")],
+        [InlineKeyboardButton(text="💰 10,000₽", callback_data="price_stories_10000")],
+        [InlineKeyboardButton(text="💰 20,000₽", callback_data="price_stories_20000")],
+        [InlineKeyboardButton(text="💰 50,000₽", callback_data="price_stories_50000")],
+        [InlineKeyboardButton(text="💰 100,000₽", callback_data="price_stories_100000")],
+        [InlineKeyboardButton(text="📝 Ввести вручную", callback_data="price_stories_custom")],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_action")]
+    ])
+
+
+def get_price_post_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура выбора цены за пост (кратная 1000)"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💰 4,000₽", callback_data="price_post_4000")],
+        [InlineKeyboardButton(text="💰 10,000₽", callback_data="price_post_10000")],
+        [InlineKeyboardButton(text="💰 20,000₽", callback_data="price_post_20000")],
+        [InlineKeyboardButton(text="💰 50,000₽", callback_data="price_post_50000")],
+        [InlineKeyboardButton(text="💰 100,000₽", callback_data="price_post_100000")],
+        [InlineKeyboardButton(text="📝 Ввести вручную", callback_data="price_post_custom")],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_action")]
+    ])
+
+
+def get_price_video_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура выбора цены за видео (кратная 1000)"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💰 4,000₽", callback_data="price_video_4000")],
+        [InlineKeyboardButton(text="💰 10,000₽", callback_data="price_video_10000")],
+        [InlineKeyboardButton(text="💰 20,000₽", callback_data="price_video_20000")],
+        [InlineKeyboardButton(text="💰 50,000₽", callback_data="price_video_50000")],
+        [InlineKeyboardButton(text="💰 100,000₽", callback_data="price_video_100000")],
+        [InlineKeyboardButton(text="📝 Ввести вручную", callback_data="price_video_custom")],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_action")]
+    ])
+
+
+def get_yes_no_keyboard(action: str) -> InlineKeyboardMarkup:
+    """Универсальная клавиатура Да/Нет"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✅ Да", callback_data=f"yes_{action}"),
+            InlineKeyboardButton(text="❌ Нет", callback_data=f"no_{action}")
+        ]
+    ])
+
+
+def get_rating_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура оценки"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="⭐", callback_data="rating_1"),
+            InlineKeyboardButton(text="⭐⭐", callback_data="rating_2"),
+            InlineKeyboardButton(text="⭐⭐⭐", callback_data="rating_3"),
+            InlineKeyboardButton(text="⭐⭐⭐⭐", callback_data="rating_4"),
+            InlineKeyboardButton(text="⭐⭐⭐⭐⭐", callback_data="rating_5")
+        ]
+    ])
+
+
+def get_complaint_reasons_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура причин жалобы"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🚫 Некачественный контент", callback_data="complaint_reason_low_quality")],
+        [InlineKeyboardButton(text="💰 Завышенные цены", callback_data="complaint_reason_high_price")],
+        [InlineKeyboardButton(text="⏰ Нарушение сроков", callback_data="complaint_reason_deadline")],
+        [InlineKeyboardButton(text="🤥 Несоответствие описанию", callback_data="complaint_reason_misleading")],
+        [InlineKeyboardButton(text="📞 Плохая коммуникация", callback_data="complaint_reason_communication")],
+        [InlineKeyboardButton(text="📝 Другое", callback_data="complaint_reason_other")],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_action")]
+    ])
+
+
+def get_blogger_action_keyboard(blogger_id: int) -> InlineKeyboardMarkup:
+    """Клавиатура действий с блогером"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Подходит", callback_data=f"blogger_suitable_{blogger_id}")],
+        [InlineKeyboardButton(text="❌ Не подходит", callback_data=f"blogger_not_suitable_{blogger_id}")],
+        [InlineKeyboardButton(text="⚠️ Пожаловаться", callback_data=f"blogger_complaint_{blogger_id}")]
+    ])
 
 
 def get_blogger_list_keyboard(bloggers, page=0) -> InlineKeyboardMarkup:
@@ -137,7 +321,7 @@ def get_search_results_keyboard(results, page=0) -> InlineKeyboardMarkup:
     for i, (blogger, seller) in enumerate(results):
         keyboard.append([
             InlineKeyboardButton(
-                text=f"{blogger.name} - {blogger.category}",
+                text=f"{blogger.name} - {blogger.platform}",
                 callback_data=f"select_blogger_{blogger.id}"
             )
         ])
@@ -167,91 +351,32 @@ def get_blogger_selection_keyboard(blogger_id: int, seller_id: int) -> InlineKey
     ])
 
 
-def get_yes_no_keyboard(action: str) -> InlineKeyboardMarkup:
-    """Универсальная клавиатура Да/Нет"""
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="✅ Да", callback_data=f"yes_{action}"),
-            InlineKeyboardButton(text="❌ Нет", callback_data=f"no_{action}")
-        ]
-    ])
-
-
-def get_platform_keyboard() -> InlineKeyboardMarkup:
-    """Клавиатура выбора платформы"""
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📺 YouTube", callback_data="platform_youtube")],
-        [InlineKeyboardButton(text="📸 Instagram", callback_data="platform_instagram")],
-        [InlineKeyboardButton(text="🎵 TikTok", callback_data="platform_tiktok")],
-        [InlineKeyboardButton(text="📱 Telegram", callback_data="platform_telegram")],
-        [InlineKeyboardButton(text="🌐 Другое", callback_data="platform_other")],
-        [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_action")]
-    ])
-
-
-def get_category_keyboard() -> InlineKeyboardMarkup:
-    """Клавиатура выбора категории"""
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🏥 Медицина", callback_data="category_медицина")],
-        [InlineKeyboardButton(text="💕 Отношения", callback_data="category_отношения")],
-        [InlineKeyboardButton(text="👶 Дети", callback_data="category_дети")],
-        [InlineKeyboardButton(text="🏠 Дом и быт", callback_data="category_дом")],
-        [InlineKeyboardButton(text="💄 Красота", callback_data="category_красота")],
-        [InlineKeyboardButton(text="🍳 Кулинария", callback_data="category_кулинария")],
-        [InlineKeyboardButton(text="🎮 Развлечения", callback_data="category_развлечения")],
-        [InlineKeyboardButton(text="📚 Образование", callback_data="category_образование")],
-        [InlineKeyboardButton(text="💼 Бизнес", callback_data="category_бизнес")],
-        [InlineKeyboardButton(text="🌐 Другое", callback_data="category_other")],
-        [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_action")]
-    ])
-
-
-def get_rating_keyboard() -> InlineKeyboardMarkup:
-    """Клавиатура оценки"""
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="1⭐", callback_data="rating_1"),
-            InlineKeyboardButton(text="2⭐", callback_data="rating_2"),
-            InlineKeyboardButton(text="3⭐", callback_data="rating_3"),
-            InlineKeyboardButton(text="4⭐", callback_data="rating_4"),
-            InlineKeyboardButton(text="5⭐", callback_data="rating_5")
-        ]
-    ])
-
-
-def get_subscription_management_keyboard(auto_renewal: bool = True) -> InlineKeyboardMarkup:
-    """Клавиатура управления подпиской"""
+def get_payment_confirmation_keyboard(payment_data: dict) -> InlineKeyboardMarkup:
+    """Клавиатура подтверждения платежа"""
     keyboard = []
     
-    if auto_renewal:
+    # Если это mock-платеж, добавляем кнопку имитации оплаты
+    if payment_data.get('is_mock'):
         keyboard.append([InlineKeyboardButton(
-            text="🔄 Отключить автообновление", 
-            callback_data="disable_auto_renewal"
+            text="✅ Имитировать успешную оплату", 
+            callback_data=f"mock_payment_success_{payment_data['invoice_id']}"
+        )])
+        keyboard.append([InlineKeyboardButton(
+            text="❌ Имитировать неудачную оплату", 
+            callback_data=f"mock_payment_failure_{payment_data['invoice_id']}"
         )])
     else:
+        # Для реальных платежей - ссылка на оплату
         keyboard.append([InlineKeyboardButton(
-            text="🔄 Включить автообновление", 
-            callback_data="enable_auto_renewal"
+            text="💳 Перейти к оплате", 
+            url=payment_data['payment_url']
+        )])
+        keyboard.append([InlineKeyboardButton(
+            text="🔄 Проверить статус", 
+            callback_data=f"check_payment_{payment_data['invoice_id']}"
         )])
     
-    keyboard.extend([
-        [InlineKeyboardButton(
-            text="⏸️ Приостановить до окончания", 
-            callback_data="suspend_subscription"
-        )],
-        [InlineKeyboardButton(
-            text="❌ Отменить подписку полностью", 
-            callback_data="cancel_subscription_full"
-        )],
-        [InlineKeyboardButton(
-            text="📊 История платежей", 
-            callback_data="payment_history"
-        )],
-        [InlineKeyboardButton(
-            text="⬅️ Назад", 
-            callback_data="back_to_main"
-        )]
-    ])
+    keyboard.append([InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_payment")])
     
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
@@ -259,14 +384,8 @@ def get_subscription_management_keyboard(auto_renewal: bool = True) -> InlineKey
 def get_subscription_cancel_confirmation_keyboard() -> InlineKeyboardMarkup:
     """Клавиатура подтверждения отмены подписки"""
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(
-            text="✅ Да, отменить подписку", 
-            callback_data="confirm_cancel_subscription"
-        )],
-        [InlineKeyboardButton(
-            text="❌ Нет, оставить как есть", 
-            callback_data="cancel_subscription_cancel"
-        )]
+        [InlineKeyboardButton(text="✅ Да, отменить", callback_data="confirm_cancel_subscription")],
+        [InlineKeyboardButton(text="❌ Нет, оставить", callback_data="keep_subscription")]
     ])
 
 
@@ -276,5 +395,6 @@ def get_settings_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="🔄 Сменить роль", callback_data="change_role")],
         [InlineKeyboardButton(text="👤 Профиль", callback_data="profile")],
         [InlineKeyboardButton(text="📊 Статистика", callback_data="statistics")],
-        [InlineKeyboardButton(text="❓ Помощь", callback_data="help")]
+        [InlineKeyboardButton(text="❓ Справка", callback_data="help")],
+        [InlineKeyboardButton(text="📞 Поддержка", callback_data="support")]
     ]) 
