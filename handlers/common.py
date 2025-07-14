@@ -55,30 +55,39 @@ async def handle_role_selection(callback: CallbackQuery, state: FSMContext):
     role_str = callback.data.split("_")[1]  # seller или buyer
     role = UserRole.SELLER if role_str == "seller" else UserRole.BUYER
     
-    # Создаем пользователя
-    user = await create_user(
-        telegram_id=callback.from_user.id,
-        username=callback.from_user.username,
-        first_name=callback.from_user.first_name,
-        last_name=callback.from_user.last_name,
-        role=role
-    )
+    logger.info(f"Роль определена как: {role}")
+    logger.info(f"Данные пользователя: telegram_id={callback.from_user.id}, username={callback.from_user.username}, first_name={callback.from_user.first_name}, last_name={callback.from_user.last_name}")
     
-    logger.info(f"Пользователь создан: {user}")
-    
-    await callback.answer()
-    await callback.message.delete()
-    
-    role_name = "продажник" if role == UserRole.SELLER else "закупщик"
-    await callback.message.answer(
-        f"✅ Отлично! Вы зарегистрированы как {role_name}.\n\n"
-        f"📋 Теперь вам доступны функции {'для размещения блогеров' if role == UserRole.SELLER else 'для поиска блогеров'}.\n\n"
-        "💡 Для полного доступа к функциям бота необходима подписка 500₽/мес.",
-        reply_markup=get_main_menu_seller(False) if role == UserRole.SELLER else get_main_menu_buyer(False)
-    )
-    
-    await state.clear()
-    logger.info("Регистрация завершена успешно")
+    try:
+        # Создаем пользователя
+        user = await create_user(
+            telegram_id=callback.from_user.id,
+            username=callback.from_user.username,
+            first_name=callback.from_user.first_name,
+            last_name=callback.from_user.last_name,
+            role=role
+        )
+        
+        logger.info(f"Пользователь создан успешно: {user}")
+        
+        await callback.answer()
+        await callback.message.delete()
+        
+        role_name = "продажник" if role == UserRole.SELLER else "закупщик"
+        await callback.message.answer(
+            f"✅ Отлично! Вы зарегистрированы как {role_name}.\n\n"
+            f"📋 Теперь вам доступны функции {'для размещения блогеров' if role == UserRole.SELLER else 'для поиска блогеров'}.\n\n"
+            "💡 Для полного доступа к функциям бота необходима подписка 500₽/мес.",
+            reply_markup=get_main_menu_seller(False) if role == UserRole.SELLER else get_main_menu_buyer(False)
+        )
+        
+        await state.clear()
+        logger.info("Регистрация завершена успешно")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при создании пользователя: {e}")
+        await callback.answer("❌ Ошибка при регистрации. Попробуйте еще раз.")
+        await callback.message.answer("❌ Произошла ошибка при регистрации. Пожалуйста, попробуйте еще раз или обратитесь в поддержку.")
 
 
 @router.message(F.text == "⚙️ Настройки")

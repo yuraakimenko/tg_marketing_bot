@@ -148,16 +148,32 @@ async def init_db():
 async def create_user(telegram_id: int, username: str = None, first_name: str = None, 
                      last_name: str = None, role: UserRole = UserRole.SELLER) -> User:
     """Создание нового пользователя"""
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        cursor = await db.execute("""
-            INSERT INTO users (telegram_id, username, first_name, last_name, role)
-            VALUES (?, ?, ?, ?, ?)
-        """, (telegram_id, username, first_name, last_name, role.value))
-        
-        user_id = cursor.lastrowid
-        await db.commit()
-        
-        return await get_user(telegram_id)
+    logger.info(f"Создание пользователя: telegram_id={telegram_id}, username={username}, first_name={first_name}, last_name={last_name}, role={role}")
+    
+    try:
+        async with aiosqlite.connect(DATABASE_PATH) as db:
+            logger.info(f"Подключение к базе данных: {DATABASE_PATH}")
+            
+            cursor = await db.execute("""
+                INSERT INTO users (telegram_id, username, first_name, last_name, role)
+                VALUES (?, ?, ?, ?, ?)
+            """, (telegram_id, username, first_name, last_name, role.value))
+            
+            user_id = cursor.lastrowid
+            logger.info(f"Пользователь создан с ID: {user_id}")
+            
+            await db.commit()
+            logger.info("Транзакция зафиксирована")
+            
+            # Получаем созданного пользователя
+            created_user = await get_user(telegram_id)
+            logger.info(f"Созданный пользователь: {created_user}")
+            
+            return created_user
+            
+    except Exception as e:
+        logger.error(f"Ошибка при создании пользователя: {e}")
+        raise
 
 
 async def get_user(telegram_id: int) -> Optional[User]:
