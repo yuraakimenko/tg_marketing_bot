@@ -42,16 +42,6 @@ async def handle_role_selection(callback: CallbackQuery, state: FSMContext):
     """Обработка выбора роли при первичной регистрации"""
     logger.info(f"Получен callback для выбора роли: {callback.data} от пользователя {callback.from_user.id}")
     
-    # Проверяем, не находимся ли мы в состоянии смены роли
-    current_state = await state.get_state()
-    logger.info(f"Текущее состояние: {current_state}")
-    
-    if current_state == RegistrationStates.waiting_for_role:
-        # Если мы в состоянии смены роли, пропускаем этот обработчик
-        # Его обработает handle_role_change
-        logger.info("Пропускаем обработчик - пользователь в состоянии смены роли")
-        return
-    
     # Проверяем, что пользователь не существует (первичная регистрация)
     user = await get_user(callback.from_user.id)
     if user:
