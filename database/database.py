@@ -23,7 +23,6 @@ async def init_db():
                 username TEXT,
                 first_name TEXT,
                 last_name TEXT,
-                role TEXT NOT NULL DEFAULT 'seller',
                 subscription_status TEXT NOT NULL DEFAULT 'inactive',
                 subscription_start_date TIMESTAMP,
                 subscription_end_date TIMESTAMP,
@@ -34,6 +33,18 @@ async def init_db():
                 is_blocked BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Создание таблицы ролей пользователей
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS user_roles (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                role TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                UNIQUE(user_id, role)
             )
         """)
         
@@ -173,6 +184,8 @@ async def init_db():
         
         # Создание индексов для оптимизации поиска
         await db.execute("CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users (telegram_id)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_user_roles_user_id ON user_roles (user_id)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_user_roles_role ON user_roles (role)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_bloggers_seller_id ON bloggers (seller_id)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_bloggers_platform ON bloggers (platform)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_reviews_reviewed_id ON reviews (reviewed_id)")
@@ -195,6 +208,29 @@ async def init_db():
             if 'is_blocked' not in columns:
                 await db.execute("ALTER TABLE users ADD COLUMN is_blocked BOOLEAN DEFAULT FALSE")
                 logger.info("Added is_blocked column to users table")
+            
+            # Миграция ролей: если есть старое поле role, переносим данные в новую таблицу
+            if 'role' in columns:
+                logger.info("Migrating roles from old 'role' column to new 'user_roles' table")
+                cursor = await db.execute("SELECT id, role FROM users WHERE role IS NOT NULL")
+                users_with_roles = await cursor.fetchall()
+                
+                for user_id, role in users_with_roles:
+                    try:
+                        await db.execute(
+                            "INSERT INTO user_roles (user_id, role) VALUES (?, ?)",
+                            (user_id, role)
+                        )
+                        logger.info(f"Migrated role '{role}' for user {user_id}")
+                    except Exception as e:
+                        logger.warning(f"Failed to migrate role '{role}' for user {user_id}: {e}")
+                
+                # Удаляем старое поле role
+                await db.execute("CREATE TABLE users_new AS SELECT id, telegram_id, username, first_name, last_name, subscription_status, subscription_start_date, subscription_end_date, rating, reviews_count, is_vip, penalty_amount, is_blocked, created_at, updated_at FROM users")
+                await db.execute("DROP TABLE users")
+                await db.execute("ALTER TABLE users_new RENAME TO users")
+                await db.execute("CREATE UNIQUE INDEX idx_users_telegram_id ON users (telegram_id)")
+                logger.info("Removed old 'role' column from users table")
             
             # Проверяем и добавляем новые поля в bloggers
             cursor = await db.execute("PRAGMA table_info(bloggers)")
@@ -240,6 +276,10 @@ async def init_db():
                 await db.execute("ALTER TABLE bloggers ADD COLUMN price_video INTEGER")
                 logger.info("Added price_video column to bloggers table")
             
+            if 'has_reviews' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN has_reviews BOOLEAN DEFAULT FALSE")
+                logger.info("Added has_reviews column to bloggers table")
+            
             if 'is_registered_rkn' not in columns:
                 await db.execute("ALTER TABLE bloggers ADD COLUMN is_registered_rkn BOOLEAN DEFAULT FALSE")
                 logger.info("Added is_registered_rkn column to bloggers table")
@@ -247,6 +287,10 @@ async def init_db():
             if 'official_payment_possible' not in columns:
                 await db.execute("ALTER TABLE bloggers ADD COLUMN official_payment_possible BOOLEAN DEFAULT FALSE")
                 logger.info("Added official_payment_possible column to bloggers table")
+            
+            if 'subscribers_count' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN subscribers_count INTEGER")
+                logger.info("Added subscribers_count column to bloggers table")
             
             if 'avg_views' not in columns:
                 await db.execute("ALTER TABLE bloggers ADD COLUMN avg_views INTEGER")
@@ -260,61 +304,50 @@ async def init_db():
                 await db.execute("ALTER TABLE bloggers ADD COLUMN engagement_rate REAL")
                 logger.info("Added engagement_rate column to bloggers table")
             
-            # Миграция для перехода от platform к platforms
-            if 'platform' in columns and 'platforms' not in columns:
-                # Создаем новую колонку platforms
-                await db.execute("ALTER TABLE bloggers ADD COLUMN platforms TEXT")
-                logger.info("Added platforms column to bloggers table")
-                
-                # Копируем данные из platform в platforms
-                cursor = await db.execute("SELECT id, platform FROM bloggers WHERE platform IS NOT NULL")
-                rows = await cursor.fetchall()
-                for row in rows:
-                    blogger_id, platform = row
-                    if platform:
-                        platforms_json = json.dumps([platform])
-                        await db.execute("UPDATE bloggers SET platforms = ? WHERE id = ?", (platforms_json, blogger_id))
-                logger.info("Migrated platform data to platforms column")
+            if 'description' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN description TEXT")
+                logger.info("Added description column to bloggers table")
             
-            # Проверяем и добавляем subscription_start_date в users
-            cursor = await db.execute("PRAGMA table_info(users)")
-            columns = [row[1] for row in await cursor.fetchall()]
-            
-            if 'subscription_start_date' not in columns:
-                await db.execute("ALTER TABLE users ADD COLUMN subscription_start_date TIMESTAMP")
-                logger.info("Added subscription_start_date column to users table")
-            
-            # Проверяем и добавляем новые поля в subscriptions
-            cursor = await db.execute("PRAGMA table_info(subscriptions)")
-            columns = [row[1] for row in await cursor.fetchall()]
-            
-            if 'promo_code' not in columns:
-                await db.execute("ALTER TABLE subscriptions ADD COLUMN promo_code TEXT")
-                logger.info("Added promo_code column to subscriptions table")
+            if 'updated_at' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+                logger.info("Added updated_at column to bloggers table")
                 
         except Exception as e:
             logger.error(f"Error during migration: {e}")
         
         await db.commit()
+        logger.info("Database initialization completed")
 
 
 # Функции для работы с пользователями
 async def create_user(telegram_id: int, username: str = None, first_name: str = None, 
-                     last_name: str = None, role: UserRole = UserRole.SELLER) -> User:
-    """Создание нового пользователя"""
-    logger.info(f"Создание пользователя: telegram_id={telegram_id}, username={username}, first_name={first_name}, last_name={last_name}, role={role}")
+                     last_name: str = None, roles: List[UserRole] = None) -> User:
+    """Создание нового пользователя с поддержкой множественных ролей"""
+    if roles is None:
+        roles = [UserRole.SELLER]  # По умолчанию продажник
+    
+    logger.info(f"Создание пользователя: telegram_id={telegram_id}, username={username}, first_name={first_name}, last_name={last_name}, roles={[r.value for r in roles]}")
     
     try:
         async with aiosqlite.connect(DATABASE_PATH) as db:
             logger.info(f"Подключение к базе данных: {DATABASE_PATH}")
             
+            # Создаем пользователя
             cursor = await db.execute("""
-                INSERT INTO users (telegram_id, username, first_name, last_name, role, is_vip, penalty_amount, is_blocked)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (telegram_id, username, first_name, last_name, role.value, False, 0, False))
+                INSERT INTO users (telegram_id, username, first_name, last_name, is_vip, penalty_amount, is_blocked)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (telegram_id, username, first_name, last_name, False, 0, False))
             
             user_id = cursor.lastrowid
             logger.info(f"Пользователь создан с ID: {user_id}")
+            
+            # Добавляем роли
+            for role in roles:
+                await db.execute("""
+                    INSERT INTO user_roles (user_id, role)
+                    VALUES (?, ?)
+                """, (user_id, role.value))
+                logger.info(f"Добавлена роль {role.value} для пользователя {user_id}")
             
             await db.commit()
             logger.info("Транзакция зафиксирована")
@@ -331,46 +364,154 @@ async def create_user(telegram_id: int, username: str = None, first_name: str = 
 
 
 async def get_user(telegram_id: int) -> Optional[User]:
-    """Получение пользователя по telegram_id"""
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        cursor = await db.execute(
-            "SELECT * FROM users WHERE telegram_id = ?", (telegram_id,)
-        )
-        row = await cursor.fetchone()
-        
-        if row:
-            return User(
+    """Получение пользователя по telegram_id с ролями"""
+    try:
+        async with aiosqlite.connect(DATABASE_PATH) as db:
+            db.row_factory = aiosqlite.Row
+            
+            # Получаем основную информацию о пользователе
+            cursor = await db.execute("""
+                SELECT * FROM users WHERE telegram_id = ?
+            """, (telegram_id,))
+            
+            row = await cursor.fetchone()
+            if not row:
+                return None
+            
+            # Получаем роли пользователя
+            cursor = await db.execute("""
+                SELECT role FROM user_roles WHERE user_id = ?
+            """, (row['id'],))
+            
+            role_rows = await cursor.fetchall()
+            roles = {UserRole(role_row['role']) for role_row in role_rows}
+            
+            # Создаем объект пользователя
+            user = User(
                 id=row['id'],
                 telegram_id=row['telegram_id'],
                 username=row['username'],
                 first_name=row['first_name'],
                 last_name=row['last_name'],
-                role=UserRole(row['role']),
+                roles=roles,
                 subscription_status=SubscriptionStatus(row['subscription_status']),
-                subscription_start_date=datetime.fromisoformat(row['subscription_start_date']) if row['subscription_start_date'] else None,
                 subscription_end_date=datetime.fromisoformat(row['subscription_end_date']) if row['subscription_end_date'] else None,
+                subscription_start_date=datetime.fromisoformat(row['subscription_start_date']) if row['subscription_start_date'] else None,
                 rating=row['rating'],
                 reviews_count=row['reviews_count'],
-                is_vip=bool(row['is_vip']) if 'is_vip' in row.keys() else False,
-                penalty_amount=row['penalty_amount'] if 'penalty_amount' in row.keys() else 0,
-                is_blocked=bool(row['is_blocked']) if 'is_blocked' in row.keys() else False,
+                is_vip=bool(row['is_vip']),
+                penalty_amount=row['penalty_amount'],
+                is_blocked=bool(row['is_blocked']),
                 created_at=datetime.fromisoformat(row['created_at']),
                 updated_at=datetime.fromisoformat(row['updated_at'])
             )
+            
+            return user
+            
+    except Exception as e:
+        logger.error(f"Ошибка при получении пользователя: {e}")
         return None
 
 
+async def update_user_roles(telegram_id: int, roles: List[UserRole]) -> bool:
+    """Обновление ролей пользователя (заменяет все существующие роли)"""
+    try:
+        async with aiosqlite.connect(DATABASE_PATH) as db:
+            # Получаем ID пользователя
+            cursor = await db.execute("SELECT id FROM users WHERE telegram_id = ?", (telegram_id,))
+            user_row = await cursor.fetchone()
+            
+            if not user_row:
+                logger.error(f"Пользователь с telegram_id {telegram_id} не найден")
+                return False
+            
+            user_id = user_row[0]
+            
+            # Удаляем все существующие роли
+            await db.execute("DELETE FROM user_roles WHERE user_id = ?", (user_id,))
+            
+            # Добавляем новые роли
+            for role in roles:
+                await db.execute("""
+                    INSERT INTO user_roles (user_id, role)
+                    VALUES (?, ?)
+                """, (user_id, role.value))
+            
+            await db.commit()
+            logger.info(f"Роли пользователя {telegram_id} обновлены: {[r.value for r in roles]}")
+            return True
+            
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении ролей пользователя: {e}")
+        return False
+
+
+async def add_user_role(telegram_id: int, role: UserRole) -> bool:
+    """Добавление роли пользователю (не заменяет существующие)"""
+    try:
+        async with aiosqlite.connect(DATABASE_PATH) as db:
+            # Получаем ID пользователя
+            cursor = await db.execute("SELECT id FROM users WHERE telegram_id = ?", (telegram_id,))
+            user_row = await cursor.fetchone()
+            
+            if not user_row:
+                logger.error(f"Пользователь с telegram_id {telegram_id} не найден")
+                return False
+            
+            user_id = user_row[0]
+            
+            # Добавляем роль (UNIQUE constraint предотвратит дублирование)
+            await db.execute("""
+                INSERT OR IGNORE INTO user_roles (user_id, role)
+                VALUES (?, ?)
+            """, (user_id, role.value))
+            
+            await db.commit()
+            logger.info(f"Роль {role.value} добавлена пользователю {telegram_id}")
+            return True
+            
+    except Exception as e:
+        logger.error(f"Ошибка при добавлении роли пользователю: {e}")
+        return False
+
+
+async def remove_user_role(telegram_id: int, role: UserRole) -> bool:
+    """Удаление роли у пользователя"""
+    try:
+        async with aiosqlite.connect(DATABASE_PATH) as db:
+            # Получаем ID пользователя
+            cursor = await db.execute("SELECT id FROM users WHERE telegram_id = ?", (telegram_id,))
+            user_row = await cursor.fetchone()
+            
+            if not user_row:
+                logger.error(f"Пользователь с telegram_id {telegram_id} не найден")
+                return False
+            
+            user_id = user_row[0]
+            
+            # Удаляем роль
+            cursor = await db.execute("""
+                DELETE FROM user_roles WHERE user_id = ? AND role = ?
+            """, (user_id, role.value))
+            
+            await db.commit()
+            
+            if cursor.rowcount > 0:
+                logger.info(f"Роль {role.value} удалена у пользователя {telegram_id}")
+                return True
+            else:
+                logger.warning(f"Роль {role.value} не найдена у пользователя {telegram_id}")
+                return False
+            
+    except Exception as e:
+        logger.error(f"Ошибка при удалении роли у пользователя: {e}")
+        return False
+
+
+# Функция для обратной совместимости
 async def update_user_role(telegram_id: int, role: UserRole) -> bool:
-    """Обновление роли пользователя"""
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        cursor = await db.execute("""
-            UPDATE users SET role = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE telegram_id = ?
-        """, (role.value, telegram_id))
-        
-        await db.commit()
-        return cursor.rowcount > 0
+    """Обновление роли пользователя (заменяет все существующие роли на одну) - для обратной совместимости"""
+    return await update_user_roles(telegram_id, [role])
 
 
 async def update_subscription_status(user_id: int, status: SubscriptionStatus, 
@@ -549,81 +690,175 @@ async def get_user_bloggers(seller_id: int) -> List[Blogger]:
         return bloggers
 
 
-async def search_bloggers(category: str = None, target_audience: str = None,
-                         has_reviews: bool = None, budget_min: int = None,
-                         budget_max: int = None, limit: int = 5, offset: int = 0) -> List[Tuple[Blogger, User]]:
+async def search_bloggers(platforms: List[str] = None, categories: List[str] = None,
+                         target_age_min: int = None, target_age_max: int = None,
+                         target_gender: str = None, budget_min: int = None,
+                         budget_max: int = None, has_reviews: bool = None,
+                         limit: int = 10, offset: int = 0) -> List[Tuple[Blogger, User]]:
     """Поиск блогеров по критериям"""
-    query = """
-        SELECT b.*, u.telegram_id, u.username, u.first_name, u.last_name, u.rating
-        FROM bloggers b
-        JOIN users u ON b.seller_id = u.id
-        WHERE u.subscription_status = 'active'
-    """
-    params = []
-    
-    if category:
-        query += " AND b.category LIKE ?"
-        params.append(f"%{category}%")
-    
-    if target_audience:
-        query += " AND b.target_audience LIKE ?"
-        params.append(f"%{target_audience}%")
-    
-    if has_reviews is not None:
-        query += " AND b.has_reviews = ?"
-        params.append(has_reviews)
-    
-    if budget_min is not None:
-        query += " AND (b.price_min IS NULL OR b.price_min >= ?)"
-        params.append(budget_min)
-    
-    if budget_max is not None:
-        query += " AND (b.price_max IS NULL OR b.price_max <= ?)"
-        params.append(budget_max)
-    
-    query += " ORDER BY u.rating DESC, b.created_at DESC LIMIT ? OFFSET ?"
-    params.extend([limit, offset])
-    
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        cursor = await db.execute(query, params)
-        rows = await cursor.fetchall()
-        
-        results = []
-        for row in rows:
-            blogger = Blogger(
-                id=row['id'],
-                seller_id=row['seller_id'],
-                name=row['name'],
-                url=row['url'],
-                platform=row['platform'],
-                category=row['category'],
-                target_audience=row['target_audience'],
-                has_reviews=bool(row['has_reviews']),
-                review_categories=row['review_categories'],
-                subscribers_count=row['subscribers_count'],
-                price_min=row['price_min'],
-                price_max=row['price_max'],
-                description=row['description'],
-                created_at=datetime.fromisoformat(row['created_at']),
-                updated_at=datetime.fromisoformat(row['updated_at'])
-            )
+    try:
+        async with aiosqlite.connect(DATABASE_PATH) as db:
+            db.row_factory = aiosqlite.Row
             
-            seller = User(
-                id=row['seller_id'],
-                telegram_id=row['telegram_id'],
-                username=row['username'],
-                first_name=row['first_name'],
-                last_name=row['last_name'],
-                role=UserRole.SELLER,
-                subscription_status=SubscriptionStatus.ACTIVE,
-                rating=row['rating'],
-                reviews_count=0
-            )
+            # Базовый запрос
+            query = """
+                SELECT b.*, u.* FROM bloggers b
+                JOIN users u ON b.seller_id = u.id
+                WHERE 1=1
+            """
+            params = []
             
-            results.append((blogger, seller))
-        
-        return results
+            # Фильтр по платформам
+            if platforms:
+                platform_conditions = []
+                for platform in platforms:
+                    platform_conditions.append("b.platforms LIKE ?")
+                    params.append(f'%"{platform}"%')
+                query += f" AND ({' OR '.join(platform_conditions)})"
+            
+            # Фильтр по категориям
+            if categories:
+                category_conditions = []
+                for category in categories:
+                    category_conditions.append("b.categories LIKE ?")
+                    params.append(f'%"{category}"%')
+                query += f" AND ({' OR '.join(category_conditions)})"
+            
+            # Фильтр по возрасту целевой аудитории
+            if target_age_min is not None and target_age_max is not None:
+                # Проверяем, что хотя бы одна возрастная категория попадает в диапазон
+                age_conditions = []
+                if target_age_min <= 17 and target_age_max >= 13:
+                    age_conditions.append("b.audience_13_17_percent > 0")
+                if target_age_min <= 24 and target_age_max >= 18:
+                    age_conditions.append("b.audience_18_24_percent > 0")
+                if target_age_min <= 35 and target_age_max >= 25:
+                    age_conditions.append("b.audience_25_35_percent > 0")
+                if target_age_max >= 35:
+                    age_conditions.append("b.audience_35_plus_percent > 0")
+                
+                if age_conditions:
+                    query += f" AND ({' OR '.join(age_conditions)})"
+            
+            # Фильтр по полу целевой аудитории
+            if target_gender and target_gender != "any":
+                if target_gender == "female":
+                    query += " AND b.female_percent > b.male_percent"
+                elif target_gender == "male":
+                    query += " AND b.male_percent > b.female_percent"
+            
+            # Фильтр по бюджету
+            if budget_min is not None or budget_max is not None:
+                budget_conditions = []
+                if budget_min is not None:
+                    budget_conditions.append("(b.price_stories >= ? OR b.price_post >= ? OR b.price_video >= ?)")
+                    params.extend([budget_min, budget_min, budget_min])
+                if budget_max is not None:
+                    budget_conditions.append("(b.price_stories <= ? OR b.price_post <= ? OR b.price_video <= ?)")
+                    params.extend([budget_max, budget_max, budget_max])
+                
+                if budget_conditions:
+                    query += f" AND ({' OR '.join(budget_conditions)})"
+            
+            # Фильтр по наличию отзывов
+            if has_reviews is not None:
+                query += " AND b.has_reviews = ?"
+                params.append(has_reviews)
+            
+            # Сортировка по рейтингу продавца
+            query += " ORDER BY u.rating DESC, b.subscribers_count DESC"
+            
+            # Лимит и смещение
+            query += " LIMIT ? OFFSET ?"
+            params.extend([limit, offset])
+            
+            cursor = await db.execute(query, params)
+            rows = await cursor.fetchall()
+            
+            results = []
+            for row in rows:
+                # Парсим платформы из JSON
+                platforms_data = []
+                if row['platforms']:
+                    try:
+                        platforms_json = json.loads(row['platforms'])
+                        platforms_data = [Platform(p) for p in platforms_json]
+                    except json.JSONDecodeError:
+                        logger.warning(f"Invalid platforms JSON for blogger {row['id']}: {row['platforms']}")
+                
+                # Парсим категории из JSON
+                categories_data = []
+                if row['categories']:
+                    try:
+                        categories_json = json.loads(row['categories'])
+                        categories_data = [BlogCategory(c) for c in categories_json]
+                    except json.JSONDecodeError:
+                        logger.warning(f"Invalid categories JSON for blogger {row['id']}: {row['categories']}")
+                
+                # Получаем роли продавца
+                seller_cursor = await db.execute("""
+                    SELECT role FROM user_roles WHERE user_id = ?
+                """, (row['seller_id'],))
+                
+                seller_role_rows = await seller_cursor.fetchall()
+                seller_roles = {UserRole(role_row['role']) for role_row in seller_role_rows}
+                
+                # Создаем объект блогера
+                blogger = Blogger(
+                    id=row['id'],
+                    seller_id=row['seller_id'],
+                    name=row['name'],
+                    url=row['url'],
+                    platforms=platforms_data,
+                    audience_13_17_percent=row['audience_13_17_percent'],
+                    audience_18_24_percent=row['audience_18_24_percent'],
+                    audience_25_35_percent=row['audience_25_35_percent'],
+                    audience_35_plus_percent=row['audience_35_plus_percent'],
+                    female_percent=row['female_percent'],
+                    male_percent=row['male_percent'],
+                    categories=categories_data,
+                    price_stories=row['price_stories'],
+                    price_post=row['price_post'],
+                    price_video=row['price_video'],
+                    has_reviews=bool(row['has_reviews']),
+                    is_registered_rkn=bool(row['is_registered_rkn']),
+                    official_payment_possible=bool(row['official_payment_possible']),
+                    subscribers_count=row['subscribers_count'],
+                    avg_views=row['avg_views'],
+                    avg_likes=row['avg_likes'],
+                    engagement_rate=row['engagement_rate'],
+                    description=row['description'],
+                    created_at=datetime.fromisoformat(row['created_at']),
+                    updated_at=datetime.fromisoformat(row['updated_at'])
+                )
+                
+                # Создаем объект пользователя (продавца)
+                seller = User(
+                    id=row['seller_id'],
+                    telegram_id=row['telegram_id'],
+                    username=row['username'],
+                    first_name=row['first_name'],
+                    last_name=row['last_name'],
+                    roles=seller_roles,
+                    subscription_status=SubscriptionStatus(row['subscription_status']),
+                    subscription_end_date=datetime.fromisoformat(row['subscription_end_date']) if row['subscription_end_date'] else None,
+                    subscription_start_date=datetime.fromisoformat(row['subscription_start_date']) if row['subscription_start_date'] else None,
+                    rating=row['rating'],
+                    reviews_count=row['reviews_count'],
+                    is_vip=bool(row['is_vip']),
+                    penalty_amount=row['penalty_amount'],
+                    is_blocked=bool(row['is_blocked']),
+                    created_at=datetime.fromisoformat(row['created_at']),
+                    updated_at=datetime.fromisoformat(row['updated_at'])
+                )
+                
+                results.append((blogger, seller))
+            
+            return results
+            
+    except Exception as e:
+        logger.error(f"Ошибка при поиске блогеров: {e}")
+        return []
 
 
 async def update_blogger(blogger_id: int, seller_id: int, **kwargs) -> bool:

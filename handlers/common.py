@@ -4,7 +4,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 
-from database.database import get_user, create_user, update_user_role
+from database.database import get_user, create_user, add_user_role, update_user_roles
 from database.models import UserRole, SubscriptionStatus
 from bot.keyboards import (
     get_role_selection_keyboard, 
@@ -59,13 +59,13 @@ async def handle_role_selection(callback: CallbackQuery, state: FSMContext):
     logger.info(f"Данные пользователя: telegram_id={callback.from_user.id}, username={callback.from_user.username}, first_name={callback.from_user.first_name}, last_name={callback.from_user.last_name}")
     
     try:
-        # Создаем пользователя
+        # Создаем пользователя с выбранной ролью
         user = await create_user(
             telegram_id=callback.from_user.id,
             username=callback.from_user.username,
             first_name=callback.from_user.first_name,
             last_name=callback.from_user.last_name,
-            role=role
+            roles=[role]
         )
         
         logger.info(f"Пользователь создан успешно: {user}")
@@ -98,12 +98,19 @@ async def settings_menu(message: Message):
         await message.answer("❌ Пользователь не найден. Используйте /start для регистрации.")
         return
     
-    role_name = "продажник" if user.role == UserRole.SELLER else "закупщик"
+    # Формируем список ролей
+    role_names = []
+    if user.has_role(UserRole.SELLER):
+        role_names.append("продажник")
+    if user.has_role(UserRole.BUYER):
+        role_names.append("закупщик")
+    
+    roles_text = ", ".join(role_names) if role_names else "не указана"
     subscription_status = "активна" if user.subscription_status == SubscriptionStatus.ACTIVE else "неактивна"
     
     await message.answer(
         f"⚙️ <b>Настройки</b>\n\n"
-        f"👤 <b>Роль:</b> {role_name}\n"
+        f"👤 <b>Роли:</b> {roles_text}\n"
         f"💳 <b>Подписка:</b> {subscription_status}\n"
         f"⭐ <b>Рейтинг:</b> {user.rating:.1f} ({user.reviews_count} отзывов)\n\n"
         "Выберите действие:",
@@ -123,16 +130,23 @@ async def change_role(callback: CallbackQuery, state: FSMContext):
         await callback.answer("❌ Пользователь не найден")
         return
     
-    current_role = "продажник" if user.role == UserRole.SELLER else "закупщик"
-    logger.info(f"Текущая роль пользователя {callback.from_user.id}: {current_role}")
+    # Формируем список текущих ролей
+    current_roles = []
+    if user.has_role(UserRole.SELLER):
+        current_roles.append("продажник")
+    if user.has_role(UserRole.BUYER):
+        current_roles.append("закупщик")
+    
+    current_roles_text = ", ".join(current_roles) if current_roles else "не указана"
+    logger.info(f"Текущие роли пользователя {callback.from_user.id}: {current_roles_text}")
     
     await callback.answer()
     await callback.message.edit_text(
-        f"🔄 <b>Смена роли</b>\n\n"
-        f"📋 Текущая роль: <b>{current_role}</b>\n\n"
-        f"Выберите новую роль:\n\n"
-        f"ℹ️ <b>Важно:</b> Подписка сохранится при смене роли.",
-        reply_markup=get_role_selection_keyboard(),
+        f"🔄 <b>Управление ролями</b>\n\n"
+        f"📋 Текущие роли: <b>{current_roles_text}</b>\n\n"
+        f"Выберите действие:\n\n"
+        f"ℹ️ <b>Важно:</b> Подписка сохранится при изменении ролей.",
+        reply_markup=get_role_management_keyboard(),
         parse_mode="HTML"
     )
     await state.set_state(RegistrationStates.waiting_for_role)
@@ -157,16 +171,16 @@ async def handle_role_change(callback: CallbackQuery, state: FSMContext):
         await state.clear()
         return
     
-    logger.info(f"Текущая роль пользователя: {user.role}")
+    logger.info(f"Текущие роли пользователя: {[r.value for r in user.roles]}")
     
-    # Проверяем, не выбрал ли пользователь ту же роль
-    if user.role == new_role:
+    # Проверяем, есть ли уже эта роль
+    if user.has_role(new_role):
         role_name = "продажника" if new_role == UserRole.SELLER else "закупщика"
-        logger.info(f"Пользователь выбрал ту же роль: {role_name}")
-        await callback.answer(f"ℹ️ Вы уже работаете в роли {role_name}")
+        logger.info(f"У пользователя уже есть роль {role_name}")
+        await callback.answer(f"ℹ️ У вас уже есть роль {role_name}")
         await callback.message.edit_text(
-            f"ℹ️ <b>Роль не изменена</b>\n\n"
-            f"Вы уже работаете в роли <b>{role_name}</b>.\n\n"
+            f"ℹ️ <b>Роль уже добавлена</b>\n\n"
+            f"У вас уже есть роль <b>{role_name}</b>.\n\n"
             f"Для возврата в настройки используйте кнопку ниже.",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="⚙️ Вернуться в настройки", callback_data="back_to_settings")]
@@ -176,13 +190,13 @@ async def handle_role_change(callback: CallbackQuery, state: FSMContext):
         await state.clear()
         return
     
-    # Обновляем роль пользователя
-    logger.info(f"Обновляем роль пользователя {callback.from_user.id} с {user.role} на {new_role}")
-    success = await update_user_role(callback.from_user.id, new_role)
+    # Добавляем новую роль пользователю
+    logger.info(f"Добавляем роль {new_role} пользователю {callback.from_user.id}")
+    success = await add_user_role(callback.from_user.id, new_role)
     
     if success:
-        logger.info("Роль успешно обновлена")
-        await callback.answer("✅ Роль успешно изменена!")
+        logger.info("Роль успешно добавлена")
+        await callback.answer("✅ Роль успешно добавлена!")
         await callback.message.delete()
         
         role_name = "продажник" if new_role == UserRole.SELLER else "закупщик"
@@ -194,158 +208,47 @@ async def handle_role_change(callback: CallbackQuery, state: FSMContext):
             SubscriptionStatus.CANCELLED
         ] if updated_user else False
         
+        # Формируем список всех ролей
+        all_roles = []
+        if updated_user.has_role(UserRole.SELLER):
+            all_roles.append("продажник")
+        if updated_user.has_role(UserRole.BUYER):
+            all_roles.append("закупщик")
+        
+        roles_text = ", ".join(all_roles)
+        
         await callback.message.answer(
-            f"✅ <b>Роль успешно изменена!</b>\n\n"
-            f"🎭 Новая роль: <b>{role_name}</b>\n"
+            f"✅ <b>Роль успешно добавлена!</b>\n\n"
+            f"🎭 Ваши роли: <b>{roles_text}</b>\n"
             f"💳 Подписка: {'сохранена' if has_active_subscription else 'неактивна'}\n\n"
-            f"🚀 Теперь вам доступны функции для {role_name}а.",
-            reply_markup=get_main_menu_seller(has_active_subscription) if new_role == UserRole.SELLER else get_main_menu_buyer(has_active_subscription),
+            f"🚀 Теперь вам доступны функции для всех ваших ролей.",
+            reply_markup=get_combined_main_menu(updated_user, has_active_subscription),
             parse_mode="HTML"
         )
+        
+        await state.clear()
+        logger.info("Роль добавлена успешно")
+        
     else:
-        logger.error("Ошибка при обновлении роли в базе данных")
-        await callback.answer("❌ Ошибка при смене роли")
+        logger.error("Ошибка при добавлении роли")
+        await callback.answer("❌ Ошибка при добавлении роли")
         await callback.message.edit_text(
-            "❌ <b>Ошибка при смене роли</b>\n\n"
-            "Попробуйте еще раз или обратитесь в поддержку.",
+            "❌ <b>Ошибка</b>\n\n"
+            "Произошла ошибка при добавлении роли.\n"
+            "Пожалуйста, попробуйте еще раз или обратитесь в поддержку.",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🔄 Попробовать снова", callback_data="change_role")],
                 [InlineKeyboardButton(text="⚙️ Вернуться в настройки", callback_data="back_to_settings")]
             ]),
             parse_mode="HTML"
         )
-    
-    await state.clear()
-    logger.info("Смена роли завершена")
-
-
-@router.callback_query(F.data == "profile")
-async def show_profile(callback: CallbackQuery):
-    """Показать профиль пользователя"""
-    user = await get_user(callback.from_user.id)
-    if not user:
-        await callback.answer("❌ Пользователь не найден")
-        return
-    
-    role_name = "продажник" if user.role == UserRole.SELLER else "закупщик"
-    subscription_status = "активна" if user.subscription_status == SubscriptionStatus.ACTIVE else "неактивна"
-    
-    profile_text = (
-        f"👤 <b>Ваш профиль</b>\n\n"
-        f"🆔 <b>ID:</b> {user.id}\n"
-        f"👤 <b>Имя:</b> {user.first_name or 'Не указано'}\n"
-        f"📛 <b>Username:</b> @{user.username or 'Не указано'}\n"
-        f"🎭 <b>Роль:</b> {role_name}\n"
-        f"💳 <b>Подписка:</b> {subscription_status}\n"
-        f"⭐ <b>Рейтинг:</b> {user.rating:.1f} ({user.reviews_count} отзывов)\n"
-        f"📅 <b>Регистрация:</b> {user.created_at.strftime('%d.%m.%Y')}"
-    )
-    
-    if user.subscription_end_date:
-        profile_text += f"\n🗓️ <b>Подписка до:</b> {user.subscription_end_date.strftime('%d.%m.%Y')}"
-    
-    await callback.answer()
-    await callback.message.edit_text(profile_text, parse_mode="HTML")
-
-
-@router.callback_query(F.data == "statistics")
-async def show_statistics_callback(callback: CallbackQuery):
-    """Показать статистику пользователя (через callback)"""
-    user = await get_user(callback.from_user.id)
-    if not user:
-        await callback.answer("❌ Пользователь не найден")
-        return
-    
-    role_name = "продажник" if user.role == UserRole.SELLER else "закупщик"
-    subscription_status = "активна" if user.subscription_status == SubscriptionStatus.ACTIVE else "неактивна"
-    
-    stats_text = (
-        f"📊 <b>Ваша статистика</b>\n\n"
-        f"👤 <b>Роль:</b> {role_name}\n"
-        f"💳 <b>Подписка:</b> {subscription_status}\n"
-        f"⭐ <b>Рейтинг:</b> {user.rating:.1f}\n"
-        f"📝 <b>Отзывов:</b> {user.reviews_count}\n"
-        f"📅 <b>В боте с:</b> {user.created_at.strftime('%d.%m.%Y')}\n"
-    )
-    
-    if user.role == UserRole.SELLER:
-        # Статистика для продажника
-        from database.database import get_user_bloggers
-        bloggers = await get_user_bloggers(user.id)
-        stats_text += f"\n📝 <b>Добавлено блогеров:</b> {len(bloggers)}\n"
-        
-        # Можно добавить больше статистики:
-        # - Количество просмотров блогеров
-        # - Количество переходов к контактам
-        # - etc.
-    
-    if user.subscription_end_date:
-        stats_text += f"🗓️ <b>Подписка до:</b> {user.subscription_end_date.strftime('%d.%m.%Y')}"
-    
-    await callback.answer()
-    await callback.message.edit_text(stats_text, parse_mode="HTML")
+        await state.clear()
 
 
 @router.callback_query(F.data == "back_to_settings")
 async def back_to_settings(callback: CallbackQuery):
     """Возврат в настройки"""
-    user = await get_user(callback.from_user.id)
-    if not user:
-        await callback.answer("❌ Пользователь не найден")
-        return
-    
-    role_name = "продажник" if user.role == UserRole.SELLER else "закупщик"
-    subscription_status = "активна" if user.subscription_status == SubscriptionStatus.ACTIVE else "неактивна"
-    
     await callback.answer()
-    await callback.message.edit_text(
-        f"⚙️ <b>Настройки</b>\n\n"
-        f"👤 <b>Роль:</b> {role_name}\n"
-        f"💳 <b>Подписка:</b> {subscription_status}\n"
-        f"⭐ <b>Рейтинг:</b> {user.rating:.1f} ({user.reviews_count} отзывов)\n\n"
-        "Выберите действие:",
-        reply_markup=get_settings_keyboard(),
-        parse_mode="HTML"
-    )
-
-
-@router.callback_query(F.data == "help")
-async def show_help(callback: CallbackQuery):
-    """Показать справку"""
-    help_text = (
-        "❓ <b>Справка</b>\n\n"
-        "🤖 Этот бот поможет вам найти подходящих блогеров или предложить своих.\n\n"
-        "<b>Для продажников:</b>\n"
-        "• Добавляйте блогеров в базу\n"
-        "• Указывайте категории и цены\n"
-        "• Получайте заказы от закупщиков\n\n"
-        "<b>Для закупщиков:</b>\n"
-        "• Ищите блогеров по критериям\n"
-        "• Получайте подборки по вашим требованиям\n"
-        "• Оценивайте качество сотрудничества\n\n"
-        "💳 <b>Подписка:</b> 500₽/мес для доступа ко всем функциям\n\n"
-        "📞 <b>Поддержка:</b> @support_username"
-    )
-    
-    await callback.answer()
-    await callback.message.edit_text(help_text, parse_mode="HTML")
-
-
-@router.message(Command("help"))
-async def help_command(message: Message):
-    """Команда помощи"""
-    await show_help(message)
-
-
-@router.message(Command("menu"))
-async def menu_command(message: Message):
-    """Команда обновления главного меню"""
-    user = await get_user(message.from_user.id)
-    if not user:
-        await message.answer("❌ Пользователь не найден. Используйте /start для регистрации.")
-        return
-    
-    await update_main_menu_keyboard(message, user.id)
+    await settings_menu(callback.message)
 
 
 async def show_main_menu(message: Message, user):
@@ -357,7 +260,20 @@ async def show_main_menu(message: Message, user):
         SubscriptionStatus.CANCELLED
     ]
     
-    if user.role == UserRole.SELLER:
+    # Определяем, какие роли есть у пользователя
+    is_seller = user.has_role(UserRole.SELLER)
+    is_buyer = user.has_role(UserRole.BUYER)
+    
+    if is_seller and is_buyer:
+        # Пользователь имеет обе роли
+        greeting = (
+            f"👋 Добро пожаловать, {user.first_name or 'Пользователь'}!\n\n"
+            "🎭 У вас есть роли продажника и закупщика.\n"
+            "Выберите действие:"
+        )
+        keyboard = get_combined_main_menu(user, has_active_subscription)
+    elif is_seller:
+        # Только продажник
         greeting = (
             f"👋 Добро пожаловать, {user.first_name or 'Продажник'}!\n\n"
             "📋 Здесь вы можете управлять своими блогерами.\n"
@@ -365,6 +281,7 @@ async def show_main_menu(message: Message, user):
         )
         keyboard = get_main_menu_seller(has_active_subscription)
     else:
+        # Только закупщик
         greeting = (
             f"👋 Добро пожаловать, {user.first_name or 'Закупщик'}!\n\n"
             "🔍 Здесь вы можете найти подходящих блогеров.\n"
@@ -387,10 +304,54 @@ async def update_main_menu_keyboard(message: Message, user_id: int):
         SubscriptionStatus.CANCELLED
     ]
     
-    keyboard = get_main_menu_seller(has_active_subscription) if user.role == UserRole.SELLER else get_main_menu_buyer(has_active_subscription)
+    keyboard = get_combined_main_menu(user, has_active_subscription)
     
     await message.answer(
         "🔄 Главное меню обновлено!\n\n"
         "Теперь вам доступны актуальные функции.",
         reply_markup=keyboard
+    )
+
+
+def get_role_management_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура управления ролями"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="➕ Добавить роль продажника", callback_data="role_seller")],
+        [InlineKeyboardButton(text="➕ Добавить роль закупщика", callback_data="role_buyer")],
+        [InlineKeyboardButton(text="⚙️ Вернуться в настройки", callback_data="back_to_settings")]
+    ])
+
+
+def get_combined_main_menu(user, has_active_subscription: bool) -> InlineKeyboardMarkup:
+    """Комбинированное главное меню для пользователей с несколькими ролями"""
+    from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+    
+    keyboard_buttons = []
+    
+    # Функции продажника
+    if user.has_role(UserRole.SELLER):
+        keyboard_buttons.extend([
+            [KeyboardButton(text="📝 Добавить блогера")],
+            [KeyboardButton(text="📋 Мои блогеры")],
+            [KeyboardButton(text="✏️ Редактировать блогера")]
+        ])
+    
+    # Функции закупщика
+    if user.has_role(UserRole.BUYER):
+        keyboard_buttons.extend([
+            [KeyboardButton(text="🔍 Поиск блогеров")],
+            [KeyboardButton(text="📋 История поиска")],
+            [KeyboardButton(text="📊 Статистика")]
+        ])
+    
+    # Общие функции
+    keyboard_buttons.extend([
+        [KeyboardButton(text="💳 Подписка")],
+        [KeyboardButton(text="⚙️ Настройки")]
+    ])
+    
+    return ReplyKeyboardMarkup(
+        keyboard=keyboard_buttons,
+        resize_keyboard=True,
+        input_field_placeholder="Выберите действие"
     ) 

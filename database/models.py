@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional, List
+from typing import Optional, List, Set
 from datetime import datetime
 from enum import Enum
 
@@ -47,13 +47,13 @@ class BlogCategory(Enum):
 
 @dataclass
 class User:
-    """Модель пользователя"""
+    """Модель пользователя с поддержкой множественных ролей"""
     id: int
     telegram_id: int
     username: Optional[str] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
-    role: UserRole = UserRole.SELLER
+    roles: Set[UserRole] = field(default_factory=set)  # Множество ролей вместо одной роли
     subscription_status: SubscriptionStatus = SubscriptionStatus.INACTIVE
     subscription_end_date: Optional[datetime] = None
     subscription_start_date: Optional[datetime] = None  # Добавляем дату начала подписки
@@ -64,6 +64,34 @@ class User:
     is_blocked: bool = False  # Блокировка за штрафы
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
+    
+    def has_role(self, role: UserRole) -> bool:
+        """Проверяет, есть ли у пользователя указанная роль"""
+        return role in self.roles
+    
+    def has_any_role(self, roles: List[UserRole]) -> bool:
+        """Проверяет, есть ли у пользователя хотя бы одна из указанных ролей"""
+        return bool(self.roles.intersection(set(roles)))
+    
+    def add_role(self, role: UserRole) -> None:
+        """Добавляет роль пользователю"""
+        self.roles.add(role)
+    
+    def remove_role(self, role: UserRole) -> None:
+        """Удаляет роль у пользователя"""
+        self.roles.discard(role)
+    
+    def get_primary_role(self) -> Optional[UserRole]:
+        """Возвращает основную роль (первую добавленную) для обратной совместимости"""
+        return next(iter(self.roles)) if self.roles else None
+    
+    def can_complain(self) -> bool:
+        """Проверяет, может ли пользователь подавать жалобы (только закупщики)"""
+        return UserRole.BUYER in self.roles
+    
+    def can_edit_bloggers(self) -> bool:
+        """Проверяет, может ли пользователь редактировать блогеров (продажники и закупщики)"""
+        return bool(self.roles)  # Любая роль может редактировать блогеров
 
 
 @dataclass

@@ -28,7 +28,7 @@ async def test_database_migration():
         username="test_user",
         first_name="Test",
         last_name="User",
-        role=UserRole.SELLER
+        roles=[UserRole.SELLER]
     )
     logger.info(f"✅ Создан тестовый пользователь: {user.username}")
     
@@ -81,7 +81,7 @@ async def test_google_sheets_integration(user, blogger):
             # Тест записи действия с блогером
             user_data = {
                 'username': user.username,
-                'role': user.role.value,
+                'roles': [r.value for r in user.roles],
                 'subscription_start_date': datetime.now(),
                 'subscription_end_date': datetime.now() + timedelta(days=30)
             }
@@ -146,21 +146,21 @@ async def test_role_permissions():
     seller = await create_user(
         telegram_id=111111111,
         username="test_seller",
-        role=UserRole.SELLER
+        roles=[UserRole.SELLER]
     )
     
     buyer = await create_user(
         telegram_id=222222222,
         username="test_buyer",
-        role=UserRole.BUYER
+        roles=[UserRole.BUYER]
     )
     
-    logger.info(f"   Продажник: {seller.username} - {seller.role.value}")
-    logger.info(f"   Закупщик: {buyer.username} - {buyer.role.value}")
+    logger.info(f"   Продажник: {seller.username} - {[r.value for r in seller.roles]}")
+    logger.info(f"   Закупщик: {buyer.username} - {[r.value for r in buyer.roles]}")
     
     # Проверка прав доступа
-    seller_can_complain = seller.role == UserRole.BUYER
-    buyer_can_complain = buyer.role == UserRole.BUYER
+    seller_can_complain = seller.has_role(UserRole.BUYER)
+    buyer_can_complain = buyer.has_role(UserRole.BUYER)
     
     logger.info(f"   Продажник может жаловаться: {'❌' if seller_can_complain else '✅'}")
     logger.info(f"   Закупщик может жаловаться: {'✅' if buyer_can_complain else '❌'}")

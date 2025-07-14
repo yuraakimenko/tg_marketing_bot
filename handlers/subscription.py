@@ -227,7 +227,19 @@ async def handle_mock_payment_success(callback: CallbackQuery):
                 SubscriptionStatus.CANCELLED
             ]
             
-            keyboard = get_main_menu_seller(has_active_subscription) if updated_user.role == UserRole.SELLER else get_main_menu_buyer(has_active_subscription)
+            # Определяем клавиатуру на основе ролей пользователя
+            from database.models import UserRole
+            from bot.keyboards import get_main_menu_seller, get_main_menu_buyer
+            try:
+                from handlers.common import get_combined_main_menu
+            except ImportError:
+                get_combined_main_menu = None
+            if updated_user.has_role(UserRole.SELLER) and updated_user.has_role(UserRole.BUYER) and get_combined_main_menu:
+                keyboard = get_combined_main_menu(updated_user, has_active_subscription)
+            elif updated_user.has_role(UserRole.SELLER):
+                keyboard = get_main_menu_seller(has_active_subscription)
+            else:
+                keyboard = get_main_menu_buyer(has_active_subscription)
             
             # Отправляем новое сообщение с обновленной клавиатурой
             await callback.message.answer(
