@@ -114,18 +114,18 @@ def get_platforms_multi_keyboard(selected_platforms: list = None) -> InlineKeybo
     if selected_platforms is None:
         selected_platforms = []
     platforms = [
-        ("📸 Instagram", "platform_instagram"),
-        ("📺 YouTube", "platform_youtube"),
-        ("📱 Telegram", "platform_telegram"),
-        ("🎵 TikTok", "platform_tiktok"),
-        ("🌐 VK", "platform_vk")
+        ("📸 Instagram", "instagram"),
+        ("📺 YouTube", "youtube"),
+        ("📱 Telegram", "telegram"),
+        ("🎵 TikTok", "tiktok"),
+        ("🌐 VK", "vk")
     ]
     keyboard = []
     for name, value in platforms:
         if value in selected_platforms:
-            keyboard.append([InlineKeyboardButton(text=f"✅ {name}", callback_data=f"toggle_{value}")])
+            keyboard.append([InlineKeyboardButton(text=f"✅ {name}", callback_data=f"toggle_platform_{value}")])
         else:
-            keyboard.append([InlineKeyboardButton(text=f"⬜ {name}", callback_data=f"toggle_{value}")])
+            keyboard.append([InlineKeyboardButton(text=f"⬜ {name}", callback_data=f"toggle_platform_{value}")])
     keyboard.append([InlineKeyboardButton(text="✅ Завершить выбор", callback_data="finish_platforms_selection")])
     keyboard.append([InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_action")])
     return InlineKeyboardMarkup(inline_keyboard=keyboard)

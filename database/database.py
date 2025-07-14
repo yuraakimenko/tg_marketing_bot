@@ -25,6 +25,7 @@ async def init_db():
                 last_name TEXT,
                 role TEXT NOT NULL DEFAULT 'seller',
                 subscription_status TEXT NOT NULL DEFAULT 'inactive',
+                subscription_start_date TIMESTAMP,
                 subscription_end_date TIMESTAMP,
                 rating REAL DEFAULT 0.0,
                 reviews_count INTEGER DEFAULT 0,
@@ -43,7 +44,7 @@ async def init_db():
                 seller_id INTEGER NOT NULL,
                 name TEXT NOT NULL,
                 url TEXT NOT NULL,
-                platform TEXT NOT NULL,
+                platforms TEXT NOT NULL,  -- JSON массив платформ
                 
                 -- Демография аудитории
                 audience_13_17_percent INTEGER,
@@ -134,6 +135,8 @@ async def init_db():
                 FOREIGN KEY (user_id) REFERENCES users (id)
             )
         """)
+        
+
         
         # Создание таблицы контактов
         await db.execute("""
@@ -257,6 +260,30 @@ async def init_db():
                 await db.execute("ALTER TABLE bloggers ADD COLUMN engagement_rate REAL")
                 logger.info("Added engagement_rate column to bloggers table")
             
+            # Миграция для перехода от platform к platforms
+            if 'platform' in columns and 'platforms' not in columns:
+                # Создаем новую колонку platforms
+                await db.execute("ALTER TABLE bloggers ADD COLUMN platforms TEXT")
+                logger.info("Added platforms column to bloggers table")
+                
+                # Копируем данные из platform в platforms
+                cursor = await db.execute("SELECT id, platform FROM bloggers WHERE platform IS NOT NULL")
+                rows = await cursor.fetchall()
+                for row in rows:
+                    blogger_id, platform = row
+                    if platform:
+                        platforms_json = json.dumps([platform])
+                        await db.execute("UPDATE bloggers SET platforms = ? WHERE id = ?", (platforms_json, blogger_id))
+                logger.info("Migrated platform data to platforms column")
+            
+            # Проверяем и добавляем subscription_start_date в users
+            cursor = await db.execute("PRAGMA table_info(users)")
+            columns = [row[1] for row in await cursor.fetchall()]
+            
+            if 'subscription_start_date' not in columns:
+                await db.execute("ALTER TABLE users ADD COLUMN subscription_start_date TIMESTAMP")
+                logger.info("Added subscription_start_date column to users table")
+            
             # Проверяем и добавляем новые поля в subscriptions
             cursor = await db.execute("PRAGMA table_info(subscriptions)")
             columns = [row[1] for row in await cursor.fetchall()]
@@ -321,6 +348,7 @@ async def get_user(telegram_id: int) -> Optional[User]:
                 last_name=row['last_name'],
                 role=UserRole(row['role']),
                 subscription_status=SubscriptionStatus(row['subscription_status']),
+                subscription_start_date=datetime.fromisoformat(row['subscription_start_date']) if row['subscription_start_date'] else None,
                 subscription_end_date=datetime.fromisoformat(row['subscription_end_date']) if row['subscription_end_date'] else None,
                 rating=row['rating'],
                 reviews_count=row['reviews_count'],
@@ -346,30 +374,32 @@ async def update_user_role(telegram_id: int, role: UserRole) -> bool:
 
 
 async def update_subscription_status(user_id: int, status: SubscriptionStatus, 
-                                   end_date: datetime = None) -> bool:
+                                   end_date: datetime = None, start_date: datetime = None) -> bool:
     """Обновление статуса подписки"""
     async with aiosqlite.connect(DATABASE_PATH) as db:
         cursor = await db.execute("""
-            UPDATE users SET subscription_status = ?, subscription_end_date = ?, 
+            UPDATE users SET subscription_status = ?, subscription_start_date = ?, subscription_end_date = ?, 
                            updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
-        """, (status.value, end_date.isoformat() if end_date else None, user_id))
+        """, (status.value, start_date.isoformat() if start_date else None, 
+              end_date.isoformat() if end_date else None, user_id))
         
         await db.commit()
         return cursor.rowcount > 0
 
 
 # Функции для работы с блогерами
-async def create_blogger(seller_id: int, name: str, url: str, platform: Platform,
+async def create_blogger(seller_id: int, name: str, url: str, platforms: List[Platform],
                         categories: List[BlogCategory], **kwargs) -> Blogger:
     """Создание нового блогера"""
     async with aiosqlite.connect(DATABASE_PATH) as db:
-        # Преобразуем категории в JSON
+        # Преобразуем платформы и категории в JSON
+        platforms_json = json.dumps([platform.value for platform in platforms]) if platforms else None
         categories_json = json.dumps([cat.value for cat in categories]) if categories else None
         
         cursor = await db.execute("""
             INSERT INTO bloggers (
-                seller_id, name, url, platform, categories,
+                seller_id, name, url, platforms, categories,
                 audience_13_17_percent, audience_18_24_percent, audience_25_35_percent, audience_35_plus_percent,
                 female_percent, male_percent,
                 price_stories, price_post, price_video,
@@ -379,7 +409,7 @@ async def create_blogger(seller_id: int, name: str, url: str, platform: Platform
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            seller_id, name, url, platform.value, categories_json,
+            seller_id, name, url, platforms_json, categories_json,
             kwargs.get('audience_13_17_percent'),
             kwargs.get('audience_18_24_percent'),
             kwargs.get('audience_25_35_percent'),
@@ -415,6 +445,19 @@ async def get_blogger(blogger_id: int) -> Optional[Blogger]:
         row = await cursor.fetchone()
         
         if row:
+            # Парсим платформы из JSON
+            platforms = []
+            if row['platforms']:
+                try:
+                    platform_values = json.loads(row['platforms'])
+                    platforms = [Platform(platform) for platform in platform_values]
+                except (json.JSONDecodeError, ValueError):
+                    # Fallback для старых данных с одной платформой
+                    try:
+                        platforms = [Platform(row['platform'])] if row.get('platform') else []
+                    except (ValueError, KeyError):
+                        pass
+            
             # Парсим категории из JSON
             categories = []
             if row['categories']:
@@ -429,7 +472,7 @@ async def get_blogger(blogger_id: int) -> Optional[Blogger]:
                 seller_id=row['seller_id'],
                 name=row['name'],
                 url=row['url'],
-                platform=Platform(row['platform']),
+                platforms=platforms,
                 audience_13_17_percent=row['audience_13_17_percent'],
                 audience_18_24_percent=row['audience_18_24_percent'],
                 audience_25_35_percent=row['audience_25_35_percent'],

@@ -495,12 +495,51 @@ async def process_blogger_description(message: Message, state: FSMContext):
     data = await state.get_data()
     user = await get_user(message.from_user.id)
     
+    # Валидация возрастных категорий
+    age_total = (
+        data.get('audience_13_17_percent', 0) +
+        data.get('audience_18_24_percent', 0) +
+        data.get('audience_25_35_percent', 0) +
+        data.get('audience_35_plus_percent', 0)
+    )
+    
+    if age_total != 100:
+        await message.answer(
+            f"❌ <b>Ошибка валидации!</b>\n\n"
+            f"Сумма процентов возрастных категорий должна быть 100%.\n"
+            f"Текущая сумма: {age_total}%\n\n"
+            f"Пожалуйста, исправьте данные и попробуйте снова.",
+            parse_mode="HTML"
+        )
+        return
+    
+    # Валидация процентов по полу
+    gender_total = data.get('female_percent', 0) + data.get('male_percent', 0)
+    if gender_total != 100:
+        await message.answer(
+            f"❌ <b>Ошибка валидации!</b>\n\n"
+            f"Сумма процентов по полу должна быть 100%.\n"
+            f"Текущая сумма: {gender_total}%\n\n"
+            f"Пожалуйста, исправьте данные и попробуйте снова.",
+            parse_mode="HTML"
+        )
+        return
+    
+    # Преобразуем платформы в enum
+    platforms = []
+    for platform_code in data.get('platforms', []):
+        try:
+            platforms.append(Platform(platform_code))
+        except ValueError:
+            await message.answer(f"❌ Неизвестная платформа: {platform_code}")
+            return
+    
     # Создаем блогера с новыми полями
     blogger = await create_blogger(
         seller_id=user.id,
         name=data['name'],
         url=data['url'],
-        platform=data['platform'], # This will be a list of Platform enums
+        platforms=platforms,
         categories=data['categories'],
         audience_13_17_percent=data['audience_13_17_percent'],
         audience_18_24_percent=data['audience_18_24_percent'],
@@ -515,12 +554,35 @@ async def process_blogger_description(message: Message, state: FSMContext):
         description=description
     )
     
+    # Логируем в Google Sheets
+    from utils.google_sheets import log_blogger_action_to_sheets
+    
+    user_data = {
+        'username': user.username,
+        'role': user.role.value,
+        'subscription_start_date': user.subscription_start_date,
+        'subscription_end_date': user.subscription_end_date
+    }
+    
+    blogger_data = {
+        'name': blogger.name,
+        'url': blogger.url,
+        'platforms': [p.value for p in blogger.platforms],
+        'audience_13_17_percent': blogger.audience_13_17_percent,
+        'audience_18_24_percent': blogger.audience_18_24_percent,
+        'audience_25_35_percent': blogger.audience_25_35_percent,
+        'audience_35_plus_percent': blogger.audience_35_plus_percent
+    }
+    
+    await log_blogger_action_to_sheets(user_data, blogger_data, "add")
+    
     await message.answer(
         f"✅ <b>Блогер успешно добавлен!</b>\n\n"
         f"📝 <b>Имя:</b> {blogger.name}\n"
-        f"📱 <b>Платформа:</b> {', '.join([p.value for p in blogger.platform])} (множество)\n" # Display multiple platforms
-        f"🎯 <b>Категория:</b> {', '.join([cat.value for cat in blogger.categories])}\n"
+        f"📱 <b>Платформы:</b> {', '.join([p.value for p in blogger.platforms])}\n"
+        f"🎯 <b>Категории:</b> {', '.join([cat.value for cat in blogger.categories])}\n"
         f"👥 <b>Аудитория:</b> {blogger.female_percent}%♀️ {blogger.male_percent}%♂️\n"
+        f"📊 <b>Возрастные категории:</b> {blogger.get_age_categories_summary()}\n"
         f"🗣️ <b>Отзывы:</b> {'Есть' if blogger.has_reviews else 'Нет'}\n"
         f"💰 <b>Цены:</b>\n"
         f"• 4 истории: {blogger.price_stories}₽\n"
@@ -655,8 +717,7 @@ async def show_blogger_details(callback: CallbackQuery):
             await callback.answer("❌ Нет доступа к этому блогеру")
             return
         # Платформы
-        platforms = blogger.platform if isinstance(blogger.platform, list) else [blogger.platform]
-        platforms_str = ", ".join([p.value if hasattr(p, 'value') else str(p) for p in platforms])
+        platforms_str = blogger.get_platforms_summary()
         # Категории
         categories = blogger.categories if hasattr(blogger, 'categories') else []
         categories_str = ", ".join([c.value if hasattr(c, 'value') else str(c) for c in categories])

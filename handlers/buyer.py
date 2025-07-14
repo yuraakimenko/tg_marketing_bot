@@ -225,8 +225,8 @@ async def show_search_results(message, results, page=0):
         
         results_text += (
             f"<b>{i}. {blogger.name}</b>\n"
-            f"📱 {blogger.platform} | 🎯 {blogger.category}\n"
-            f"👥 {blogger.target_audience}\n"
+            f"📱 {blogger.get_platforms_summary()} | 🎯 {', '.join([cat.value for cat in blogger.categories])}\n"
+            f"👥 {blogger.get_age_categories_summary()}\n"
             f"💰 {price_info}\n"
             f"🗣️ Отзывы: {'Есть' if blogger.has_reviews else 'Нет'}\n"
             f"⭐ Рейтинг продавца: {seller.rating:.1f}\n\n"
@@ -571,6 +571,12 @@ async def get_user_by_id(user_id: int):
 @router.callback_query(F.data.startswith("complaint_"))
 async def start_complaint(callback: CallbackQuery, state: FSMContext):
     """Начать процесс подачи жалобы на блогера"""
+    # Проверяем, что пользователь - закупщик
+    user = await get_user(callback.from_user.id)
+    if not user or user.role != UserRole.BUYER:
+        await callback.answer("❌ Только закупщики могут подавать жалобы")
+        return
+    
     blogger_id = int(callback.data.split("_")[1])
     
     # Получаем информацию о блогере
@@ -587,7 +593,7 @@ async def start_complaint(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text(
         f"⚠️ <b>Подача жалобы на блогера</b>\n\n"
         f"📝 <b>Блогер:</b> {blogger.name}\n"
-        f"📱 <b>Платформа:</b> {blogger.platform}\n\n"
+        f"📱 <b>Платформы:</b> {blogger.get_platforms_summary()}\n\n"
         f"💬 <b>Напишите причину жалобы:</b>\n"
         f"Опишите подробно, что вас беспокоит в этом блогере "
         f"(например: подозрение на накрутку, фейковые подписчики, неактуальная информация и т.д.)\n\n"

@@ -184,6 +184,7 @@ async def handle_mock_payment_success(callback: CallbackQuery):
         return
     
     # Определяем тип подписки по сумме (можно улучшить логику)
+    start_date = datetime.now()
     subscription_duration = timedelta(days=30)  # По умолчанию месяц
     
     # Здесь можно добавить логику определения типа подписки из invoice_id
@@ -192,12 +193,13 @@ async def handle_mock_payment_success(callback: CallbackQuery):
     elif "yearly" in invoice_id:
         subscription_duration = timedelta(days=365)
     
-    end_date = datetime.now() + subscription_duration
+    end_date = start_date + subscription_duration
     
     success = await update_subscription_status(
         user.id, 
         SubscriptionStatus.ACTIVE, 
-        end_date
+        end_date,
+        start_date
     )
     
     if success:

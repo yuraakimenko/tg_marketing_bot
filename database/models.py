@@ -56,6 +56,7 @@ class User:
     role: UserRole = UserRole.SELLER
     subscription_status: SubscriptionStatus = SubscriptionStatus.INACTIVE
     subscription_end_date: Optional[datetime] = None
+    subscription_start_date: Optional[datetime] = None  # Добавляем дату начала подписки
     rating: float = 0.0
     reviews_count: int = 0
     is_vip: bool = False  # VIP статус для менеджеров
@@ -72,7 +73,7 @@ class Blogger:
     seller_id: int
     name: str
     url: str
-    platform: Platform  # Платформа (instagram, youtube, telegram, etc.)
+    platforms: List[Platform] = field(default_factory=list)  # Множественный выбор платформ
     
     # Демография аудитории
     audience_13_17_percent: Optional[int] = None  # % аудитории 13-17 лет
@@ -106,6 +107,51 @@ class Blogger:
     description: Optional[str] = None
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
+    
+    def validate_age_percentages(self) -> bool:
+        """Проверка корректности процентов возрастных категорий"""
+        total = 0
+        if self.audience_13_17_percent:
+            total += self.audience_13_17_percent
+        if self.audience_18_24_percent:
+            total += self.audience_18_24_percent
+        if self.audience_25_35_percent:
+            total += self.audience_25_35_percent
+        if self.audience_35_plus_percent:
+            total += self.audience_35_plus_percent
+        
+        return total == 100 or total == 0  # 0 означает, что данные не заполнены
+    
+    def validate_gender_percentages(self) -> bool:
+        """Проверка корректности процентов по полу"""
+        if self.female_percent is None and self.male_percent is None:
+            return True  # Данные не заполнены
+        
+        total = 0
+        if self.female_percent:
+            total += self.female_percent
+        if self.male_percent:
+            total += self.male_percent
+        
+        return total == 100
+    
+    def get_age_categories_summary(self) -> str:
+        """Получить сводку по возрастным категориям"""
+        categories = []
+        if self.audience_13_17_percent:
+            categories.append(f"13-17: {self.audience_13_17_percent}%")
+        if self.audience_18_24_percent:
+            categories.append(f"18-24: {self.audience_18_24_percent}%")
+        if self.audience_25_35_percent:
+            categories.append(f"25-35: {self.audience_25_35_percent}%")
+        if self.audience_35_plus_percent:
+            categories.append(f"35+: {self.audience_35_plus_percent}%")
+        
+        return "; ".join(categories) if categories else "Не указано"
+    
+    def get_platforms_summary(self) -> str:
+        """Получить сводку по платформам"""
+        return ", ".join([platform.value for platform in self.platforms]) if self.platforms else "Не указано"
 
 
 @dataclass

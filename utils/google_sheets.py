@@ -1,8 +1,9 @@
 import gspread
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from google.auth.exceptions import GoogleAuthError
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ class GoogleSheetsManager:
             try:
                 self.worksheet = self.spreadsheet.sheet1
             except gspread.exceptions.WorksheetNotFound:
-                self.worksheet = self.spreadsheet.add_worksheet(title="Жалобы", rows="1000", cols="10")
+                self.worksheet = self.spreadsheet.add_worksheet(title="Данные блогеров", rows="1000", cols="10")
             
             # Проверяем заголовки, добавляем если нужно
             await self._ensure_headers()
@@ -54,16 +55,85 @@ class GoogleSheetsManager:
             first_row = self.worksheet.row_values(1)
             
             if not first_row or len(first_row) == 0:
-                # Добавляем заголовки
+                # Добавляем заголовки согласно ТЗ
                 headers = [
-                    "Дата", "ID блогера", "Имя блогера", 
-                    "ID пользователя", "Username", "Причина жалобы", "Статус"
+                    "Пользователь", "Блогер", "Жалоба", "Тип Жалобы", 
+                    "Соцсети", "Проценты возрастных категорий", 
+                    "Дата подписки", "Дата окончания подписки"
                 ]
                 self.worksheet.insert_row(headers, 1)
                 logger.info("Headers added to Google Sheets")
                 
         except Exception as e:
             logger.error(f"Error ensuring headers: {e}")
+    
+    async def add_blogger_action(self, user_data: Dict[str, Any], blogger_data: Dict[str, Any], 
+                                action_type: str = "add") -> bool:
+        """Добавить действие с блогером в Google Sheets"""
+        try:
+            if not self.worksheet:
+                if not await self.initialize():
+                    return False
+            
+            # Форматируем данные пользователя
+            user_info = f"{user_data.get('username', 'N/A')} ({user_data.get('role', 'N/A')})"
+            
+            # Форматируем данные блогера
+            blogger_info = f"{blogger_data.get('name', 'N/A')} - {blogger_data.get('url', 'N/A')}"
+            
+            # Форматируем соцсети
+            platforms = blogger_data.get('platforms', [])
+            if isinstance(platforms, str):
+                try:
+                    platforms = json.loads(platforms)
+                except:
+                    platforms = [platforms]
+            social_networks = ", ".join(platforms) if platforms else "N/A"
+            
+            # Форматируем возрастные категории
+            age_categories = []
+            if blogger_data.get('audience_13_17_percent'):
+                age_categories.append(f"13-17: {blogger_data['audience_13_17_percent']}%")
+            if blogger_data.get('audience_18_24_percent'):
+                age_categories.append(f"18-24: {blogger_data['audience_18_24_percent']}%")
+            if blogger_data.get('audience_25_35_percent'):
+                age_categories.append(f"25-35: {blogger_data['audience_25_35_percent']}%")
+            if blogger_data.get('audience_35_plus_percent'):
+                age_categories.append(f"35+: {blogger_data['audience_35_plus_percent']}%")
+            
+            age_info = "; ".join(age_categories) if age_categories else "N/A"
+            
+            # Форматируем даты подписки
+            subscription_start = user_data.get('subscription_start_date', 'N/A')
+            if subscription_start and subscription_start != 'N/A':
+                subscription_start = subscription_start.strftime('%d.%m.%Y') if hasattr(subscription_start, 'strftime') else subscription_start
+            
+            subscription_end = user_data.get('subscription_end_date', 'N/A')
+            if subscription_end and subscription_end != 'N/A':
+                subscription_end = subscription_end.strftime('%d.%m.%Y') if hasattr(subscription_end, 'strftime') else subscription_end
+            
+            # Подготавливаем данные для записи
+            current_time = datetime.now().strftime("%d.%m.%Y %H:%M")
+            row_data = [
+                user_info,  # Пользователь
+                blogger_info,  # Блогер
+                "Нет",  # Жалоба (по умолчанию нет)
+                "",  # Тип Жалобы (пусто)
+                social_networks,  # Соцсети
+                age_info,  # Проценты возрастных категорий
+                subscription_start,  # Дата подписки
+                subscription_end  # Дата окончания подписки
+            ]
+            
+            # Добавляем строку в таблицу
+            self.worksheet.append_row(row_data)
+            
+            logger.info(f"Blogger action added to Google Sheets: user={user_info}, blogger={blogger_info}, action={action_type}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error adding blogger action to Google Sheets: {e}")
+            return False
     
     async def add_complaint(self, blogger_id: int, blogger_name: str, 
                            user_id: int, username: str, reason: str, 
@@ -74,22 +144,33 @@ class GoogleSheetsManager:
                 if not await self.initialize():
                     return False
             
-            # Подготавливаем данные для записи
+            # Получаем все данные
+            all_values = self.worksheet.get_all_values()
+            
+            # Ищем строку с нужным блогером (пропускаем заголовок)
+            for i, row in enumerate(all_values[1:], start=2):
+                if len(row) >= 2 and blogger_name in row[1]:  # Ищем по имени блогера
+                    # Обновляем поля жалобы
+                    self.worksheet.update_cell(i, 3, "Да")  # Жалоба
+                    self.worksheet.update_cell(i, 4, reason)  # Тип Жалобы
+                    logger.info(f"Complaint added to Google Sheets: blogger_id={blogger_id}, user_id={user_id}")
+                    return True
+            
+            # Если блогер не найден, создаем новую строку
             current_time = datetime.now().strftime("%d.%m.%Y %H:%M")
             row_data = [
-                current_time,
-                str(blogger_id),
-                blogger_name,
-                str(user_id),
-                username,
-                reason,
-                status
+                f"{username} (buyer)",  # Пользователь
+                blogger_name,  # Блогер
+                "Да",  # Жалоба
+                reason,  # Тип Жалобы
+                "N/A",  # Соцсети
+                "N/A",  # Проценты возрастных категорий
+                "N/A",  # Дата подписки
+                "N/A"  # Дата окончания подписки
             ]
             
-            # Добавляем строку в таблицу
             self.worksheet.append_row(row_data)
-            
-            logger.info(f"Complaint added to Google Sheets: blogger_id={blogger_id}, user_id={user_id}")
+            logger.info(f"New complaint row added to Google Sheets: blogger_id={blogger_id}, user_id={user_id}")
             return True
             
         except Exception as e:
@@ -109,9 +190,12 @@ class GoogleSheetsManager:
             
             # Ищем строку с нужной жалобой (пропускаем заголовок)
             for i, row in enumerate(all_values[1:], start=2):
-                if len(row) >= 7 and row[1] == str(blogger_id) and row[3] == str(user_id):
-                    # Обновляем статус (колонка G = индекс 6)
-                    self.worksheet.update_cell(i, 7, new_status)
+                if len(row) >= 4 and row[2] == "Да" and row[3]:  # Есть жалоба
+                    # Здесь можно добавить дополнительную логику поиска по пользователю
+                    # Пока просто обновляем статус в поле "Тип Жалобы"
+                    current_reason = row[3] if len(row) > 3 else ""
+                    updated_reason = f"{current_reason} [Статус: {new_status}]"
+                    self.worksheet.update_cell(i, 4, updated_reason)
                     logger.info(f"Complaint status updated in Google Sheets: blogger_id={blogger_id}, user_id={user_id}, status={new_status}")
                     return True
             
@@ -124,6 +208,11 @@ class GoogleSheetsManager:
 
 # Глобальный экземпляр менеджера
 sheets_manager = GoogleSheetsManager()
+
+async def log_blogger_action_to_sheets(user_data: Dict[str, Any], blogger_data: Dict[str, Any], 
+                                     action_type: str = "add") -> bool:
+    """Функция-обертка для записи действия с блогером в Google Sheets"""
+    return await sheets_manager.add_blogger_action(user_data, blogger_data, action_type)
 
 async def log_complaint_to_sheets(blogger_id: int, blogger_name: str, 
                                  user_id: int, username: str, reason: str) -> bool:
