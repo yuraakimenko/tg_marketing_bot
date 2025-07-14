@@ -13,7 +13,8 @@ from bot.keyboards import (
     get_platform_keyboard, get_category_keyboard, 
     get_yes_no_keyboard, get_blogger_list_keyboard,
     get_blogger_details_keyboard, get_price_stories_keyboard,
-    get_price_post_keyboard, get_price_video_keyboard
+    get_price_post_keyboard, get_price_video_keyboard,
+    get_platforms_multi_keyboard # добавлен импорт
 )
 from bot.states import SellerStates
 
@@ -86,44 +87,41 @@ async def add_blogger_start(message: Message, state: FSMContext):
     await message.answer(
         "➕ <b>Добавление блогера</b>\n\n"
         "Шаг 1 из 15\n"
-        "📱 Выберите платформу блогера:",
-        reply_markup=get_platform_keyboard(),
+        "📱 Выберите платформы блогера (можно несколько):",
+        reply_markup=get_platforms_multi_keyboard(),
         parse_mode="HTML"
     )
+    await state.update_data(platforms=[])
     await state.set_state(SellerStates.waiting_for_platform)
 
 
-@router.callback_query(F.data.startswith("platform_"), SellerStates.waiting_for_platform)
-async def process_platform(callback: CallbackQuery, state: FSMContext):
-    """Обработка выбора платформы"""
-    platform_str = callback.data.split("_")[1]
-    
-    # Преобразуем строку в enum
-    platform_map = {
-        "instagram": Platform.INSTAGRAM,
-        "youtube": Platform.YOUTUBE,
-        "telegram": Platform.TELEGRAM,
-        "tiktok": Platform.TIKTOK,
-        "vk": Platform.VK
-    }
-    
-    if platform_str not in platform_map:
-        await callback.answer("❌ Неизвестная платформа")
-        return
-    
-    platform = platform_map[platform_str]
-    await state.update_data(platform=platform)
+@router.callback_query(F.data.startswith("toggle_platform_"), SellerStates.waiting_for_platform)
+async def toggle_platform_selection(callback: CallbackQuery, state: FSMContext):
+    """Обработка выбора/отмены платформы"""
+    platform_code = callback.data.replace("toggle_platform_", "")
+    data = await state.get_data()
+    platforms = data.get("platforms", [])
+    if platform_code in platforms:
+        platforms.remove(platform_code)
+    else:
+        platforms.append(platform_code)
+    await state.update_data(platforms=platforms)
     await callback.answer()
-    
+    await callback.message.edit_reply_markup(reply_markup=get_platforms_multi_keyboard(platforms))
+
+
+@router.callback_query(F.data == "finish_platforms_selection", SellerStates.waiting_for_platform)
+async def finish_platforms_selection(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    platforms = data.get("platforms", [])
+    if not platforms:
+        await callback.answer("Выберите хотя бы одну платформу")
+        return
+    await callback.answer()
     await callback.message.edit_text(
         "Шаг 2 из 15\n"
         "🔗 Введите ссылку на блогера (чистую, без символов после ника):\n\n"
-        f"<b>Пример для {platform.value}:</b>\n"
-        f"{'https://instagram.com/username' if platform == Platform.INSTAGRAM else ''}"
-        f"{'https://youtube.com/@username' if platform == Platform.YOUTUBE else ''}"
-        f"{'https://t.me/username' if platform == Platform.TELEGRAM else ''}"
-        f"{'https://tiktok.com/@username' if platform == Platform.TIKTOK else ''}"
-        f"{'https://vk.com/username' if platform == Platform.VK else ''}",
+        "<b>Пример: https://instagram.com/username</b>",
         parse_mode="HTML"
     )
     await state.set_state(SellerStates.waiting_for_blogger_url)
@@ -502,7 +500,7 @@ async def process_blogger_description(message: Message, state: FSMContext):
         seller_id=user.id,
         name=data['name'],
         url=data['url'],
-        platform=data['platform'],
+        platform=data['platform'], # This will be a list of Platform enums
         categories=data['categories'],
         audience_13_17_percent=data['audience_13_17_percent'],
         audience_18_24_percent=data['audience_18_24_percent'],
@@ -520,7 +518,7 @@ async def process_blogger_description(message: Message, state: FSMContext):
     await message.answer(
         f"✅ <b>Блогер успешно добавлен!</b>\n\n"
         f"📝 <b>Имя:</b> {blogger.name}\n"
-        f"📱 <b>Платформа:</b> {blogger.platform.value}\n"
+        f"📱 <b>Платформа:</b> {', '.join([p.value for p in blogger.platform])} (множество)\n" # Display multiple platforms
         f"🎯 <b>Категория:</b> {', '.join([cat.value for cat in blogger.categories])}\n"
         f"👥 <b>Аудитория:</b> {blogger.female_percent}%♀️ {blogger.male_percent}%♂️\n"
         f"🗣️ <b>Отзывы:</b> {'Есть' if blogger.has_reviews else 'Нет'}\n"
@@ -646,41 +644,62 @@ async def show_my_bloggers(message: Message):
 @router.callback_query(F.data.startswith("blogger_"))
 async def show_blogger_details(callback: CallbackQuery):
     """Показать детали блогера"""
-    blogger_id = int(callback.data.split("_")[1])
-    blogger = await get_blogger(blogger_id)
-    
-    if not blogger:
-        await callback.answer("❌ Блогер не найден")
-        return
-    
-    # Проверяем, что это блогер текущего пользователя
-    user = await get_user(callback.from_user.id)
-    if not user or blogger.seller_id != user.id:
-        await callback.answer("❌ Нет доступа к этому блогеру")
-        return
-    
-    details_text = (
-        f"📝 <b>Детали блогера</b>\n\n"
-        f"👤 <b>Имя:</b> {blogger.name}\n"
-        f"🔗 <b>Ссылка:</b> {blogger.url}\n"
-        f"📱 <b>Платформа:</b> {blogger.platform}\n"
-        f"🎯 <b>Категория:</b> {blogger.category}\n"
-        f"👥 <b>Аудитория:</b> {blogger.target_audience}\n"
-        f"🗣️ <b>Отзывы:</b> {'Есть' if blogger.has_reviews else 'Нет'}\n"
-        f"💰 <b>Цена:</b> {blogger.price_min or 'Договорная'}"
-        + (f" - {blogger.price_max}" if blogger.price_max else "") + " ₽\n"
-        f"📅 <b>Добавлен:</b> {blogger.created_at.strftime('%d.%m.%Y')}"
-    )
-    
-    if blogger.description:
-        details_text += f"\n📝 <b>Описание:</b> {blogger.description}"
-    
-    await callback.answer()
-    await callback.message.edit_text(
-        details_text,
-        reply_markup=get_blogger_details_keyboard(blogger_id),
-        parse_mode="HTML"
-    )
+    try:
+        blogger_id = int(callback.data.split("_")[1])
+        blogger = await get_blogger(blogger_id)
+        if not blogger:
+            await callback.answer("❌ Блогер не найден")
+            return
+        user = await get_user(callback.from_user.id)
+        if not user or blogger.seller_id != user.id:
+            await callback.answer("❌ Нет доступа к этому блогеру")
+            return
+        # Платформы
+        platforms = blogger.platform if isinstance(blogger.platform, list) else [blogger.platform]
+        platforms_str = ", ".join([p.value if hasattr(p, 'value') else str(p) for p in platforms])
+        # Категории
+        categories = blogger.categories if hasattr(blogger, 'categories') else []
+        categories_str = ", ".join([c.value if hasattr(c, 'value') else str(c) for c in categories])
+        # Цены
+        price_stories = getattr(blogger, 'price_stories', None)
+        price_post = getattr(blogger, 'price_post', None)
+        price_video = getattr(blogger, 'price_video', None)
+        price_text = ""
+        if price_stories:
+            price_text += f"4 истории: {price_stories}₽\n"
+        if price_post:
+            price_text += f"Пост: {price_post}₽\n"
+        if price_video:
+            price_text += f"Видео: {price_video}₽\n"
+        if not price_text:
+            price_text = "Договорная"
+        # Аудитория
+        female = getattr(blogger, 'female_percent', None)
+        male = getattr(blogger, 'male_percent', None)
+        audience_str = f"{female or 0}%♀️ {male or 0}%♂️"
+        details_text = (
+            f"📝 <b>Детали блогера</b>\n\n"
+            f"👤 <b>Имя:</b> {blogger.name}\n"
+            f"🔗 <b>Ссылка:</b> {blogger.url}\n"
+            f"📱 <b>Платформы:</b> {platforms_str}\n"
+            f"🎯 <b>Категории:</b> {categories_str}\n"
+            f"👥 <b>Аудитория:</b> {audience_str}\n"
+            f"🗣️ <b>Отзывы:</b> {'Есть' if blogger.has_reviews else 'Нет'}\n"
+            f"💰 <b>Цены:</b>\n{price_text}"
+            f"📅 <b>Добавлен:</b> {blogger.created_at.strftime('%d.%m.%Y')}"
+        )
+        if blogger.description:
+            details_text += f"\n📝 <b>Описание:</b> {blogger.description}"
+        await callback.answer()
+        await callback.message.edit_text(
+            details_text,
+            reply_markup=get_blogger_details_keyboard(blogger_id),
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        logger.error(f"Ошибка в show_blogger_details: {e}")
+        await callback.answer("❌ Ошибка при отображении блогера")
+        await callback.message.edit_text("❌ Ошибка при отображении блогера. Попробуйте позже.")
 
 
 @router.callback_query(F.data.startswith("delete_blogger_"))
@@ -852,7 +871,7 @@ async def process_new_value(message: Message, state: FSMContext):
             f"📝 <b>Обновленные детали блогера</b>\n\n"
             f"👤 <b>Имя:</b> {blogger.name}\n"
             f"🔗 <b>Ссылка:</b> {blogger.url}\n"
-            f"📱 <b>Платформа:</b> {blogger.platform}\n"
+            f"📱 <b>Платформа:</b> {', '.join([p.value for p in blogger.platform])} (множество)\n" # Display multiple platforms
             f"🎯 <b>Категория:</b> {blogger.category}\n"
             f"👥 <b>Аудитория:</b> {blogger.target_audience}\n"
             f"🗣️ <b>Отзывы:</b> {'Есть' if blogger.has_reviews else 'Нет'}\n"

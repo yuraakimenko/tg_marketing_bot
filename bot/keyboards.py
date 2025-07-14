@@ -69,12 +69,12 @@ def get_subscription_management_keyboard(auto_renewal: bool = True) -> InlineKey
     
     if auto_renewal:
         keyboard.append([InlineKeyboardButton(
-            text="🔄 Отключить автоПРОДЛЕНИЕ", 
+            text="Отключить автопродление", 
             callback_data="toggle_auto_renewal"
         )])
     else:
         keyboard.append([InlineKeyboardButton(
-            text="🔄 Включить автоПРОДЛЕНИЕ", 
+            text="Включить автопродление", 
             callback_data="toggle_auto_renewal"
         )])
     
@@ -107,6 +107,28 @@ def get_platforms_selection_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="✅ Завершить выбор", callback_data="finish_platforms_selection")],
         [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_action")]
     ])
+
+
+def get_platforms_multi_keyboard(selected_platforms: list = None) -> InlineKeyboardMarkup:
+    """Клавиатура для множественного выбора платформ при добавлении блогера"""
+    if selected_platforms is None:
+        selected_platforms = []
+    platforms = [
+        ("📸 Instagram", "platform_instagram"),
+        ("📺 YouTube", "platform_youtube"),
+        ("📱 Telegram", "platform_telegram"),
+        ("🎵 TikTok", "platform_tiktok"),
+        ("🌐 VK", "platform_vk")
+    ]
+    keyboard = []
+    for name, value in platforms:
+        if value in selected_platforms:
+            keyboard.append([InlineKeyboardButton(text=f"✅ {name}", callback_data=f"toggle_{value}")])
+        else:
+            keyboard.append([InlineKeyboardButton(text=f"⬜ {name}", callback_data=f"toggle_{value}")])
+    keyboard.append([InlineKeyboardButton(text="✅ Завершить выбор", callback_data="finish_platforms_selection")])
+    keyboard.append([InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_action")])
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
 def get_category_keyboard() -> InlineKeyboardMarkup:
