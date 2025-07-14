@@ -324,9 +324,9 @@ async def get_user(telegram_id: int) -> Optional[User]:
                 subscription_end_date=datetime.fromisoformat(row['subscription_end_date']) if row['subscription_end_date'] else None,
                 rating=row['rating'],
                 reviews_count=row['reviews_count'],
-                is_vip=bool(row.get('is_vip', False)),
-                penalty_amount=row.get('penalty_amount', 0),
-                is_blocked=bool(row.get('is_blocked', False)),
+                is_vip=bool(row['is_vip']) if 'is_vip' in row.keys() else False,
+                penalty_amount=row['penalty_amount'] if 'penalty_amount' in row.keys() else 0,
+                is_blocked=bool(row['is_blocked']) if 'is_blocked' in row.keys() else False,
                 created_at=datetime.fromisoformat(row['created_at']),
                 updated_at=datetime.fromisoformat(row['updated_at'])
             )
@@ -640,9 +640,9 @@ async def get_user_subscription(user_id: int) -> Optional[Subscription]:
                 end_date=datetime.fromisoformat(row['end_date']),
                 amount=row['amount'],
                 status=SubscriptionStatus(row['status']),
-                payment_id=row.get('payment_id'),
-                auto_renewal=bool(row.get('auto_renewal', True)),
-                cancelled_at=datetime.fromisoformat(row['cancelled_at']) if row.get('cancelled_at') else None,
+                payment_id=row['payment_id'] if 'payment_id' in row.keys() else None,
+                auto_renewal=bool(row['auto_renewal']) if 'auto_renewal' in row.keys() else True,
+                cancelled_at=datetime.fromisoformat(row['cancelled_at']) if 'cancelled_at' in row.keys() and row['cancelled_at'] else None,
                 created_at=datetime.fromisoformat(row['created_at'])
             )
         return None
@@ -786,9 +786,9 @@ async def get_user_payment_history(user_id: int, limit: int = 10) -> List[Subscr
                 end_date=datetime.fromisoformat(row['end_date']),
                 amount=row['amount'],
                 status=SubscriptionStatus(row['status']),
-                payment_id=row.get('payment_id'),
-                auto_renewal=bool(row.get('auto_renewal', True)),
-                cancelled_at=datetime.fromisoformat(row['cancelled_at']) if row.get('cancelled_at') else None,
+                payment_id=row['payment_id'] if 'payment_id' in row.keys() else None,
+                auto_renewal=bool(row['auto_renewal']) if 'auto_renewal' in row.keys() else True,
+                cancelled_at=datetime.fromisoformat(row['cancelled_at']) if 'cancelled_at' in row.keys() and row['cancelled_at'] else None,
                 created_at=datetime.fromisoformat(row['created_at'])
             ))
         
@@ -902,9 +902,9 @@ async def get_top_sellers(limit: int = 10) -> List[User]:
                 subscription_end_date=datetime.fromisoformat(row['subscription_end_date']) if row['subscription_end_date'] else None,
                 rating=row['rating'],
                 reviews_count=row['reviews_count'],
-                is_vip=bool(row.get('is_vip', False)),
-                penalty_amount=row.get('penalty_amount', 0),
-                is_blocked=bool(row.get('is_blocked', False)),
+                is_vip=bool(row['is_vip']) if 'is_vip' in row.keys() else False,
+                penalty_amount=row['penalty_amount'] if 'penalty_amount' in row.keys() else 0,
+                is_blocked=bool(row['is_blocked']) if 'is_blocked' in row.keys() else False,
                 created_at=datetime.fromisoformat(row['created_at']),
                 updated_at=datetime.fromisoformat(row['updated_at'])
             ))
