@@ -219,12 +219,19 @@ async def change_role(callback: CallbackQuery, state: FSMContext):
     logger.info(f"Текущие роли пользователя {callback.from_user.id}: {current_roles_text}")
     
     await callback.answer()
+    # Создаем клавиатуру управления ролями  
+    role_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="➕ Добавить роль продажника", callback_data="role_seller")],
+        [InlineKeyboardButton(text="➕ Добавить роль закупщика", callback_data="role_buyer")],
+        [InlineKeyboardButton(text="⚙️ Вернуться в настройки", callback_data="back_to_settings")]
+    ])
+    
     await callback.message.edit_text(
         f"🔄 <b>Управление ролями</b>\n\n"
         f"📋 Текущие роли: <b>{current_roles_text}</b>\n\n"
         f"Выберите действие:\n\n"
         f"ℹ️ <b>Важно:</b> Подписка сохранится при изменении ролей.",
-        reply_markup=get_role_management_keyboard(),
+        reply_markup=role_keyboard,
         parse_mode="HTML"
     )
     logger.info(f"Отображено меню управления ролями для пользователя {callback.from_user.id}")
@@ -233,8 +240,31 @@ async def change_role(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "back_to_settings")
 async def back_to_settings(callback: CallbackQuery):
     """Возврат в настройки"""
+    user = await get_user(callback.from_user.id)
+    if not user:
+        await callback.answer("❌ Пользователь не найден")
+        return
+    
+    # Формируем список ролей
+    role_names = []
+    if user.has_role(UserRole.SELLER):
+        role_names.append("продажник")
+    if user.has_role(UserRole.BUYER):
+        role_names.append("закупщик")
+    
+    roles_text = ", ".join(role_names) if role_names else "не указана"
+    subscription_status = "активна" if user.subscription_status == SubscriptionStatus.ACTIVE else "неактивна"
+    
+    await callback.message.edit_text(
+        f"⚙️ <b>Настройки</b>\n\n"
+        f"👤 <b>Роли:</b> {roles_text}\n"
+        f"💳 <b>Подписка:</b> {subscription_status}\n"
+        f"⭐ <b>Рейтинг:</b> {user.rating:.1f} ({user.reviews_count} отзывов)\n\n"
+        "Выберите действие:",
+        reply_markup=get_settings_keyboard(),
+        parse_mode="HTML"
+    )
     await callback.answer()
-    await settings_menu(callback.message)
 
 
 async def show_main_menu(message: Message, user: User):
@@ -307,13 +337,7 @@ async def update_main_menu_keyboard(message: Message, user_id: int):
     )
 
 
-def get_role_management_keyboard() -> InlineKeyboardMarkup:
-    """Клавиатура управления ролями"""
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="➕ Добавить роль продажника", callback_data="role_seller")],
-        [InlineKeyboardButton(text="➕ Добавить роль закупщика", callback_data="role_buyer")],
-        [InlineKeyboardButton(text="⚙️ Вернуться в настройки", callback_data="back_to_settings")]
-    ])
+
 
 
 def get_combined_main_menu(user, has_active_subscription: bool) -> InlineKeyboardMarkup:

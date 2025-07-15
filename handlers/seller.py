@@ -688,14 +688,37 @@ async def handle_official_payment(callback: CallbackQuery, state: FSMContext):
 @router.message(SellerStates.waiting_for_statistics)
 async def handle_statistics(message: Message, state: FSMContext):
     """Обработка ввода статистики"""
+    input_text = message.text.strip()
+    logger.info(f"Получен ввод статистики: '{input_text}' (длина: {len(input_text)})")
+    
     try:
-        subscribers = int(message.text.strip())
+        # Убираем возможные пробелы и нечисловые символы
+        clean_input = ''.join(filter(str.isdigit, input_text))
+        
+        if not clean_input:
+            raise ValueError("No digits found")
+            
+        subscribers = int(clean_input)
+        logger.info(f"Преобразованное число подписчиков: {subscribers}")
+        
         if subscribers < 0:
             raise ValueError("Negative subscribers")
-    except ValueError:
+            
+        if subscribers > 1000000000:  # 1 миллиард - разумный лимит
+            await message.answer(
+                "❌ <b>Слишком большое число</b>\n\n"
+                "Максимальное количество подписчиков: 1,000,000,000\n"
+                "Попробуйте еще раз:",
+                parse_mode="HTML"
+            )
+            return
+            
+    except ValueError as e:
+        logger.error(f"Ошибка валидации статистики: {e}, ввод: '{input_text}'")
         await message.answer(
             "❌ <b>Неверный формат</b>\n\n"
             "Введите целое положительное число.\n"
+            f"Ваш ввод: '{input_text}'\n"
             "Попробуйте еще раз:",
             parse_mode="HTML"
         )
@@ -714,14 +737,26 @@ async def handle_statistics(message: Message, state: FSMContext):
 @router.message(SellerStates.waiting_for_avg_views)
 async def handle_avg_views(message: Message, state: FSMContext):
     """Обработка ввода средних просмотров"""
+    input_text = message.text.strip()
+    
     try:
-        avg_views = int(message.text.strip())
+        # Убираем возможные пробелы и нечисловые символы
+        clean_input = ''.join(filter(str.isdigit, input_text))
+        
+        if not clean_input:
+            raise ValueError("No digits found")
+            
+        avg_views = int(clean_input)
+        
         if avg_views < 0:
             raise ValueError("Negative views")
-    except ValueError:
+            
+    except ValueError as e:
+        logger.error(f"Ошибка валидации просмотров: {e}, ввод: '{input_text}'")
         await message.answer(
             "❌ <b>Неверный формат</b>\n\n"
             "Введите целое положительное число.\n"
+            f"Ваш ввод: '{input_text}'\n"
             "Попробуйте еще раз:",
             parse_mode="HTML"
         )
@@ -740,14 +775,26 @@ async def handle_avg_views(message: Message, state: FSMContext):
 @router.message(SellerStates.waiting_for_avg_likes)
 async def handle_avg_likes(message: Message, state: FSMContext):
     """Обработка ввода средних лайков"""
+    input_text = message.text.strip()
+    
     try:
-        avg_likes = int(message.text.strip())
+        # Убираем возможные пробелы и нечисловые символы
+        clean_input = ''.join(filter(str.isdigit, input_text))
+        
+        if not clean_input:
+            raise ValueError("No digits found")
+            
+        avg_likes = int(clean_input)
+        
         if avg_likes < 0:
             raise ValueError("Negative likes")
-    except ValueError:
+            
+    except ValueError as e:
+        logger.error(f"Ошибка валидации лайков: {e}, ввод: '{input_text}'")
         await message.answer(
             "❌ <b>Неверный формат</b>\n\n"
             "Введите целое положительное число.\n"
+            f"Ваш ввод: '{input_text}'\n"
             "Попробуйте еще раз:",
             parse_mode="HTML"
         )
