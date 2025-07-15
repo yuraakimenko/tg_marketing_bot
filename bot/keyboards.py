@@ -1,4 +1,5 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
+from database.models import UserRole
 
 
 def get_role_selection_keyboard() -> InlineKeyboardMarkup:
@@ -206,3 +207,114 @@ def get_platforms_multi_keyboard(selected_platforms=None) -> InlineKeyboardMarku
     buttons.append([InlineKeyboardButton(text="✅ Завершить выбор", callback_data="finish_platforms_selection")])
     
     return InlineKeyboardMarkup(inline_keyboard=buttons) 
+
+
+def get_subscription_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура для подписки"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="1 месяц - 500₽", callback_data="subscribe_1_month")],
+        [InlineKeyboardButton(text="3 месяца - 1200₽", callback_data="subscribe_3_months")],
+        [InlineKeyboardButton(text="6 месяцев - 2100₽", callback_data="subscribe_6_months")],
+        [InlineKeyboardButton(text="12 месяцев - 3600₽", callback_data="subscribe_12_months")],
+        [InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main")]
+    ])
+
+
+def get_payment_confirmation_keyboard(payment_data) -> InlineKeyboardMarkup:
+    """Клавиатура подтверждения оплаты"""
+    if payment_data.get('is_mock', False):
+        # Mock payment buttons
+        invoice_id = payment_data['invoice_id']
+        return InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Оплачено (тест)", callback_data=f"mock_payment_success_{invoice_id}")],
+            [InlineKeyboardButton(text="❌ Отклонить (тест)", callback_data=f"mock_payment_failure_{invoice_id}")],
+            [InlineKeyboardButton(text="🔙 Отмена", callback_data="cancel_payment")]
+        ])
+    else:
+        # Real payment buttons
+        invoice_id = payment_data['invoice_id']
+        return InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔄 Проверить статус", callback_data=f"check_payment_{invoice_id}")],
+            [InlineKeyboardButton(text="🔙 Отмена", callback_data="cancel_payment")]
+        ])
+
+
+def get_subscription_management_keyboard(auto_renewal_enabled: bool = True) -> InlineKeyboardMarkup:
+    """Клавиатура управления подпиской"""
+    buttons = []
+    
+    if auto_renewal_enabled:
+        buttons.append([InlineKeyboardButton(text="⏸️ Отключить автопродление", callback_data="disable_auto_renewal")])
+    else:
+        buttons.append([InlineKeyboardButton(text="▶️ Включить автопродление", callback_data="enable_auto_renewal")])
+    
+    buttons.extend([
+        [InlineKeyboardButton(text="⏸️ Приостановить до окончания", callback_data="suspend_subscription")],
+        [InlineKeyboardButton(text="❌ Отменить полностью", callback_data="cancel_subscription_full")],
+        [InlineKeyboardButton(text="📊 История платежей", callback_data="payment_history")],
+        [InlineKeyboardButton(text="🔙 Главное меню", callback_data="back_to_main")]
+    ])
+    
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def get_subscription_cancel_confirmation_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура подтверждения отмены подписки"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Да, отменить", callback_data="confirm_cancel_subscription")],
+        [InlineKeyboardButton(text="❌ Нет, оставить", callback_data="cancel_subscription_cancel")]
+    ])
+
+
+def get_platform_selection_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура выбора платформ для поиска"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📱 Instagram", callback_data="platform_instagram")],
+        [InlineKeyboardButton(text="📺 YouTube", callback_data="platform_youtube")],
+        [InlineKeyboardButton(text="📱 TikTok", callback_data="platform_tiktok")],
+        [InlineKeyboardButton(text="📱 Telegram", callback_data="platform_telegram")],
+        [InlineKeyboardButton(text="📱 VK", callback_data="platform_vk")],
+        [InlineKeyboardButton(text="✅ Подтвердить выбор", callback_data="confirm_platforms")]
+    ])
+
+
+def get_role_management_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура управления ролями"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="➕ Добавить роль продажника", callback_data="role_seller")],
+        [InlineKeyboardButton(text="➕ Добавить роль закупщика", callback_data="role_buyer")],
+        [InlineKeyboardButton(text="⚙️ Вернуться в настройки", callback_data="back_to_settings")]
+    ])
+
+
+def get_combined_main_menu(user, has_active_subscription: bool) -> ReplyKeyboardMarkup:
+    """Комбинированное главное меню для пользователей с несколькими ролями"""
+    keyboard_buttons = []
+    
+    # Функции продажника
+    if user.has_role(UserRole.SELLER):
+        keyboard_buttons.extend([
+            [KeyboardButton(text="📝 Добавить блогера")],
+            [KeyboardButton(text="📋 Мои блогеры")],
+            [KeyboardButton(text="✏️ Редактировать блогера")]
+        ])
+    
+    # Функции закупщика
+    if user.has_role(UserRole.BUYER):
+        keyboard_buttons.extend([
+            [KeyboardButton(text="🔍 Поиск блогеров")],
+            [KeyboardButton(text="📋 История поиска")],
+            [KeyboardButton(text="📊 Статистика")]
+        ])
+    
+    # Общие функции
+    keyboard_buttons.extend([
+        [KeyboardButton(text="💳 Подписка")],
+        [KeyboardButton(text="⚙️ Настройки")]
+    ])
+    
+    return ReplyKeyboardMarkup(
+        keyboard=keyboard_buttons,
+        resize_keyboard=True,
+        input_field_placeholder="Выберите действие"
+    ) 

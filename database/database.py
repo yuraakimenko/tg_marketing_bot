@@ -394,7 +394,7 @@ async def get_user(telegram_id: int) -> Optional[User]:
                 first_name=row['first_name'],
                 last_name=row['last_name'],
                 roles=roles,
-                subscription_status=SubscriptionStatus(row['subscription_status']),
+                subscription_status=SubscriptionStatus(row['subscription_status']) if row['subscription_status'] else SubscriptionStatus.INACTIVE,
                 subscription_end_date=datetime.fromisoformat(row['subscription_end_date']) if row['subscription_end_date'] else None,
                 subscription_start_date=datetime.fromisoformat(row['subscription_start_date']) if row['subscription_start_date'] else None,
                 rating=row['rating'],
@@ -402,8 +402,8 @@ async def get_user(telegram_id: int) -> Optional[User]:
                 is_vip=bool(row['is_vip']),
                 penalty_amount=row['penalty_amount'],
                 is_blocked=bool(row['is_blocked']),
-                created_at=datetime.fromisoformat(row['created_at']),
-                updated_at=datetime.fromisoformat(row['updated_at'])
+                created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else datetime.now(),
+                updated_at=datetime.fromisoformat(row['updated_at']) if row['updated_at'] else datetime.now()
             )
             
             return user
@@ -538,9 +538,14 @@ async def create_blogger(seller_id: int, name: str, url: str, platforms: List[Pl
         platforms_json = json.dumps([platform.value for platform in platforms]) if platforms else None
         categories_json = json.dumps([cat.value for cat in categories]) if categories else None
         
+        # Для совместимости со старой схемой
+        primary_platform = platforms[0].value if platforms else 'instagram'
+        primary_category = categories[0].value if categories else 'lifestyle'
+        
         cursor = await db.execute("""
             INSERT INTO bloggers (
-                seller_id, name, url, platforms, categories,
+                seller_id, name, url, platform, category, target_audience,
+                platforms, categories,
                 audience_13_17_percent, audience_18_24_percent, audience_25_35_percent, audience_35_plus_percent,
                 female_percent, male_percent,
                 price_stories, price_post, price_video,
@@ -548,9 +553,10 @@ async def create_blogger(seller_id: int, name: str, url: str, platforms: List[Pl
                 subscribers_count, avg_views, avg_likes, engagement_rate,
                 description
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            seller_id, name, url, platforms_json, categories_json,
+            seller_id, name, url, primary_platform, primary_category, 'general',
+            platforms_json, categories_json,
             kwargs.get('audience_13_17_percent'),
             kwargs.get('audience_18_24_percent'),
             kwargs.get('audience_25_35_percent'),
@@ -632,8 +638,8 @@ async def get_blogger(blogger_id: int) -> Optional[Blogger]:
                 avg_likes=row['avg_likes'],
                 engagement_rate=row['engagement_rate'],
                 description=row['description'],
-                created_at=datetime.fromisoformat(row['created_at']),
-                updated_at=datetime.fromisoformat(row['updated_at'])
+                created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else datetime.now(),
+                updated_at=datetime.fromisoformat(row['updated_at']) if row['updated_at'] else datetime.now()
             )
         return None
 
@@ -683,8 +689,8 @@ async def get_user_bloggers(seller_id: int) -> List[Blogger]:
                 avg_likes=row['avg_likes'],
                 engagement_rate=row['engagement_rate'],
                 description=row['description'],
-                created_at=datetime.fromisoformat(row['created_at']),
-                updated_at=datetime.fromisoformat(row['updated_at'])
+                created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else datetime.now(),
+                updated_at=datetime.fromisoformat(row['updated_at']) if row['updated_at'] else datetime.now()
             ))
         
         return bloggers
@@ -840,7 +846,7 @@ async def search_bloggers(platforms: List[str] = None, categories: List[str] = N
                     first_name=row['first_name'],
                     last_name=row['last_name'],
                     roles=seller_roles,
-                    subscription_status=SubscriptionStatus(row['subscription_status']),
+                    subscription_status=SubscriptionStatus(row['subscription_status']) if row['subscription_status'] else SubscriptionStatus.INACTIVE,
                     subscription_end_date=datetime.fromisoformat(row['subscription_end_date']) if row['subscription_end_date'] else None,
                     subscription_start_date=datetime.fromisoformat(row['subscription_start_date']) if row['subscription_start_date'] else None,
                     rating=row['rating'],
@@ -1176,7 +1182,7 @@ async def get_top_sellers(limit: int = 10) -> List[User]:
                 first_name=row['first_name'],
                 last_name=row['last_name'],
                 role=UserRole(row['role']),
-                subscription_status=SubscriptionStatus(row['subscription_status']),
+                subscription_status=SubscriptionStatus(row['subscription_status']) if row['subscription_status'] else SubscriptionStatus.INACTIVE,
                 subscription_end_date=datetime.fromisoformat(row['subscription_end_date']) if row['subscription_end_date'] else None,
                 rating=row['rating'],
                 reviews_count=row['reviews_count'],

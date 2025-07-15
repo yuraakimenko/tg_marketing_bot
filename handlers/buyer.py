@@ -664,7 +664,7 @@ async def get_user_by_id(user_id: int):
                 first_name=row['first_name'],
                 last_name=row['last_name'],
                 roles=roles,
-                subscription_status=SubscriptionStatus(row['subscription_status']),
+                subscription_status=SubscriptionStatus(row['subscription_status']) if row['subscription_status'] else SubscriptionStatus.INACTIVE,
                 subscription_end_date=datetime.fromisoformat(row['subscription_end_date']) if row['subscription_end_date'] else None,
                 subscription_start_date=datetime.fromisoformat(row['subscription_start_date']) if row['subscription_start_date'] else None,
                 rating=row['rating'],
@@ -672,7 +672,7 @@ async def get_user_by_id(user_id: int):
                 is_vip=bool(row['is_vip']),
                 penalty_amount=row['penalty_amount'],
                 is_blocked=bool(row['is_blocked']),
-                created_at=datetime.fromisoformat(row['created_at']),
-                updated_at=datetime.fromisoformat(row['updated_at'])
+                created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else datetime.now(),
+                updated_at=datetime.fromisoformat(row['updated_at']) if row['updated_at'] else datetime.now()
             )
         return None 

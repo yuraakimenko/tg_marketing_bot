@@ -5,6 +5,7 @@
 
 import asyncio
 import logging
+import random
 from datetime import datetime, timedelta
 from database.database import init_db, create_user, create_blogger, get_user, get_blogger
 from database.models import UserRole, Platform, BlogCategory, SubscriptionStatus
@@ -22,20 +23,40 @@ async def test_database_migration():
     await init_db()
     logger.info("✅ База данных инициализирована")
     
-    # Создание тестового пользователя
-    user = await create_user(
-        telegram_id=123456789,
-        username="test_user",
-        first_name="Test",
-        last_name="User",
-        roles=[UserRole.SELLER]
-    )
-    logger.info(f"✅ Создан тестовый пользователь: {user.username}")
+    # Генерируем уникальный telegram_id для тестирования
+    test_telegram_id = random.randint(100000000, 999999999)
+    
+    # Проверяем, что пользователь не существует
+    existing_user = await get_user(test_telegram_id)
+    if existing_user:
+        logger.info(f"ℹ️ Пользователь с ID {test_telegram_id} уже существует, используем его")
+        user = existing_user
+    else:
+        # Создание тестового пользователя
+        user = await create_user(
+            telegram_id=test_telegram_id,
+            username="test_user",
+            first_name="Test",
+            last_name="User",
+            roles=[UserRole.SELLER]
+        )
+        logger.info(f"✅ Создан тестовый пользователь: {user.username}")
+    
+    # Отладочная информация
+    logger.info(f"📋 Информация о пользователе:")
+    logger.info(f"   ID: {user.id}")
+    logger.info(f"   Telegram ID: {user.telegram_id}")
+    logger.info(f"   Username: {user.username}")
+    logger.info(f"   Роли: {[r.value for r in user.roles]}")
+    
+    if user.id is None:
+        logger.error("❌ User ID равно None! Невозможно создать блогера.")
+        return None, None
     
     # Создание тестового блогера с множественными платформами
     blogger = await create_blogger(
         seller_id=user.id,
-        name="Test Blogger",
+        name=f"Test Blogger {random.randint(1000, 9999)}",
         url="https://instagram.com/testblogger",
         platforms=[Platform.INSTAGRAM, Platform.YOUTUBE],
         categories=[BlogCategory.LIFESTYLE, BlogCategory.BEAUTY],
@@ -142,18 +163,31 @@ async def test_role_permissions():
     """Тест системы ролей"""
     logger.info("🧪 Тестирование системы ролей...")
     
-    # Создание пользователей с разными ролями
-    seller = await create_user(
-        telegram_id=111111111,
-        username="test_seller",
-        roles=[UserRole.SELLER]
-    )
+    # Генерируем уникальные telegram_id для тестирования
+    seller_telegram_id = random.randint(100000000, 999999999)
+    buyer_telegram_id = random.randint(100000000, 999999999)
     
-    buyer = await create_user(
-        telegram_id=222222222,
-        username="test_buyer",
-        roles=[UserRole.BUYER]
-    )
+    # Проверяем и создаем продажника
+    existing_seller = await get_user(seller_telegram_id)
+    if existing_seller:
+        seller = existing_seller
+    else:
+        seller = await create_user(
+            telegram_id=seller_telegram_id,
+            username="test_seller",
+            roles=[UserRole.SELLER]
+        )
+    
+    # Проверяем и создаем закупщика
+    existing_buyer = await get_user(buyer_telegram_id)
+    if existing_buyer:
+        buyer = existing_buyer
+    else:
+        buyer = await create_user(
+            telegram_id=buyer_telegram_id,
+            username="test_buyer",
+            roles=[UserRole.BUYER]
+        )
     
     logger.info(f"   Продажник: {seller.username} - {[r.value for r in seller.roles]}")
     logger.info(f"   Закупщик: {buyer.username} - {[r.value for r in buyer.roles]}")
