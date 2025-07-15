@@ -57,10 +57,12 @@ class BuyerStates(StatesGroup):
     """Состояния для закупщика"""
     # Поиск блогеров
     waiting_for_platforms = State()  # Выбор платформ
-    waiting_for_target_age = State()  # Целевой возраст
+    waiting_for_target_age = State()  # Целевой возраст (минимальный)
+    waiting_for_target_age_max = State()  # Целевой возраст (максимальный)
     waiting_for_target_gender = State()  # Целевой пол
     waiting_for_categories = State()  # Категории
-    waiting_for_budget = State()  # Бюджет (кратный 1000)
+    waiting_for_budget = State()  # Бюджет минимальный (кратный 1000)
+    waiting_for_budget_max = State()  # Бюджет максимальный (кратный 1000)
     waiting_for_additional_criteria = State()  # Дополнительные критерии
     
     # Просмотр результатов
@@ -79,4 +81,5 @@ class ReviewStates(StatesGroup):
 
 class ComplaintStates(StatesGroup):
     """Состояния для жалоб"""
-    waiting_for_complaint_reason = State() 
+    waiting_for_complaint_reason = State()
+    waiting_for_reason = State()  # Альтернативное название для совместимости 
