@@ -37,7 +37,7 @@ async def start_command(message: Message, state: FSMContext):
         await show_main_menu(message, user)
 
 
-@router.callback_query(F.data.startswith("role_"))
+@router.callback_query(F.data.startswith("role_"), RegistrationStates.waiting_for_role)
 async def handle_role_selection(callback: CallbackQuery, state: FSMContext):
     """Обработка выбора роли при первичной регистрации"""
     logger.info(f"Получен callback для выбора роли: {callback.data} от пользователя {callback.from_user.id}")
@@ -149,28 +149,25 @@ async def change_role(callback: CallbackQuery, state: FSMContext):
         reply_markup=get_role_management_keyboard(),
         parse_mode="HTML"
     )
-    await state.set_state(RegistrationStates.waiting_for_role)
-    logger.info(f"Установлено состояние waiting_for_role для пользователя {callback.from_user.id}")
+    logger.info(f"Отображено меню управления ролями для пользователя {callback.from_user.id}")
 
 
-@router.callback_query(F.data.startswith("role_"), RegistrationStates.waiting_for_role)
-async def handle_role_change(callback: CallbackQuery, state: FSMContext):
-    """Обработка смены роли"""
-    logger.info(f"Обработка смены роли: {callback.data} от пользователя {callback.from_user.id}")
+@router.callback_query(F.data.startswith("role_"))
+async def handle_role_change_existing_user(callback: CallbackQuery, state: FSMContext):
+    """Обработка смены роли для существующих пользователей"""
+    logger.info(f"Обработка смены роли существующим пользователем: {callback.data} от пользователя {callback.from_user.id}")
+    
+    # Проверяем, что пользователь существует
+    user = await get_user(callback.from_user.id)
+    if not user:
+        logger.error(f"Пользователь {callback.from_user.id} не найден при смене роли")
+        await callback.answer("❌ Пользователь не найден")
+        return
     
     role_str = callback.data.split("_")[1]
     new_role = UserRole.SELLER if role_str == "seller" else UserRole.BUYER
     
     logger.info(f"Новая роль: {new_role}")
-    
-    # Получаем текущие данные пользователя
-    user = await get_user(callback.from_user.id)
-    if not user:
-        logger.error(f"Пользователь {callback.from_user.id} не найден при смене роли")
-        await callback.answer("❌ Пользователь не найден")
-        await state.clear()
-        return
-    
     logger.info(f"Текущие роли пользователя: {[r.value for r in user.roles]}")
     
     # Проверяем, есть ли уже эта роль
@@ -178,16 +175,6 @@ async def handle_role_change(callback: CallbackQuery, state: FSMContext):
         role_name = "продажника" if new_role == UserRole.SELLER else "закупщика"
         logger.info(f"У пользователя уже есть роль {role_name}")
         await callback.answer(f"ℹ️ У вас уже есть роль {role_name}")
-        await callback.message.edit_text(
-            f"ℹ️ <b>Роль уже добавлена</b>\n\n"
-            f"У вас уже есть роль <b>{role_name}</b>.\n\n"
-            f"Для возврата в настройки используйте кнопку ниже.",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="⚙️ Вернуться в настройки", callback_data="back_to_settings")]
-            ]),
-            parse_mode="HTML"
-        )
-        await state.clear()
         return
     
     # Добавляем новую роль пользователю
@@ -197,9 +184,7 @@ async def handle_role_change(callback: CallbackQuery, state: FSMContext):
     if success:
         logger.info("Роль успешно добавлена")
         await callback.answer("✅ Роль успешно добавлена!")
-        await callback.message.delete()
         
-        role_name = "продажник" if new_role == UserRole.SELLER else "закупщик"
         # Получаем обновленные данные пользователя для проверки подписки
         updated_user = await get_user(callback.from_user.id)
         has_active_subscription = updated_user.subscription_status in [
@@ -217,7 +202,8 @@ async def handle_role_change(callback: CallbackQuery, state: FSMContext):
         
         roles_text = ", ".join(all_roles)
         
-        await callback.message.answer(
+        # Обновляем сообщение с новыми ролями
+        await callback.message.edit_text(
             f"✅ <b>Роль успешно добавлена!</b>\n\n"
             f"🎭 Ваши роли: <b>{roles_text}</b>\n"
             f"💳 Подписка: {'сохранена' if has_active_subscription else 'неактивна'}\n\n"
@@ -226,7 +212,6 @@ async def handle_role_change(callback: CallbackQuery, state: FSMContext):
             parse_mode="HTML"
         )
         
-        await state.clear()
         logger.info("Роль добавлена успешно")
         
     else:
@@ -241,7 +226,6 @@ async def handle_role_change(callback: CallbackQuery, state: FSMContext):
             ]),
             parse_mode="HTML"
         )
-        await state.clear()
 
 
 @router.callback_query(F.data == "back_to_settings")
