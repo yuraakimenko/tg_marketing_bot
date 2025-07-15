@@ -187,9 +187,25 @@ async def init_db():
         await db.execute("CREATE INDEX IF NOT EXISTS idx_user_roles_user_id ON user_roles (user_id)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_user_roles_role ON user_roles (role)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_bloggers_seller_id ON bloggers (seller_id)")
-        await db.execute("CREATE INDEX IF NOT EXISTS idx_bloggers_platform ON bloggers (platform)")
-        await db.execute("CREATE INDEX IF NOT EXISTS idx_reviews_reviewed_id ON reviews (reviewed_id)")
-        await db.execute("CREATE INDEX IF NOT EXISTS idx_complaints_blogger_id ON complaints (blogger_id)")
+        
+        # Проверяем наличие колонки platform перед созданием индекса
+        cursor = await db.execute("PRAGMA table_info(bloggers)")
+        columns = await cursor.fetchall()
+        column_names = [col[1] for col in columns]  # col[1] это имя колонки
+        
+        if 'platform' in column_names:
+            await db.execute("CREATE INDEX IF NOT EXISTS idx_bloggers_platform ON bloggers (platform)")
+        if 'platforms' in column_names:
+            await db.execute("CREATE INDEX IF NOT EXISTS idx_bloggers_platforms ON bloggers (platforms)")
+            
+        # Проверяем существование таблиц перед созданием индексов
+        cursor = await db.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = [row[0] for row in await cursor.fetchall()]
+        
+        if 'reviews' in tables:
+            await db.execute("CREATE INDEX IF NOT EXISTS idx_reviews_reviewed_id ON reviews (reviewed_id)")
+        if 'complaints' in tables:
+            await db.execute("CREATE INDEX IF NOT EXISTS idx_complaints_blogger_id ON complaints (blogger_id)")
         
         # Миграция: добавляем новые поля в существующие таблицы
         try:
