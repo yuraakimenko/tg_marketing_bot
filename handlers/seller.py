@@ -403,19 +403,19 @@ async def handle_category_selection(callback: CallbackQuery, state: FSMContext):
     if category in categories:
         # Убираем категорию
         categories.remove(category)
-        await callback.answer(f"❌ Категория '{category.value}' убрана")
+        await callback.answer(f"❌ Категория '{category.get_russian_name()}' убрана")
     else:
         # Добавляем категорию
         if len(categories) >= 3:
             await callback.answer("❌ Максимум 3 категории")
             return
         categories.append(category)
-        await callback.answer(f"✅ Категория '{category.value}' добавлена")
+        await callback.answer(f"✅ Категория '{category.get_russian_name()}' добавлена")
     
     await state.update_data(categories=categories)
     
     # Обновляем сообщение
-    categories_text = ", ".join([cat.value for cat in categories]) if categories else "Не выбрано"
+    categories_text = ", ".join([cat.get_russian_name() for cat in categories]) if categories else "Не выбрано"
     
     await callback.message.edit_text(
         f"🏷️ <b>Категории блога</b>\n\n"
@@ -836,7 +836,7 @@ async def handle_blogger_selection(callback: CallbackQuery, state: FSMContext):
         info_text += f"• Возраст: {blogger.get_age_categories_summary()}\n"
         info_text += f"• Пол: Женщины {blogger.female_percent}%, Мужчины {blogger.male_percent}%\n"
         
-        info_text += f"\n🏷️ <b>Категории:</b> {', '.join([cat.value for cat in blogger.categories])}\n"
+        info_text += f"\n🏷️ <b>Категории:</b> {', '.join([cat.get_russian_name() for cat in blogger.categories])}\n"
         
         info_text += f"\n💰 <b>Цены:</b>\n"
         if blogger.price_stories:

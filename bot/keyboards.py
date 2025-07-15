@@ -73,7 +73,7 @@ def get_platform_keyboard() -> InlineKeyboardMarkup:
 def get_category_keyboard() -> InlineKeyboardMarkup:
     """Клавиатура выбора категорий"""
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🏠 Образ жизни", callback_data="category_lifestyle")],
+        [InlineKeyboardButton(text="🏠 Лайфстайл", callback_data="category_lifestyle")],
         [InlineKeyboardButton(text="⚽ Спорт", callback_data="category_sport")],
         [InlineKeyboardButton(text="🥗 Питание", callback_data="category_nutrition")],
         [InlineKeyboardButton(text="🏥 Медицина", callback_data="category_medicine")],

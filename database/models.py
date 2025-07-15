@@ -43,6 +43,27 @@ class BlogCategory(Enum):
     PARENTING = "parenting"
     FINANCE = "finance"
     NOT_IMPORTANT = "not_important"  # "неважно"
+    
+    def get_russian_name(self) -> str:
+        """Получить русское название категории"""
+        names = {
+            "lifestyle": "Лайфстайл",
+            "sport": "Спорт",
+            "nutrition": "Питание",
+            "medicine": "Медицина",
+            "relationships": "Отношения",
+            "beauty": "Красота",
+            "fashion": "Мода",
+            "travel": "Путешествия",
+            "business": "Бизнес",
+            "education": "Образование",
+            "entertainment": "Развлечения",
+            "technology": "Технологии",
+            "parenting": "Родительство",
+            "finance": "Финансы",
+            "not_important": "Неважно"
+        }
+        return names.get(self.value, self.value)
 
 
 @dataclass
