@@ -608,19 +608,19 @@ async def confirm_full_cancellation(callback: CallbackQuery):
         # Получаем обновленные данные пользователя
         updated_user = await get_user(callback.from_user.id)
         if updated_user:
-                    # После полной отмены подписки has_active_subscription = False
-        has_active_subscription = False
-        
-        # Определяем клавиатуру на основе ролей пользователя
-        if updated_user.has_role(UserRole.SELLER) and updated_user.has_role(UserRole.BUYER):
-            from bot.keyboards import get_combined_main_menu
-            keyboard = get_combined_main_menu(updated_user, has_active_subscription)
-        elif updated_user.has_role(UserRole.SELLER):
-            keyboard = get_main_menu_seller(has_active_subscription)
-        else:
-            keyboard = get_main_menu_buyer(has_active_subscription)
-        
-        # Отправляем новое сообщение с обновленной клавиатурой
+            # После полной отмены подписки has_active_subscription = False
+            has_active_subscription = False
+            
+            # Определяем клавиатуру на основе ролей пользователя
+            if updated_user.has_role(UserRole.SELLER) and updated_user.has_role(UserRole.BUYER):
+                from bot.keyboards import get_combined_main_menu
+                keyboard = get_combined_main_menu(updated_user, has_active_subscription)
+            elif updated_user.has_role(UserRole.SELLER):
+                keyboard = get_main_menu_seller(has_active_subscription)
+            else:
+                keyboard = get_main_menu_buyer(has_active_subscription)
+            
+            # Отправляем новое сообщение с обновленной клавиатурой
             await callback.message.answer(
                 "🏠 Главное меню обновлено.\n\n"
                 "Кнопка 'Управление подпиской' удалена, так как подписка отменена.",
