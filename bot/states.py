@@ -39,6 +39,10 @@ class SellerStates(StatesGroup):
     
     # Статистика (загрузка)
     waiting_for_statistics = State()  # Загрузка статистики
+    waiting_for_subscribers_count = State()  # Количество подписчиков
+    waiting_for_avg_views = State()  # Средние просмотры
+    waiting_for_avg_likes = State()  # Средние лайки
+    waiting_for_engagement_rate = State()  # Процент вовлеченности
     
     # Описание
     waiting_for_blogger_description = State()  # Описание блогера
