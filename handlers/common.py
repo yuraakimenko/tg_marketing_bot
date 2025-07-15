@@ -5,7 +5,7 @@ from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 
 from database.database import get_user, create_user, add_user_role, update_user_roles
-from database.models import UserRole, SubscriptionStatus
+from database.models import UserRole, SubscriptionStatus, User
 from bot.keyboards import (
     get_role_selection_keyboard, 
     get_main_menu_seller, 
