@@ -104,17 +104,22 @@ async def subscription_info(callback: CallbackQuery):
 
 
 # Обработчики для разных типов подписки
-@router.callback_query(F.data == "pay_monthly")
+@router.callback_query(F.data == "subscribe_1_month")
 async def initiate_monthly_payment(callback: CallbackQuery):
     """Инициация платежа за месячную подписку"""
     await initiate_payment(callback, "monthly")
 
-@router.callback_query(F.data == "pay_quarterly") 
+@router.callback_query(F.data == "subscribe_3_months") 
 async def initiate_quarterly_payment(callback: CallbackQuery):
     """Инициация платежа за квартальную подписку"""
     await initiate_payment(callback, "quarterly")
 
-@router.callback_query(F.data == "pay_yearly")
+@router.callback_query(F.data == "subscribe_6_months")
+async def initiate_half_yearly_payment(callback: CallbackQuery):
+    """Инициация платежа за полугодовую подписку"""
+    await initiate_payment(callback, "half_yearly")
+
+@router.callback_query(F.data == "subscribe_12_months")
 async def initiate_yearly_payment(callback: CallbackQuery):
     """Инициация платежа за годовую подписку"""
     await initiate_payment(callback, "yearly")
@@ -138,6 +143,7 @@ async def initiate_payment(callback: CallbackQuery, subscription_type: str):
     subscription_names = {
         "monthly": "1 месяц",
         "quarterly": "3 месяца", 
+        "half_yearly": "6 месяцев",
         "yearly": "12 месяцев"
     }
     
@@ -183,13 +189,15 @@ async def handle_mock_payment_success(callback: CallbackQuery):
         await callback.answer("❌ Пользователь не найден")
         return
     
-    # Определяем тип подписки по сумме (можно улучшить логику)
+    # Определяем тип подписки по invoice_id
     start_date = datetime.now()
     subscription_duration = timedelta(days=30)  # По умолчанию месяц
     
-    # Здесь можно добавить логику определения типа подписки из invoice_id
+    # Определяем длительность подписки из invoice_id
     if "quarterly" in invoice_id:
         subscription_duration = timedelta(days=90)
+    elif "half_yearly" in invoice_id:
+        subscription_duration = timedelta(days=180)
     elif "yearly" in invoice_id:
         subscription_duration = timedelta(days=365)
     
@@ -229,12 +237,9 @@ async def handle_mock_payment_success(callback: CallbackQuery):
             
             # Определяем клавиатуру на основе ролей пользователя
             from database.models import UserRole
-            from bot.keyboards import get_main_menu_seller, get_main_menu_buyer
-            try:
-                from handlers.common import get_combined_main_menu
-            except ImportError:
-                get_combined_main_menu = None
-            if updated_user.has_role(UserRole.SELLER) and updated_user.has_role(UserRole.BUYER) and get_combined_main_menu:
+            from bot.keyboards import get_main_menu_seller, get_main_menu_buyer, get_combined_main_menu
+            
+            if updated_user.has_role(UserRole.SELLER) and updated_user.has_role(UserRole.BUYER):
                 keyboard = get_combined_main_menu(updated_user, has_active_subscription)
             elif updated_user.has_role(UserRole.SELLER):
                 keyboard = get_main_menu_seller(has_active_subscription)
@@ -317,7 +322,14 @@ async def check_payment_status(callback: CallbackQuery):
                         SubscriptionStatus.CANCELLED
                     ]
                     
-                    keyboard = get_main_menu_seller(has_active_subscription) if updated_user.role == UserRole.SELLER else get_main_menu_buyer(has_active_subscription)
+                    # Определяем клавиатуру на основе ролей пользователя
+                    if updated_user.has_role(UserRole.SELLER) and updated_user.has_role(UserRole.BUYER):
+                        from bot.keyboards import get_combined_main_menu
+                        keyboard = get_combined_main_menu(updated_user, has_active_subscription)
+                    elif updated_user.has_role(UserRole.SELLER):
+                        keyboard = get_main_menu_seller(has_active_subscription)
+                    else:
+                        keyboard = get_main_menu_buyer(has_active_subscription)
                     
                     # Отправляем новое сообщение с обновленной клавиатурой
                     await callback.message.answer(
@@ -528,13 +540,20 @@ async def suspend_subscription(callback: CallbackQuery):
             # Подписка приостановлена, но все еще считается активной до окончания периода
             has_active_subscription = updated_user.subscription_status in [
                 SubscriptionStatus.ACTIVE, 
-                SubscriptionStatus.AUTO_RENEWAL_OFF, 
-                SubscriptionStatus.CANCELLED
-            ]
-            
-            keyboard = get_main_menu_seller(has_active_subscription) if updated_user.role == UserRole.SELLER else get_main_menu_buyer(has_active_subscription)
-            
-            # Отправляем новое сообщение с обновленной клавиатурой
+                            SubscriptionStatus.AUTO_RENEWAL_OFF, 
+            SubscriptionStatus.CANCELLED
+        ]
+        
+        # Определяем клавиатуру на основе ролей пользователя
+        if updated_user.has_role(UserRole.SELLER) and updated_user.has_role(UserRole.BUYER):
+            from bot.keyboards import get_combined_main_menu
+            keyboard = get_combined_main_menu(updated_user, has_active_subscription)
+        elif updated_user.has_role(UserRole.SELLER):
+            keyboard = get_main_menu_seller(has_active_subscription)
+        else:
+            keyboard = get_main_menu_buyer(has_active_subscription)
+        
+        # Отправляем новое сообщение с обновленной клавиатурой
             await callback.message.answer(
                 "🏠 Главное меню обновлено.\n\n"
                 "Управление подпиской доступно до окончания текущего периода.",
@@ -589,12 +608,19 @@ async def confirm_full_cancellation(callback: CallbackQuery):
         # Получаем обновленные данные пользователя
         updated_user = await get_user(callback.from_user.id)
         if updated_user:
-            # После полной отмены подписки has_active_subscription = False
-            has_active_subscription = False
-            
-            keyboard = get_main_menu_seller(has_active_subscription) if updated_user.role == UserRole.SELLER else get_main_menu_buyer(has_active_subscription)
-            
-            # Отправляем новое сообщение с обновленной клавиатурой
+                    # После полной отмены подписки has_active_subscription = False
+        has_active_subscription = False
+        
+        # Определяем клавиатуру на основе ролей пользователя
+        if updated_user.has_role(UserRole.SELLER) and updated_user.has_role(UserRole.BUYER):
+            from bot.keyboards import get_combined_main_menu
+            keyboard = get_combined_main_menu(updated_user, has_active_subscription)
+        elif updated_user.has_role(UserRole.SELLER):
+            keyboard = get_main_menu_seller(has_active_subscription)
+        else:
+            keyboard = get_main_menu_buyer(has_active_subscription)
+        
+        # Отправляем новое сообщение с обновленной клавиатурой
             await callback.message.answer(
                 "🏠 Главное меню обновлено.\n\n"
                 "Кнопка 'Управление подпиской' удалена, так как подписка отменена.",
@@ -736,7 +762,14 @@ async def back_to_main_menu(callback: CallbackQuery):
             SubscriptionStatus.CANCELLED
         ]
         
-        keyboard = get_main_menu_seller(has_active_subscription) if user.role == UserRole.SELLER else get_main_menu_buyer(has_active_subscription)
+        # Определяем клавиатуру на основе ролей пользователя
+        if user.has_role(UserRole.SELLER) and user.has_role(UserRole.BUYER):
+            from bot.keyboards import get_combined_main_menu
+            keyboard = get_combined_main_menu(user, has_active_subscription)
+        elif user.has_role(UserRole.SELLER):
+            keyboard = get_main_menu_seller(has_active_subscription)
+        else:
+            keyboard = get_main_menu_buyer(has_active_subscription)
         
         # Отправляем сообщение о возврате в главное меню с правильной клавиатурой
         await callback.message.answer(

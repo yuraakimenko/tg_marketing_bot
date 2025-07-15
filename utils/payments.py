@@ -93,6 +93,7 @@ def create_subscription_payment(user_id: int, subscription_type: str = "monthly"
     amounts = {
         "monthly": 500.0,
         "quarterly": 1350.0,  # 3 месяца со скидкой 10%
+        "half_yearly": 2550.0,  # 6 месяцев со скидкой 15%
         "yearly": 5000.0      # 12 месяцев со скидкой 17%
     }
     
@@ -100,6 +101,7 @@ def create_subscription_payment(user_id: int, subscription_type: str = "monthly"
     descriptions = {
         "monthly": "Подписка на 1 месяц - Tinder для блогеров",
         "quarterly": "Подписка на 3 месяца - Tinder для блогеров", 
+        "half_yearly": "Подписка на 6 месяцев - Tinder для блогеров",
         "yearly": "Подписка на 12 месяцев - Tinder для блогеров"
     }
     
