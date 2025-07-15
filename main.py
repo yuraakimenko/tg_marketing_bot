@@ -104,15 +104,33 @@ if BOT_TOKEN:
 async def main():
     """Главная функция запуска бота"""
     
-    # Инициализация базы данных
-    await init_db()
-    
-    # Инициализация бота и диспетчера
-    bot = Bot(
-        token=BOT_TOKEN,
-        default=DefaultBotProperties(parse_mode=ParseMode.HTML)
-    )
-    dp = Dispatcher()
+    try:
+        # Инициализация базы данных
+        logger.info("🗄️ Инициализация базы данных...")
+        await init_db()
+        logger.info("✅ База данных инициализирована")
+        
+        # Инициализация бота и диспетчера
+        logger.info("🤖 Создание экземпляра бота...")
+        logger.info(f"Используемый токен (первые 10 символов): {BOT_TOKEN[:10]}")
+        
+        bot = Bot(
+            token=BOT_TOKEN,
+            default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+        )
+        logger.info("✅ Бот создан")
+        
+        # Проверяем подключение к Telegram API
+        logger.info("🔄 Проверка подключения к Telegram API...")
+        bot_info = await bot.get_me()
+        logger.info(f"✅ Бот подключен: @{bot_info.username} ({bot_info.first_name})")
+        
+        dp = Dispatcher()
+        logger.info("✅ Диспетчер создан")
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка при инициализации: {type(e).__name__}: {e}")
+        raise
     
     # Флаг для корректного завершения
     shutdown_event = asyncio.Event()
@@ -125,18 +143,31 @@ async def main():
     signal.signal(signal.SIGTERM, signal_handler)
     signal.signal(signal.SIGINT, signal_handler)
     
-    # Очищаем webhook перед запуском polling
-    logger.info("Очищаем webhook...")
-    await bot.delete_webhook(drop_pending_updates=True)
-    logger.info("Webhook очищен")
-    
-    # Регистрация обработчиков
-    dp.include_router(common.router)
-    dp.include_router(seller.router)
-    dp.include_router(buyer.router)
-    dp.include_router(subscription.router)
-    
-    logger.info("Бот запущен")
+    try:
+        # Очищаем webhook перед запуском polling
+        logger.info("🔄 Очищаем webhook...")
+        await bot.delete_webhook(drop_pending_updates=True)
+        logger.info("✅ Webhook очищен")
+        
+        # Регистрация обработчиков
+        logger.info("📝 Регистрация обработчиков...")
+        dp.include_router(common.router)
+        logger.info("✅ common.router зарегистрирован")
+        
+        dp.include_router(seller.router)
+        logger.info("✅ seller.router зарегистрирован")
+        
+        dp.include_router(buyer.router)
+        logger.info("✅ buyer.router зарегистрирован")
+        
+        dp.include_router(subscription.router)
+        logger.info("✅ subscription.router зарегистрирован")
+        
+        logger.info("🎉 Все обработчики зарегистрированы, бот готов к запуску")
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка при регистрации обработчиков: {type(e).__name__}: {e}")
+        raise
     
     try:
         # Запуск бота с увеличенным timeout
