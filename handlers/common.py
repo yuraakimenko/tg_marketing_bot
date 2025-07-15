@@ -10,7 +10,8 @@ from bot.keyboards import (
     get_role_selection_keyboard, 
     get_main_menu_seller, 
     get_main_menu_buyer,
-    get_settings_keyboard
+    get_settings_keyboard,
+    get_combined_main_menu
 )
 from bot.states import RegistrationStates
 
@@ -56,6 +57,8 @@ async def handle_role_selection_unified(callback: CallbackQuery, state: FSMConte
         
         try:
             # Создаем пользователя с выбранной ролью
+            logger.info(f"Начинаем создание пользователя с telegram_id: {callback.from_user.id}")
+            
             user = await create_user(
                 telegram_id=callback.from_user.id,
                 username=callback.from_user.username,
@@ -64,7 +67,19 @@ async def handle_role_selection_unified(callback: CallbackQuery, state: FSMConte
                 roles=[role]
             )
             
-            logger.info(f"Пользователь создан успешно: {user}")
+            if not user:
+                logger.error("create_user вернул None")
+                await callback.answer("❌ Ошибка при создании пользователя")
+                await callback.message.answer("❌ Не удалось создать пользователя. Попробуйте еще раз.")
+                return
+            
+            if not user.id:
+                logger.error(f"Пользователь создан, но ID равно None: {user}")
+                await callback.answer("❌ Ошибка данных пользователя")
+                await callback.message.answer("❌ Проблема с данными пользователя. Обратитесь в поддержку.")
+                return
+            
+            logger.info(f"Пользователь создан успешно: ID={user.id}, telegram_id={user.telegram_id}, роли={[r.value for r in user.roles]}")
             
             await callback.answer()
             await callback.message.delete()
@@ -81,9 +96,13 @@ async def handle_role_selection_unified(callback: CallbackQuery, state: FSMConte
             logger.info("Регистрация завершена успешно")
             
         except Exception as e:
-            logger.error(f"Ошибка при создании пользователя: {e}")
+            logger.error(f"Ошибка при создании пользователя: {e}", exc_info=True)
             await callback.answer("❌ Ошибка при регистрации. Попробуйте еще раз.")
-            await callback.message.answer("❌ Произошла ошибка при регистрации. Пожалуйста, попробуйте еще раз или обратитесь в поддержку.")
+            await callback.message.answer(
+                "❌ Произошла ошибка при регистрации.\n\n"
+                f"Детали ошибки: {str(e)[:100]}\n\n"
+                "Попробуйте выполнить /start еще раз или обратитесь в поддержку."
+            )
     
     else:
         # СУЩЕСТВУЮЩИЙ ПОЛЬЗОВАТЕЛЬ - ДОБАВЛЕНИЕ РОЛИ
@@ -218,45 +237,53 @@ async def back_to_settings(callback: CallbackQuery):
     await settings_menu(callback.message)
 
 
-async def show_main_menu(message: Message, user):
-    """Показать главное меню для пользователя"""
-    # Проверяем наличие активной подписки
+async def show_main_menu(message: Message, user: User):
+    """Показать главное меню в зависимости от ролей пользователя"""
     has_active_subscription = user.subscription_status in [
         SubscriptionStatus.ACTIVE, 
         SubscriptionStatus.AUTO_RENEWAL_OFF, 
         SubscriptionStatus.CANCELLED
     ]
     
-    # Определяем, какие роли есть у пользователя
-    is_seller = user.has_role(UserRole.SELLER)
-    is_buyer = user.has_role(UserRole.BUYER)
-    
-    if is_seller and is_buyer:
-        # Пользователь имеет обе роли
-        greeting = (
-            f"👋 Добро пожаловать, {user.first_name or 'Пользователь'}!\n\n"
-            "🎭 У вас есть роли продажника и закупщика.\n"
-            "Выберите действие:"
-        )
+    if user.has_role(UserRole.SELLER) and user.has_role(UserRole.BUYER):
+        # Пользователь с двумя ролями
         keyboard = get_combined_main_menu(user, has_active_subscription)
-    elif is_seller:
+        await message.answer(
+            f"👋 Добро пожаловать обратно, {user.first_name or 'пользователь'}!\n\n"
+            f"🎭 Ваши роли: продажник, закупщик\n"
+            f"💳 Подписка: {'активна' if has_active_subscription else 'неактивна'}\n\n"
+            "Выберите действие:",
+            reply_markup=keyboard
+        )
+    elif user.has_role(UserRole.SELLER):
         # Только продажник
-        greeting = (
-            f"👋 Добро пожаловать, {user.first_name or 'Продажник'}!\n\n"
-            "📋 Здесь вы можете управлять своими блогерами.\n"
-            "Выберите действие:"
-        )
         keyboard = get_main_menu_seller(has_active_subscription)
-    else:
-        # Только закупщик
-        greeting = (
-            f"👋 Добро пожаловать, {user.first_name or 'Закупщик'}!\n\n"
-            "🔍 Здесь вы можете найти подходящих блогеров.\n"
-            "Выберите действие:"
+        await message.answer(
+            f"👋 Добро пожаловать обратно, {user.first_name or 'пользователь'}!\n\n"
+            f"🎭 Ваша роль: продажник\n"
+            f"💳 Подписка: {'активна' if has_active_subscription else 'неактивна'}\n\n"
+            "Выберите действие:",
+            reply_markup=keyboard
         )
+    elif user.has_role(UserRole.BUYER):
+        # Только закупщик
         keyboard = get_main_menu_buyer(has_active_subscription)
-    
-    await message.answer(greeting, reply_markup=keyboard)
+        await message.answer(
+            f"👋 Добро пожаловать обратно, {user.first_name or 'пользователь'}!\n\n"
+            f"🎭 Ваша роль: закупщик\n"
+            f"💳 Подписка: {'активна' if has_active_subscription else 'неактивна'}\n\n"
+            "Выберите действие:",
+            reply_markup=keyboard
+        )
+    else:
+        # Пользователь без ролей (ошибка)
+        await message.answer(
+            "❌ <b>Проблема с ролями</b>\n\n"
+            "У вас не назначена ни одна роль.\n"
+            "Выберите роль для продолжения:",
+            reply_markup=get_role_selection_keyboard(),
+            parse_mode="HTML"
+        )
 
 
 async def update_main_menu_keyboard(message: Message, user_id: int):

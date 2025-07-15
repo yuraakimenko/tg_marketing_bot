@@ -60,13 +60,14 @@ def get_settings_keyboard() -> InlineKeyboardMarkup:
 
 
 def get_platform_keyboard() -> InlineKeyboardMarkup:
-    """Клавиатура выбора платформы"""
+    """Клавиатура множественного выбора платформ"""
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📱 Instagram", callback_data="platform_instagram")],
         [InlineKeyboardButton(text="📺 YouTube", callback_data="platform_youtube")],
         [InlineKeyboardButton(text="📱 TikTok", callback_data="platform_tiktok")],
         [InlineKeyboardButton(text="📱 Telegram", callback_data="platform_telegram")],
-        [InlineKeyboardButton(text="📱 VK", callback_data="platform_vk")]
+        [InlineKeyboardButton(text="📱 VK", callback_data="platform_vk")],
+        [InlineKeyboardButton(text="✅ Подтвердить выбор", callback_data="confirm_platforms")]
     ])
 
 

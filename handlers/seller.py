@@ -119,16 +119,55 @@ async def universal_edit_blogger(message: Message, state: FSMContext):
 
 @router.callback_query(F.data.startswith("platform_"))
 async def handle_platform_selection(callback: CallbackQuery, state: FSMContext):
-    """Обработка выбора платформы"""
+    """Обработка множественного выбора платформ"""
     platform_str = callback.data.split("_")[1]
     platform = Platform(platform_str)
     
-    await state.update_data(platform=platform.value)
+    data = await state.get_data()
+    platforms = data.get('platforms', [])
+    
+    if platform in platforms:
+        # Убираем платформу
+        platforms.remove(platform)
+        await callback.answer(f"❌ Платформа '{platform.value}' убрана")
+    else:
+        # Добавляем платформу
+        platforms.append(platform)
+        await callback.answer(f"✅ Платформа '{platform.value}' добавлена")
+    
+    await state.update_data(platforms=platforms)
+    
+    # Обновляем сообщение
+    platforms_text = ", ".join([p.value for p in platforms]) if platforms else "Не выбрано"
+    
+    await callback.message.edit_text(
+        f"🎯 <b>Шаг 1:</b> Выберите платформы\n\n"
+        f"Выбранные платформы: <b>{platforms_text}</b>\n\n"
+        f"Выберите платформы для блогера:",
+        reply_markup=get_platform_keyboard(),
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data == "confirm_platforms")
+async def confirm_platforms(callback: CallbackQuery, state: FSMContext):
+    """Подтверждение выбора платформ"""
+    data = await state.get_data()
+    platforms = data.get('platforms', [])
+    
+    if not platforms:
+        await callback.answer("❌ Выберите хотя бы одну платформу")
+        return
+    
     await callback.answer()
+    
+    # Устанавливаем основную платформу для совместимости
+    main_platform = platforms[0].value
+    await state.update_data(platform=main_platform)
     
     await callback.message.edit_text(
         f"🎯 <b>Шаг 2:</b> Введите ссылку на профиль блогера\n\n"
-        f"Выбранная платформа: <b>{platform.value}</b>\n\n"
+        f"Выбранные платформы: <b>{', '.join([p.value for p in platforms])}</b>\n\n"
         "Примеры ссылок:\n"
         "• Instagram: https://instagram.com/username\n"
         "• YouTube: https://youtube.com/@channel\n"
@@ -145,12 +184,53 @@ async def handle_blogger_url(message: Message, state: FSMContext):
     """Обработка ввода ссылки на блогера"""
     url = message.text.strip()
     
-    # Простая валидация URL
+    # Расширенная валидация URL
     if not url.startswith(('http://', 'https://')):
         await message.answer(
             "❌ <b>Неверный формат ссылки</b>\n\n"
             "Ссылка должна начинаться с http:// или https://\n"
             "Попробуйте еще раз:",
+            parse_mode="HTML"
+        )
+        return
+    
+    # Получаем выбранные платформы для валидации
+    data = await state.get_data()
+    platforms = data.get('platforms', [])
+    
+    # Валидация для конкретных платформ
+    platform_validation = {
+        'instagram': ['instagram.com/', 'www.instagram.com/'],
+        'youtube': ['youtube.com/', 'www.youtube.com/', 'youtu.be/'],
+        'tiktok': ['tiktok.com/', 'www.tiktok.com/'],
+        'telegram': ['t.me/', 'telegram.me/'],
+        'vk': ['vk.com/', 'www.vk.com/', 'm.vk.com/']
+    }
+    
+    # Проверяем URL для хотя бы одной из выбранных платформ
+    url_valid = False
+    for platform in platforms:
+        platform_key = platform.value.lower()
+        if platform_key in platform_validation:
+            valid_domains = platform_validation[platform_key]
+            if any(domain in url.lower() for domain in valid_domains):
+                url_valid = True
+                break
+    
+    if platforms and not url_valid:
+        platform_names = {
+            'instagram': 'Instagram',
+            'youtube': 'YouTube', 
+            'tiktok': 'TikTok',
+            'telegram': 'Telegram',
+            'vk': 'VK'
+        }
+        platform_list = [platform_names.get(p.value.lower(), p.value) for p in platforms]
+        await message.answer(
+            f"❌ <b>Неверная ссылка для выбранных платформ</b>\n\n"
+            f"Выбранные платформы: {', '.join(platform_list)}\n"
+            f"URL должен соответствовать одной из выбранных платформ.\n\n"
+            f"Попробуйте еще раз:",
             parse_mode="HTML"
         )
         return
@@ -728,12 +808,55 @@ async def handle_blogger_description(message: Message, state: FSMContext):
     data = await state.get_data()
     user = await get_user(message.from_user.id)
     
+    # Проверяем пользователя
+    if not user:
+        logger.error(f"Пользователь не найден: {message.from_user.id}")
+        await message.answer(
+            "❌ <b>Ошибка пользователя</b>\n\n"
+            "Пользователь не найден в базе данных.\n"
+            "Попробуйте выполнить /start для регистрации.",
+            parse_mode="HTML"
+        )
+        await state.clear()
+        return
+    
+    if not user.id:
+        logger.error(f"User ID равно None для пользователя: {message.from_user.id}")
+        await message.answer(
+            "❌ <b>Ошибка данных пользователя</b>\n\n"
+            "Проблема с данными пользователя в базе.\n"
+            "Обратитесь в поддержку.",
+            parse_mode="HTML"
+        )
+        await state.clear()
+        return
+    
+    # Проверяем обязательные данные
+    required_fields = ['blogger_name', 'blogger_url', 'platforms', 'categories']
+    missing_fields = []
+    for field in required_fields:
+        if field not in data or not data[field]:
+            missing_fields.append(field)
+    
+    if missing_fields:
+        logger.error(f"Отсутствуют обязательные поля: {missing_fields}")
+        await message.answer(
+            "❌ <b>Недостаточно данных</b>\n\n"
+            "Некоторые обязательные поля не заполнены.\n"
+            "Начните процесс добавления блогера заново.",
+            parse_mode="HTML"
+        )
+        await state.clear()
+        return
+    
     try:
+        logger.info(f"Создание блогера для пользователя {user.id} с данными: {data}")
+        
         blogger = await create_blogger(
             seller_id=user.id,
             name=data['blogger_name'],
             url=data['blogger_url'],
-            platforms=[Platform(data['platform'])],
+            platforms=data['platforms'],  # Теперь используем множественные платформы
             categories=data['categories'],
             audience_13_17_percent=data.get('audience_13_17_percent'),
             audience_18_24_percent=data.get('audience_18_24_percent'),
