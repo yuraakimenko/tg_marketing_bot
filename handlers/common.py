@@ -37,57 +37,116 @@ async def start_command(message: Message, state: FSMContext):
         await show_main_menu(message, user)
 
 
-@router.callback_query(F.data.startswith("role_"), RegistrationStates.waiting_for_role)
-async def handle_role_selection(callback: CallbackQuery, state: FSMContext):
-    """Обработка выбора роли при первичной регистрации"""
+@router.callback_query(F.data.startswith("role_"))
+async def handle_role_selection_unified(callback: CallbackQuery, state: FSMContext):
+    """Унифицированная обработка выбора роли - и для регистрации, и для смены роли"""
     logger.info(f"Получен callback для выбора роли: {callback.data} от пользователя {callback.from_user.id}")
     
-    # Проверяем, что пользователь не существует (первичная регистрация)
+    # Получаем пользователя
     user = await get_user(callback.from_user.id)
-    if user:
-        # Пользователь уже существует, не обрабатываем здесь
-        logger.info(f"Пользователь {callback.from_user.id} уже существует")
-        await callback.answer("❌ Вы уже зарегистрированы")
-        return
-    
-    logger.info(f"Создаем нового пользователя с ролью: {callback.data}")
     
     role_str = callback.data.split("_")[1]  # seller или buyer
     role = UserRole.SELLER if role_str == "seller" else UserRole.BUYER
     
-    logger.info(f"Роль определена как: {role}")
-    logger.info(f"Данные пользователя: telegram_id={callback.from_user.id}, username={callback.from_user.username}, first_name={callback.from_user.first_name}, last_name={callback.from_user.last_name}")
+    if not user:
+        # НОВЫЙ ПОЛЬЗОВАТЕЛЬ - РЕГИСТРАЦИЯ
+        logger.info(f"Создаем нового пользователя с ролью: {callback.data}")
+        logger.info(f"Роль определена как: {role}")
+        logger.info(f"Данные пользователя: telegram_id={callback.from_user.id}, username={callback.from_user.username}, first_name={callback.from_user.first_name}, last_name={callback.from_user.last_name}")
+        
+        try:
+            # Создаем пользователя с выбранной ролью
+            user = await create_user(
+                telegram_id=callback.from_user.id,
+                username=callback.from_user.username,
+                first_name=callback.from_user.first_name,
+                last_name=callback.from_user.last_name,
+                roles=[role]
+            )
+            
+            logger.info(f"Пользователь создан успешно: {user}")
+            
+            await callback.answer()
+            await callback.message.delete()
+            
+            role_name = "продажник" if role == UserRole.SELLER else "закупщик"
+            await callback.message.answer(
+                f"✅ Отлично! Вы зарегистрированы как {role_name}.\n\n"
+                f"📋 Теперь вам доступны функции {'для размещения блогеров' if role == UserRole.SELLER else 'для поиска блогеров'}.\n\n"
+                "💡 Для полного доступа к функциям бота необходима подписка 500₽/мес.",
+                reply_markup=get_main_menu_seller(False) if role == UserRole.SELLER else get_main_menu_buyer(False)
+            )
+            
+            await state.clear()
+            logger.info("Регистрация завершена успешно")
+            
+        except Exception as e:
+            logger.error(f"Ошибка при создании пользователя: {e}")
+            await callback.answer("❌ Ошибка при регистрации. Попробуйте еще раз.")
+            await callback.message.answer("❌ Произошла ошибка при регистрации. Пожалуйста, попробуйте еще раз или обратитесь в поддержку.")
     
-    try:
-        # Создаем пользователя с выбранной ролью
-        user = await create_user(
-            telegram_id=callback.from_user.id,
-            username=callback.from_user.username,
-            first_name=callback.from_user.first_name,
-            last_name=callback.from_user.last_name,
-            roles=[role]
-        )
+    else:
+        # СУЩЕСТВУЮЩИЙ ПОЛЬЗОВАТЕЛЬ - ДОБАВЛЕНИЕ РОЛИ
+        logger.info(f"Обработка добавления роли существующим пользователем: {callback.data} от пользователя {callback.from_user.id}")
+        logger.info(f"Новая роль: {role}")
+        logger.info(f"Текущие роли пользователя: {[r.value for r in user.roles]}")
         
-        logger.info(f"Пользователь создан успешно: {user}")
+        # Проверяем, есть ли уже эта роль
+        if user.has_role(role):
+            role_name = "продажника" if role == UserRole.SELLER else "закупщика"
+            logger.info(f"У пользователя уже есть роль {role_name}")
+            await callback.answer(f"ℹ️ У вас уже есть роль {role_name}")
+            return
         
-        await callback.answer()
-        await callback.message.delete()
+        # Добавляем новую роль пользователю
+        logger.info(f"Добавляем роль {role} пользователю {callback.from_user.id}")
+        success = await add_user_role(callback.from_user.id, role)
         
-        role_name = "продажник" if role == UserRole.SELLER else "закупщик"
-        await callback.message.answer(
-            f"✅ Отлично! Вы зарегистрированы как {role_name}.\n\n"
-            f"📋 Теперь вам доступны функции {'для размещения блогеров' if role == UserRole.SELLER else 'для поиска блогеров'}.\n\n"
-            "💡 Для полного доступа к функциям бота необходима подписка 500₽/мес.",
-            reply_markup=get_main_menu_seller(False) if role == UserRole.SELLER else get_main_menu_buyer(False)
-        )
-        
-        await state.clear()
-        logger.info("Регистрация завершена успешно")
-        
-    except Exception as e:
-        logger.error(f"Ошибка при создании пользователя: {e}")
-        await callback.answer("❌ Ошибка при регистрации. Попробуйте еще раз.")
-        await callback.message.answer("❌ Произошла ошибка при регистрации. Пожалуйста, попробуйте еще раз или обратитесь в поддержку.")
+        if success:
+            logger.info("Роль успешно добавлена")
+            await callback.answer("✅ Роль успешно добавлена!")
+            
+            # Получаем обновленные данные пользователя для проверки подписки
+            updated_user = await get_user(callback.from_user.id)
+            has_active_subscription = updated_user.subscription_status in [
+                SubscriptionStatus.ACTIVE, 
+                SubscriptionStatus.AUTO_RENEWAL_OFF, 
+                SubscriptionStatus.CANCELLED
+            ] if updated_user else False
+            
+            # Формируем список всех ролей
+            all_roles = []
+            if updated_user.has_role(UserRole.SELLER):
+                all_roles.append("продажник")
+            if updated_user.has_role(UserRole.BUYER):
+                all_roles.append("закупщик")
+            
+            roles_text = ", ".join(all_roles)
+            
+            # Обновляем сообщение с новыми ролями
+            await callback.message.edit_text(
+                f"✅ <b>Роль успешно добавлена!</b>\n\n"
+                f"🎭 Ваши роли: <b>{roles_text}</b>\n"
+                f"💳 Подписка: {'сохранена' if has_active_subscription else 'неактивна'}\n\n"
+                f"🚀 Теперь вам доступны функции для всех ваших ролей.",
+                reply_markup=get_combined_main_menu(updated_user, has_active_subscription),
+                parse_mode="HTML"
+            )
+            
+            logger.info("Роль добавлена успешно")
+            
+        else:
+            logger.error("Ошибка при добавлении роли")
+            await callback.answer("❌ Ошибка при добавлении роли")
+            await callback.message.edit_text(
+                "❌ <b>Ошибка</b>\n\n"
+                "Произошла ошибка при добавлении роли.\n"
+                "Пожалуйста, попробуйте еще раз или обратитесь в поддержку.",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="⚙️ Вернуться в настройки", callback_data="back_to_settings")]
+                ]),
+                parse_mode="HTML"
+            )
 
 
 @router.message(F.text == "⚙️ Настройки")
@@ -150,82 +209,6 @@ async def change_role(callback: CallbackQuery, state: FSMContext):
         parse_mode="HTML"
     )
     logger.info(f"Отображено меню управления ролями для пользователя {callback.from_user.id}")
-
-
-@router.callback_query(F.data.startswith("role_"))
-async def handle_role_change_existing_user(callback: CallbackQuery, state: FSMContext):
-    """Обработка смены роли для существующих пользователей"""
-    logger.info(f"Обработка смены роли существующим пользователем: {callback.data} от пользователя {callback.from_user.id}")
-    
-    # Проверяем, что пользователь существует
-    user = await get_user(callback.from_user.id)
-    if not user:
-        logger.error(f"Пользователь {callback.from_user.id} не найден при смене роли")
-        await callback.answer("❌ Пользователь не найден")
-        return
-    
-    role_str = callback.data.split("_")[1]
-    new_role = UserRole.SELLER if role_str == "seller" else UserRole.BUYER
-    
-    logger.info(f"Новая роль: {new_role}")
-    logger.info(f"Текущие роли пользователя: {[r.value for r in user.roles]}")
-    
-    # Проверяем, есть ли уже эта роль
-    if user.has_role(new_role):
-        role_name = "продажника" if new_role == UserRole.SELLER else "закупщика"
-        logger.info(f"У пользователя уже есть роль {role_name}")
-        await callback.answer(f"ℹ️ У вас уже есть роль {role_name}")
-        return
-    
-    # Добавляем новую роль пользователю
-    logger.info(f"Добавляем роль {new_role} пользователю {callback.from_user.id}")
-    success = await add_user_role(callback.from_user.id, new_role)
-    
-    if success:
-        logger.info("Роль успешно добавлена")
-        await callback.answer("✅ Роль успешно добавлена!")
-        
-        # Получаем обновленные данные пользователя для проверки подписки
-        updated_user = await get_user(callback.from_user.id)
-        has_active_subscription = updated_user.subscription_status in [
-            SubscriptionStatus.ACTIVE, 
-            SubscriptionStatus.AUTO_RENEWAL_OFF, 
-            SubscriptionStatus.CANCELLED
-        ] if updated_user else False
-        
-        # Формируем список всех ролей
-        all_roles = []
-        if updated_user.has_role(UserRole.SELLER):
-            all_roles.append("продажник")
-        if updated_user.has_role(UserRole.BUYER):
-            all_roles.append("закупщик")
-        
-        roles_text = ", ".join(all_roles)
-        
-        # Обновляем сообщение с новыми ролями
-        await callback.message.edit_text(
-            f"✅ <b>Роль успешно добавлена!</b>\n\n"
-            f"🎭 Ваши роли: <b>{roles_text}</b>\n"
-            f"💳 Подписка: {'сохранена' if has_active_subscription else 'неактивна'}\n\n"
-            f"🚀 Теперь вам доступны функции для всех ваших ролей.",
-            reply_markup=get_combined_main_menu(updated_user, has_active_subscription),
-            parse_mode="HTML"
-        )
-        
-        logger.info("Роль добавлена успешно")
-        
-    else:
-        logger.error("Ошибка при добавлении роли")
-        await callback.answer("❌ Ошибка при добавлении роли")
-        await callback.message.edit_text(
-            "❌ <b>Ошибка</b>\n\n"
-            "Произошла ошибка при добавлении роли.\n"
-            "Пожалуйста, попробуйте еще раз или обратитесь в поддержку.",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="⚙️ Вернуться в настройки", callback_data="back_to_settings")]
-            ]),
-            parse_mode="HTML"
-        )
 
 
 @router.callback_query(F.data == "back_to_settings")
