@@ -560,7 +560,7 @@ async def create_blogger(seller_id: int, name: str, url: str, platforms: List[Pl
         
         cursor = await db.execute("""
             INSERT INTO bloggers (
-                seller_id, name, url, platform, category, target_audience,
+                seller_id, name, url,
                 platforms, categories,
                 audience_13_17_percent, audience_18_24_percent, audience_25_35_percent, audience_35_plus_percent,
                 female_percent, male_percent,
@@ -569,9 +569,9 @@ async def create_blogger(seller_id: int, name: str, url: str, platforms: List[Pl
                 subscribers_count, avg_views, avg_likes, engagement_rate,
                 description
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            seller_id, name, url, primary_platform, primary_category, 'general',
+            seller_id, name, url,
             platforms_json, categories_json,
             kwargs.get('audience_13_17_percent'),
             kwargs.get('audience_18_24_percent'),
