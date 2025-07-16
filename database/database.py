@@ -328,6 +328,19 @@ async def init_db():
                 await db.execute("ALTER TABLE bloggers ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
                 logger.info("Added updated_at column to bloggers table")
                 
+            # Добавляем старые поля для совместимости (если их нет)
+            if 'platform' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN platform TEXT")
+                logger.info("Added platform column to bloggers table for compatibility")
+                
+            if 'category' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN category TEXT")
+                logger.info("Added category column to bloggers table for compatibility")
+                
+            if 'target_audience' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN target_audience TEXT")
+                logger.info("Added target_audience column to bloggers table for compatibility")
+                
         except Exception as e:
             logger.error(f"Error during migration: {e}")
         
@@ -560,7 +573,7 @@ async def create_blogger(seller_id: int, name: str, url: str, platforms: List[Pl
         
         cursor = await db.execute("""
             INSERT INTO bloggers (
-                seller_id, name, url,
+                seller_id, name, url, platform, category, target_audience,
                 platforms, categories,
                 audience_13_17_percent, audience_18_24_percent, audience_25_35_percent, audience_35_plus_percent,
                 female_percent, male_percent,
@@ -569,9 +582,9 @@ async def create_blogger(seller_id: int, name: str, url: str, platforms: List[Pl
                 subscribers_count, avg_views, avg_likes, engagement_rate,
                 description
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            seller_id, name, url,
+            seller_id, name, url, primary_platform, primary_category, 'general',
             platforms_json, categories_json,
             kwargs.get('audience_13_17_percent'),
             kwargs.get('audience_18_24_percent'),
