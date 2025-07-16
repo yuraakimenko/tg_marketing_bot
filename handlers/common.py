@@ -10,8 +10,7 @@ from bot.keyboards import (
     get_role_selection_keyboard, 
     get_main_menu_seller, 
     get_main_menu_buyer,
-    get_settings_keyboard,
-    get_combined_main_menu
+    get_settings_keyboard
 )
 from bot.states import RegistrationStates
 
@@ -317,35 +316,139 @@ def get_role_management_keyboard() -> InlineKeyboardMarkup:
 
 
 def get_combined_main_menu(user, has_active_subscription: bool) -> InlineKeyboardMarkup:
-    """Комбинированное главное меню для пользователей с несколькими ролями"""
-    from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+    """Комбинированное главное меню для пользователей с несколькими ролями (inline версия)"""
     
     keyboard_buttons = []
     
     # Функции продажника
     if user.has_role(UserRole.SELLER):
         keyboard_buttons.extend([
-            [KeyboardButton(text="📝 Добавить блогера")],
-            [KeyboardButton(text="📋 Мои блогеры")],
-            [KeyboardButton(text="✏️ Редактировать блогера")]
+            [InlineKeyboardButton(text="📝 Добавить блогера", callback_data="add_blogger")],
+            [InlineKeyboardButton(text="📋 Мои блогеры", callback_data="my_bloggers")],
+            [InlineKeyboardButton(text="✏️ Редактировать блогера", callback_data="edit_blogger")]
         ])
     
     # Функции закупщика
     if user.has_role(UserRole.BUYER):
         keyboard_buttons.extend([
-            [KeyboardButton(text="🔍 Поиск блогеров")],
-            [KeyboardButton(text="📋 История поиска")],
-            [KeyboardButton(text="📊 Статистика")]
+            [InlineKeyboardButton(text="🔍 Поиск блогеров", callback_data="search_bloggers")],
+            [InlineKeyboardButton(text="📋 История поиска", callback_data="search_history")],
+            [InlineKeyboardButton(text="📊 Статистика", callback_data="statistics")]
         ])
     
     # Общие функции
     keyboard_buttons.extend([
-        [KeyboardButton(text="💳 Подписка")],
-        [KeyboardButton(text="⚙️ Настройки")]
+        [InlineKeyboardButton(text="💳 Подписка", callback_data="subscription")],
+        [InlineKeyboardButton(text="⚙️ Настройки", callback_data="settings")]
     ])
     
-    return ReplyKeyboardMarkup(
-        keyboard=keyboard_buttons,
-        resize_keyboard=True,
-        input_field_placeholder="Выберите действие"
-    ) 
+    return InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+
+
+# Обработчики для inline кнопок главного меню
+@router.callback_query(F.data == "add_blogger")
+async def handle_add_blogger_callback(callback: CallbackQuery):
+    """Перенаправление на добавление блогера"""
+    from aiogram.types import Message
+    # Создаем псевдо-сообщение для совместимости с существующими обработчиками
+    message = Message(
+        message_id=callback.message.message_id,
+        date=callback.message.date,
+        chat=callback.message.chat,
+        from_user=callback.from_user,
+        text="📝 Добавить блогера"
+    )
+    await callback.answer()
+    # Импортируем и вызываем обработчик из seller.py
+    from handlers.seller import handle_add_blogger
+    from aiogram.fsm.context import FSMContext
+    state = FSMContext(storage=callback.bot.session.storage, key=callback.message.chat.id)
+    await handle_add_blogger(message, state)
+
+@router.callback_query(F.data == "my_bloggers")
+async def handle_my_bloggers_callback(callback: CallbackQuery):
+    """Перенаправление на просмотр блогеров"""
+    from aiogram.types import Message
+    message = Message(
+        message_id=callback.message.message_id,
+        date=callback.message.date,
+        chat=callback.message.chat,
+        from_user=callback.from_user,
+        text="📋 Мои блогеры"
+    )
+    await callback.answer()
+    from handlers.seller import handle_my_bloggers
+    from aiogram.fsm.context import FSMContext
+    state = FSMContext(storage=callback.bot.session.storage, key=callback.message.chat.id)
+    await handle_my_bloggers(message, state)
+
+@router.callback_query(F.data == "edit_blogger")
+async def handle_edit_blogger_callback(callback: CallbackQuery):
+    """Перенаправление на редактирование блогера"""
+    from aiogram.types import Message
+    message = Message(
+        message_id=callback.message.message_id,
+        date=callback.message.date,
+        chat=callback.message.chat,
+        from_user=callback.from_user,
+        text="✏️ Редактировать блогера"
+    )
+    await callback.answer()
+    from handlers.seller import handle_edit_blogger
+    from aiogram.fsm.context import FSMContext
+    state = FSMContext(storage=callback.bot.session.storage, key=callback.message.chat.id)
+    await handle_edit_blogger(message, state)
+
+@router.callback_query(F.data == "search_bloggers")
+async def handle_search_bloggers_callback(callback: CallbackQuery):
+    """Перенаправление на поиск блогеров"""
+    from aiogram.types import Message
+    message = Message(
+        message_id=callback.message.message_id,
+        date=callback.message.date,
+        chat=callback.message.chat,
+        from_user=callback.from_user,
+        text="🔍 Поиск блогеров"
+    )
+    await callback.answer()
+    from handlers.buyer import handle_search_bloggers
+    from aiogram.fsm.context import FSMContext
+    state = FSMContext(storage=callback.bot.session.storage, key=callback.message.chat.id)
+    await handle_search_bloggers(message, state)
+
+@router.callback_query(F.data == "search_history")
+async def handle_search_history_callback(callback: CallbackQuery):
+    """Обработка истории поиска"""
+    await callback.answer()
+    await callback.message.edit_text(
+        "📋 <b>История поиска</b>\n\n"
+        "Функция в разработке...",
+        parse_mode="HTML"
+    )
+
+@router.callback_query(F.data == "statistics") 
+async def handle_statistics_callback(callback: CallbackQuery):
+    """Обработка статистики"""
+    await callback.answer()
+    await callback.message.edit_text(
+        "📊 <b>Статистика</b>\n\n"
+        "Функция в разработке...",
+        parse_mode="HTML"
+    )
+
+@router.callback_query(F.data == "subscription")
+async def handle_subscription_callback(callback: CallbackQuery):
+    """Перенаправление на подписку"""
+    await callback.answer()
+    from handlers.subscription import handle_subscription_info
+    from aiogram.types import Message
+    message = Message(
+        message_id=callback.message.message_id,
+        date=callback.message.date,
+        chat=callback.message.chat,
+        from_user=callback.from_user,
+        text="💳 Подписка"
+    )
+    from aiogram.fsm.context import FSMContext
+    state = FSMContext(storage=callback.bot.session.storage, key=callback.message.chat.id)
+    await handle_subscription_info(message, state) 

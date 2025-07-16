@@ -328,6 +328,19 @@ async def init_db():
                 await db.execute("ALTER TABLE bloggers ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
                 logger.info("Added updated_at column to bloggers table")
                 
+            # Добавляем старые поля для совместимости (если их нет)
+            if 'platform' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN platform TEXT")
+                logger.info("Added platform column to bloggers table for compatibility")
+                
+            if 'category' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN category TEXT")
+                logger.info("Added category column to bloggers table for compatibility")
+                
+            if 'target_audience' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN target_audience TEXT")
+                logger.info("Added target_audience column to bloggers table for compatibility")
+                
         except Exception as e:
             logger.error(f"Error during migration: {e}")
         
