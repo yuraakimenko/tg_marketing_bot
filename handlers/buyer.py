@@ -24,8 +24,21 @@ logger = logging.getLogger(__name__)
 async def universal_show_search_history(message: Message, state: FSMContext):
     await state.clear()
     user = await get_user(message.from_user.id)
-    if not user or not user.has_role(UserRole.BUYER):
-        await message.answer("❌ Эта функция доступна только закупщикам.")
+    
+    if not user:
+        await message.answer("❌ Пользователь не найден в базе данных.\n\nИспользуйте /start для регистрации.")
+        return
+    
+    # АВТОМАТИЧЕСКОЕ ИСПРАВЛЕНИЕ: если у пользователя нет ролей
+    if not user.roles:
+        from database.database import add_user_role
+        success = await add_user_role(message.from_user.id, UserRole.BUYER)
+        if success:
+            user = await get_user(message.from_user.id)
+            await message.answer("✅ Роль закупщика добавлена автоматически!")
+    
+    if not user.has_role(UserRole.BUYER):
+        await message.answer("❌ Эта функция доступна только закупщикам.\n\nИспользуйте ⚙️ Настройки → Сменить роль для добавления роли закупщика.")
         return
     await message.answer(
         "📋 <b>История поиска</b>\n\n"
@@ -43,8 +56,21 @@ async def universal_show_search_history(message: Message, state: FSMContext):
 async def universal_show_statistics(message: Message, state: FSMContext):
     await state.clear()
     user = await get_user(message.from_user.id)
-    if not user or not user.has_role(UserRole.BUYER):
-        await message.answer("❌ Эта функция доступна только закупщикам.")
+    
+    if not user:
+        await message.answer("❌ Пользователь не найден в базе данных.\n\nИспользуйте /start для регистрации.")
+        return
+    
+    # АВТОМАТИЧЕСКОЕ ИСПРАВЛЕНИЕ: если у пользователя нет ролей
+    if not user.roles:
+        from database.database import add_user_role
+        success = await add_user_role(message.from_user.id, UserRole.BUYER)
+        if success:
+            user = await get_user(message.from_user.id)
+            await message.answer("✅ Роль закупщика добавлена автоматически!")
+    
+    if not user.has_role(UserRole.BUYER):
+        await message.answer("❌ Эта функция доступна только закупщикам.\n\nИспользуйте ⚙️ Настройки → Сменить роль для добавления роли закупщика.")
         return
     subscription_status = "активна" if user.subscription_status == SubscriptionStatus.ACTIVE else "неактивна"
     stats_text = (
@@ -71,20 +97,38 @@ async def universal_search_bloggers(message: Message, state: FSMContext):
     await state.clear()
     user = await get_user(message.from_user.id)
     
-    # ВРЕМЕННАЯ ДИАГНОСТИКА
+    # ДИАГНОСТИКА И АВТОИСПРАВЛЕНИЕ
     logger.info(f"=== ДИАГНОСТИКА ПОИСКА БЛОГЕРОВ ===")
     logger.info(f"telegram_id: {message.from_user.id}")
     logger.info(f"user найден: {user is not None}")
-    if user:
-        logger.info(f"user.roles: {user.roles}")
-        logger.info(f"user.has_role(BUYER): {user.has_role(UserRole.BUYER)}")
-        logger.info(f"UserRole.BUYER in user.roles: {UserRole.BUYER in user.roles}")
-        logger.info(f"user object: {user}")
-    else:
-        logger.error(f"Пользователь с telegram_id {message.from_user.id} не найден в базе!")
     
-    if not user or not user.has_role(UserRole.BUYER):
-        await message.answer(f"❌ Эта функция доступна только закупщикам.\n\n🔧 Диагностика:\n- Пользователь найден: {'Да' if user else 'Нет'}\n- Роли: {user.roles if user else 'Нет данных'}")
+    if not user:
+        logger.error(f"Пользователь с telegram_id {message.from_user.id} не найден в базе!")
+        await message.answer("❌ Пользователь не найден в базе данных.\n\nИспользуйте /start для регистрации.")
+        return
+    
+    logger.info(f"user.roles: {user.roles}")
+    logger.info(f"user.has_role(BUYER): {user.has_role(UserRole.BUYER)}")
+    
+    # АВТОМАТИЧЕСКОЕ ИСПРАВЛЕНИЕ: если у пользователя нет ролей
+    if not user.roles:
+        logger.warning(f"У пользователя {message.from_user.id} нет ролей! Автоматически добавляем роль BUYER")
+        from database.database import add_user_role
+        success = await add_user_role(message.from_user.id, UserRole.BUYER)
+        
+        if success:
+            # Перезагружаем пользователя с новой ролью
+            user = await get_user(message.from_user.id)
+            logger.info(f"✅ Роль BUYER автоматически добавлена пользователю {message.from_user.id}")
+            await message.answer("✅ Роль закупщика добавлена автоматически!\n\nТеперь вы можете пользоваться поиском блогеров.")
+        else:
+            logger.error(f"❌ Не удалось автоматически добавить роль пользователю {message.from_user.id}")
+            await message.answer("❌ Проблема с ролями пользователя.\n\nИспользуйте /start для переназначения роли.")
+            return
+    
+    # Проверяем роль после возможного исправления
+    if not user.has_role(UserRole.BUYER):
+        await message.answer(f"❌ Эта функция доступна только закупщикам.\n\n🔧 Диагностика:\n- Пользователь найден: Да\n- Роли: {user.roles}\n\nИспользуйте ⚙️ Настройки → Сменить роль для добавления роли закупщика.")
         return
     
     # Проверяем подписку

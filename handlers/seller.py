@@ -28,8 +28,29 @@ logger = logging.getLogger(__name__)
 async def universal_add_blogger(message: Message, state: FSMContext):
     await state.clear()
     user = await get_user(message.from_user.id)
-    if not user or not user.has_role(UserRole.SELLER):
-        await message.answer("❌ Эта функция доступна только продажникам.")
+    
+    if not user:
+        await message.answer("❌ Пользователь не найден в базе данных.\n\nИспользуйте /start для регистрации.")
+        return
+    
+    # АВТОМАТИЧЕСКОЕ ИСПРАВЛЕНИЕ: если у пользователя нет ролей
+    if not user.roles:
+        logger.warning(f"У пользователя {message.from_user.id} нет ролей! Автоматически добавляем роль SELLER")
+        from database.database import add_user_role
+        success = await add_user_role(message.from_user.id, UserRole.SELLER)
+        
+        if success:
+            # Перезагружаем пользователя с новой ролью
+            user = await get_user(message.from_user.id)
+            logger.info(f"✅ Роль SELLER автоматически добавлена пользователю {message.from_user.id}")
+            await message.answer("✅ Роль продажника добавлена автоматически!\n\nТеперь вы можете добавлять блогеров.")
+        else:
+            logger.error(f"❌ Не удалось автоматически добавить роль пользователю {message.from_user.id}")
+            await message.answer("❌ Проблема с ролями пользователя.\n\nИспользуйте /start для переназначения роли.")
+            return
+    
+    if not user.has_role(UserRole.SELLER):
+        await message.answer("❌ Эта функция доступна только продажникам.\n\nИспользуйте ⚙️ Настройки → Сменить роль для добавления роли продажника.")
         return
     
     # Проверяем подписку
@@ -63,8 +84,21 @@ async def universal_add_blogger(message: Message, state: FSMContext):
 async def universal_my_bloggers(message: Message, state: FSMContext):
     await state.clear()
     user = await get_user(message.from_user.id)
-    if not user or not user.has_role(UserRole.SELLER):
-        await message.answer("❌ Эта функция доступна только продажникам.")
+    
+    if not user:
+        await message.answer("❌ Пользователь не найден в базе данных.\n\nИспользуйте /start для регистрации.")
+        return
+    
+    # АВТОМАТИЧЕСКОЕ ИСПРАВЛЕНИЕ: если у пользователя нет ролей
+    if not user.roles:
+        from database.database import add_user_role
+        success = await add_user_role(message.from_user.id, UserRole.SELLER)
+        if success:
+            user = await get_user(message.from_user.id)
+            await message.answer("✅ Роль продажника добавлена автоматически!")
+    
+    if not user.has_role(UserRole.SELLER):
+        await message.answer("❌ Эта функция доступна только продажникам.\n\nИспользуйте ⚙️ Настройки → Сменить роль для добавления роли продажника.")
         return
     
     bloggers = await get_user_bloggers(user.id)
@@ -91,8 +125,21 @@ async def universal_my_bloggers(message: Message, state: FSMContext):
 async def universal_edit_blogger(message: Message, state: FSMContext):
     await state.clear()
     user = await get_user(message.from_user.id)
-    if not user or not user.has_role(UserRole.SELLER):
-        await message.answer("❌ Эта функция доступна только продажникам.")
+    
+    if not user:
+        await message.answer("❌ Пользователь не найден в базе данных.\n\nИспользуйте /start для регистрации.")
+        return
+    
+    # АВТОМАТИЧЕСКОЕ ИСПРАВЛЕНИЕ: если у пользователя нет ролей
+    if not user.roles:
+        from database.database import add_user_role
+        success = await add_user_role(message.from_user.id, UserRole.SELLER)
+        if success:
+            user = await get_user(message.from_user.id)
+            await message.answer("✅ Роль продажника добавлена автоматически!")
+    
+    if not user.has_role(UserRole.SELLER):
+        await message.answer("❌ Эта функция доступна только продажникам.\n\nИспользуйте ⚙️ Настройки → Сменить роль для добавления роли продажника.")
         return
     
     bloggers = await get_user_bloggers(user.id)
