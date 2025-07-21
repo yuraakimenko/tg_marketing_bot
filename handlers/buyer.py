@@ -70,8 +70,21 @@ async def universal_show_statistics(message: Message, state: FSMContext):
 async def universal_search_bloggers(message: Message, state: FSMContext):
     await state.clear()
     user = await get_user(message.from_user.id)
+    
+    # ВРЕМЕННАЯ ДИАГНОСТИКА
+    logger.info(f"=== ДИАГНОСТИКА ПОИСКА БЛОГЕРОВ ===")
+    logger.info(f"telegram_id: {message.from_user.id}")
+    logger.info(f"user найден: {user is not None}")
+    if user:
+        logger.info(f"user.roles: {user.roles}")
+        logger.info(f"user.has_role(BUYER): {user.has_role(UserRole.BUYER)}")
+        logger.info(f"UserRole.BUYER in user.roles: {UserRole.BUYER in user.roles}")
+        logger.info(f"user object: {user}")
+    else:
+        logger.error(f"Пользователь с telegram_id {message.from_user.id} не найден в базе!")
+    
     if not user or not user.has_role(UserRole.BUYER):
-        await message.answer("❌ Эта функция доступна только закупщикам.")
+        await message.answer(f"❌ Эта функция доступна только закупщикам.\n\n🔧 Диагностика:\n- Пользователь найден: {'Да' if user else 'Нет'}\n- Роли: {user.roles if user else 'Нет данных'}")
         return
     
     # Проверяем подписку
