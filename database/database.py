@@ -546,22 +546,24 @@ async def update_subscription_status(user_id: int, status: SubscriptionStatus,
 
 
 # Функции для работы с блогерами
-async def create_blogger(seller_id: int, name: str, url: str, platforms: List[Platform],
-                        categories: List[BlogCategory], **kwargs) -> Blogger:
+async def create_blogger(
+    seller_id: int,
+    name: str,
+    url: str,
+    platforms: List[Platform],
+    categories: List[BlogCategory],
+    **kwargs,
+) -> Blogger:
     """Создание нового блогера"""
     async with aiosqlite.connect(DATABASE_PATH) as db:
         # Преобразуем платформы и категории в JSON
-        platforms_json = json.dumps([platform.value for platform in platforms]) if platforms else None
-        categories_json = json.dumps([cat.value for cat in categories]) if categories else None
-        
-        # Для совместимости со старой схемой
-        primary_platform = platforms[0].value if platforms else 'instagram'
-        primary_category = categories[0].value if categories else 'lifestyle'
-        
-        cursor = await db.execute("""
+        platforms_json = json.dumps([p.value for p in platforms]) if platforms else None
+        categories_json = json.dumps([c.value for c in categories]) if categories else None
+
+        cursor = await db.execute(
+            """
             INSERT INTO bloggers (
-                seller_id, name, url, platform, category, target_audience,
-                platforms, categories,
+                seller_id, name, url, platforms, categories,
                 audience_13_17_percent, audience_18_24_percent, audience_25_35_percent, audience_35_plus_percent,
                 female_percent, male_percent,
                 price_stories, price_post, price_video,
@@ -569,28 +571,33 @@ async def create_blogger(seller_id: int, name: str, url: str, platforms: List[Pl
                 subscribers_count, avg_views, avg_likes, engagement_rate,
                 description
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            seller_id, name, url, primary_platform, primary_category, 'general',
-            platforms_json, categories_json,
-            kwargs.get('audience_13_17_percent'),
-            kwargs.get('audience_18_24_percent'),
-            kwargs.get('audience_25_35_percent'),
-            kwargs.get('audience_35_plus_percent'),
-            kwargs.get('female_percent'),
-            kwargs.get('male_percent'),
-            kwargs.get('price_stories'),
-            kwargs.get('price_post'),
-            kwargs.get('price_video'),
-            kwargs.get('has_reviews', False),
-            kwargs.get('is_registered_rkn', False),
-            kwargs.get('official_payment_possible', False),
-            kwargs.get('subscribers_count'),
-            kwargs.get('avg_views'),
-            kwargs.get('avg_likes'),
-            kwargs.get('engagement_rate'),
-            kwargs.get('description')
-        ))
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+            (
+                seller_id,
+                name,
+                url,
+                platforms_json,
+                categories_json,
+                kwargs.get("audience_13_17_percent"),
+                kwargs.get("audience_18_24_percent"),
+                kwargs.get("audience_25_35_percent"),
+                kwargs.get("audience_35_plus_percent"),
+                kwargs.get("female_percent"),
+                kwargs.get("male_percent"),
+                kwargs.get("price_stories"),
+                kwargs.get("price_post"),
+                kwargs.get("price_video"),
+                kwargs.get("has_reviews", False),
+                kwargs.get("is_registered_rkn", False),
+                kwargs.get("official_payment_possible", False),
+                kwargs.get("subscribers_count"),
+                kwargs.get("avg_views"),
+                kwargs.get("avg_likes"),
+                kwargs.get("engagement_rate"),
+                kwargs.get("description"),
+            ),
+        )
         
         blogger_id = cursor.lastrowid
         await db.commit()
@@ -681,12 +688,25 @@ async def get_user_bloggers(seller_id: int) -> List[Blogger]:
                 except (json.JSONDecodeError, ValueError):
                     pass
             
+            # Парсим платформы из JSON
+            platforms = []
+            if row['platforms']:
+                try:
+                    platform_values = json.loads(row['platforms'])
+                    platforms = [Platform(p) for p in platform_values]
+                except (json.JSONDecodeError, ValueError):
+                    # Обратная совместимость со старым полем platform
+                    try:
+                        platforms = [Platform(row['platform'])] if row.get('platform') else []
+                    except (KeyError, ValueError):
+                        pass
+
             bloggers.append(Blogger(
                 id=row['id'],
                 seller_id=row['seller_id'],
                 name=row['name'],
                 url=row['url'],
-                platform=Platform(row['platform']),
+                platforms=platforms,
                 audience_13_17_percent=row['audience_13_17_percent'],
                 audience_18_24_percent=row['audience_18_24_percent'],
                 audience_25_35_percent=row['audience_25_35_percent'],
@@ -887,8 +907,9 @@ async def update_blogger(blogger_id: int, seller_id: int, **kwargs) -> bool:
     """Обновление данных блогера"""
     # Список полей, которые можно обновлять
     allowed_fields = [
-        'name', 'url', 'platform', 'category', 'target_audience',
-        'has_reviews', 'price_min', 'price_max', 'description'
+        'name', 'url', 'platforms', 'categories',
+        'price_stories', 'price_post', 'price_video',
+        'has_reviews', 'description'
     ]
     
     # Фильтруем только разрешенные поля

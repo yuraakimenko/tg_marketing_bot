@@ -7,6 +7,10 @@ import asyncio
 import logging
 import random
 from datetime import datetime, timedelta
+
+import pytest
+import pytest_asyncio
+
 from database.database import init_db, create_user, create_blogger, get_user, get_blogger
 from database.models import UserRole, Platform, BlogCategory, SubscriptionStatus
 from utils.google_sheets import sheets_manager
@@ -15,6 +19,14 @@ from utils.google_sheets import sheets_manager
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+@pytest_asyncio.fixture
+async def user_and_blogger():
+    """Create and return a test user and blogger."""
+    user, blogger = await test_database_migration()
+    return user, blogger
+
+@pytest.mark.asyncio
 async def test_database_migration():
     """Тест миграции базы данных"""
     logger.info("🧪 Тестирование миграции базы данных...")
@@ -89,7 +101,9 @@ async def test_database_migration():
     
     return user, blogger
 
-async def test_google_sheets_integration(user, blogger):
+@pytest.mark.asyncio
+async def test_google_sheets_integration(user_and_blogger):
+    user, blogger = user_and_blogger
     """Тест интеграции с Google Sheets"""
     logger.info("🧪 Тестирование интеграции с Google Sheets...")
     
@@ -138,6 +152,7 @@ async def test_google_sheets_integration(user, blogger):
     except Exception as e:
         logger.error(f"❌ Ошибка при тестировании Google Sheets: {e}")
 
+@pytest.mark.asyncio
 async def test_subscription_logic():
     """Тест логики подписок"""
     logger.info("🧪 Тестирование логики подписок...")
@@ -159,6 +174,7 @@ async def test_subscription_logic():
     
     logger.info("✅ Логика подписок работает корректно")
 
+@pytest.mark.asyncio
 async def test_role_permissions():
     """Тест системы ролей"""
     logger.info("🧪 Тестирование системы ролей...")
@@ -211,7 +227,7 @@ async def main():
         user, blogger = await test_database_migration()
         
         # Тест Google Sheets
-        await test_google_sheets_integration(user, blogger)
+        await test_google_sheets_integration((user, blogger))
         
         # Тест логики подписок
         await test_subscription_logic()
@@ -228,4 +244,4 @@ async def main():
         raise
 
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    asyncio.run(main())
