@@ -85,7 +85,10 @@ async def init_db():
                 avg_views INTEGER,
                 avg_likes INTEGER,
                 engagement_rate REAL,
-                
+
+                -- Скриншоты/фотографии статистики (JSON массив путей или URL)
+                stats_images TEXT,
+
                 description TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -319,7 +322,11 @@ async def init_db():
             if 'engagement_rate' not in columns:
                 await db.execute("ALTER TABLE bloggers ADD COLUMN engagement_rate REAL")
                 logger.info("Added engagement_rate column to bloggers table")
-            
+
+            if 'stats_images' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN stats_images TEXT")
+                logger.info("Added stats_images column to bloggers table")
+
             if 'description' not in columns:
                 await db.execute("ALTER TABLE bloggers ADD COLUMN description TEXT")
                 logger.info("Added description column to bloggers table")
@@ -569,9 +576,10 @@ async def create_blogger(
                 price_stories, price_post, price_video,
                 has_reviews, is_registered_rkn, official_payment_possible,
                 subscribers_count, avg_views, avg_likes, engagement_rate,
+                stats_images,
                 description
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 seller_id,
@@ -595,6 +603,7 @@ async def create_blogger(
                 kwargs.get("avg_views"),
                 kwargs.get("avg_likes"),
                 kwargs.get("engagement_rate"),
+                json.dumps(kwargs.get("stats_images", [])),
                 kwargs.get("description"),
             ),
         )
@@ -660,6 +669,7 @@ async def get_blogger(blogger_id: int) -> Optional[Blogger]:
                 avg_views=row['avg_views'],
                 avg_likes=row['avg_likes'],
                 engagement_rate=row['engagement_rate'],
+                stats_images=json.loads(row['stats_images']) if row['stats_images'] else [],
                 description=row['description'],
                 created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else datetime.now(),
                 updated_at=datetime.fromisoformat(row['updated_at']) if row['updated_at'] else datetime.now()
@@ -724,6 +734,7 @@ async def get_user_bloggers(seller_id: int) -> List[Blogger]:
                 avg_views=row['avg_views'],
                 avg_likes=row['avg_likes'],
                 engagement_rate=row['engagement_rate'],
+                stats_images=json.loads(row['stats_images']) if row['stats_images'] else [],
                 description=row['description'],
                 created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else datetime.now(),
                 updated_at=datetime.fromisoformat(row['updated_at']) if row['updated_at'] else datetime.now()
@@ -869,6 +880,7 @@ async def search_bloggers(platforms: List[str] = None, categories: List[str] = N
                     avg_views=row['avg_views'],
                     avg_likes=row['avg_likes'],
                     engagement_rate=row['engagement_rate'],
+                    stats_images=json.loads(row['stats_images']) if row['stats_images'] else [],
                     description=row['description'],
                     created_at=datetime.fromisoformat(row['created_at']),
                     updated_at=datetime.fromisoformat(row['updated_at'])
@@ -909,11 +921,14 @@ async def update_blogger(blogger_id: int, seller_id: int, **kwargs) -> bool:
     allowed_fields = [
         'name', 'url', 'platforms', 'categories',
         'price_stories', 'price_post', 'price_video',
-        'has_reviews', 'description'
+        'has_reviews', 'description', 'stats_images'
     ]
     
     # Фильтруем только разрешенные поля
     updates = {k: v for k, v in kwargs.items() if k in allowed_fields}
+
+    if 'stats_images' in updates:
+        updates['stats_images'] = json.dumps(updates['stats_images'])
     
     if not updates:
         return False
