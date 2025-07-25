@@ -79,9 +79,8 @@ async def test_database_migration():
         female_percent=70,
         male_percent=30,
         price_stories=10000,
-        price_post=20000,
+        price_reels=50000,
         stats_images=["path/to/screenshot1.png", "path/to/screenshot2.png"],
-        price_video=50000,
         has_reviews=True,
         description="Тестовый блогер для проверки функций"
     )
