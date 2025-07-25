@@ -85,7 +85,10 @@ async def init_db():
                 avg_views INTEGER,
                 avg_likes INTEGER,
                 engagement_rate REAL,
-                
+
+                -- Скриншоты/фотографии статистики (JSON массив путей или URL)
+                stats_images TEXT,
+
                 description TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -319,7 +322,11 @@ async def init_db():
             if 'engagement_rate' not in columns:
                 await db.execute("ALTER TABLE bloggers ADD COLUMN engagement_rate REAL")
                 logger.info("Added engagement_rate column to bloggers table")
-            
+
+            if 'stats_images' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN stats_images TEXT")
+                logger.info("Added stats_images column to bloggers table")
+
             if 'description' not in columns:
                 await db.execute("ALTER TABLE bloggers ADD COLUMN description TEXT")
                 logger.info("Added description column to bloggers table")
@@ -546,51 +553,60 @@ async def update_subscription_status(user_id: int, status: SubscriptionStatus,
 
 
 # Функции для работы с блогерами
-async def create_blogger(seller_id: int, name: str, url: str, platforms: List[Platform],
-                        categories: List[BlogCategory], **kwargs) -> Blogger:
+async def create_blogger(
+    seller_id: int,
+    name: str,
+    url: str,
+    platforms: List[Platform],
+    categories: List[BlogCategory],
+    **kwargs,
+) -> Blogger:
     """Создание нового блогера"""
     async with aiosqlite.connect(DATABASE_PATH) as db:
         # Преобразуем платформы и категории в JSON
-        platforms_json = json.dumps([platform.value for platform in platforms]) if platforms else None
-        categories_json = json.dumps([cat.value for cat in categories]) if categories else None
-        
-        # Для совместимости со старой схемой
-        primary_platform = platforms[0].value if platforms else 'instagram'
-        primary_category = categories[0].value if categories else 'lifestyle'
-        
-        cursor = await db.execute("""
+        platforms_json = json.dumps([p.value for p in platforms]) if platforms else None
+        categories_json = json.dumps([c.value for c in categories]) if categories else None
+
+        cursor = await db.execute(
+            """
             INSERT INTO bloggers (
-                seller_id, name, url, platform, category, target_audience,
-                platforms, categories,
+                seller_id, name, url, platforms, categories,
                 audience_13_17_percent, audience_18_24_percent, audience_25_35_percent, audience_35_plus_percent,
                 female_percent, male_percent,
                 price_stories, price_post, price_video,
                 has_reviews, is_registered_rkn, official_payment_possible,
                 subscribers_count, avg_views, avg_likes, engagement_rate,
+                stats_images,
                 description
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            seller_id, name, url, primary_platform, primary_category, 'general',
-            platforms_json, categories_json,
-            kwargs.get('audience_13_17_percent'),
-            kwargs.get('audience_18_24_percent'),
-            kwargs.get('audience_25_35_percent'),
-            kwargs.get('audience_35_plus_percent'),
-            kwargs.get('female_percent'),
-            kwargs.get('male_percent'),
-            kwargs.get('price_stories'),
-            kwargs.get('price_post'),
-            kwargs.get('price_video'),
-            kwargs.get('has_reviews', False),
-            kwargs.get('is_registered_rkn', False),
-            kwargs.get('official_payment_possible', False),
-            kwargs.get('subscribers_count'),
-            kwargs.get('avg_views'),
-            kwargs.get('avg_likes'),
-            kwargs.get('engagement_rate'),
-            kwargs.get('description')
-        ))
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+            (
+                seller_id,
+                name,
+                url,
+                platforms_json,
+                categories_json,
+                kwargs.get("audience_13_17_percent"),
+                kwargs.get("audience_18_24_percent"),
+                kwargs.get("audience_25_35_percent"),
+                kwargs.get("audience_35_plus_percent"),
+                kwargs.get("female_percent"),
+                kwargs.get("male_percent"),
+                kwargs.get("price_stories"),
+                kwargs.get("price_post"),
+                kwargs.get("price_video"),
+                kwargs.get("has_reviews", False),
+                kwargs.get("is_registered_rkn", False),
+                kwargs.get("official_payment_possible", False),
+                kwargs.get("subscribers_count"),
+                kwargs.get("avg_views"),
+                kwargs.get("avg_likes"),
+                kwargs.get("engagement_rate"),
+                json.dumps(kwargs.get("stats_images", [])),
+                kwargs.get("description"),
+            ),
+        )
         
         blogger_id = cursor.lastrowid
         await db.commit()
@@ -653,6 +669,7 @@ async def get_blogger(blogger_id: int) -> Optional[Blogger]:
                 avg_views=row['avg_views'],
                 avg_likes=row['avg_likes'],
                 engagement_rate=row['engagement_rate'],
+                stats_images=json.loads(row['stats_images']) if row['stats_images'] else [],
                 description=row['description'],
                 created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else datetime.now(),
                 updated_at=datetime.fromisoformat(row['updated_at']) if row['updated_at'] else datetime.now()
@@ -681,12 +698,25 @@ async def get_user_bloggers(seller_id: int) -> List[Blogger]:
                 except (json.JSONDecodeError, ValueError):
                     pass
             
+            # Парсим платформы из JSON
+            platforms = []
+            if row['platforms']:
+                try:
+                    platform_values = json.loads(row['platforms'])
+                    platforms = [Platform(p) for p in platform_values]
+                except (json.JSONDecodeError, ValueError):
+                    # Обратная совместимость со старым полем platform
+                    try:
+                        platforms = [Platform(row['platform'])] if row.get('platform') else []
+                    except (KeyError, ValueError):
+                        pass
+
             bloggers.append(Blogger(
                 id=row['id'],
                 seller_id=row['seller_id'],
                 name=row['name'],
                 url=row['url'],
-                platform=Platform(row['platform']),
+                platforms=platforms,
                 audience_13_17_percent=row['audience_13_17_percent'],
                 audience_18_24_percent=row['audience_18_24_percent'],
                 audience_25_35_percent=row['audience_25_35_percent'],
@@ -704,6 +734,7 @@ async def get_user_bloggers(seller_id: int) -> List[Blogger]:
                 avg_views=row['avg_views'],
                 avg_likes=row['avg_likes'],
                 engagement_rate=row['engagement_rate'],
+                stats_images=json.loads(row['stats_images']) if row['stats_images'] else [],
                 description=row['description'],
                 created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else datetime.now(),
                 updated_at=datetime.fromisoformat(row['updated_at']) if row['updated_at'] else datetime.now()
@@ -849,6 +880,7 @@ async def search_bloggers(platforms: List[str] = None, categories: List[str] = N
                     avg_views=row['avg_views'],
                     avg_likes=row['avg_likes'],
                     engagement_rate=row['engagement_rate'],
+                    stats_images=json.loads(row['stats_images']) if row['stats_images'] else [],
                     description=row['description'],
                     created_at=datetime.fromisoformat(row['created_at']),
                     updated_at=datetime.fromisoformat(row['updated_at'])
@@ -887,12 +919,16 @@ async def update_blogger(blogger_id: int, seller_id: int, **kwargs) -> bool:
     """Обновление данных блогера"""
     # Список полей, которые можно обновлять
     allowed_fields = [
-        'name', 'url', 'platform', 'category', 'target_audience',
-        'has_reviews', 'price_min', 'price_max', 'description'
+        'name', 'url', 'platforms', 'categories',
+        'price_stories', 'price_post', 'price_video',
+        'has_reviews', 'description', 'stats_images'
     ]
     
     # Фильтруем только разрешенные поля
     updates = {k: v for k, v in kwargs.items() if k in allowed_fields}
+
+    if 'stats_images' in updates:
+        updates['stats_images'] = json.dumps(updates['stats_images'])
     
     if not updates:
         return False

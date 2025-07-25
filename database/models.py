@@ -152,6 +152,9 @@ class Blogger:
     avg_views: Optional[int] = None  # Средние просмотры
     avg_likes: Optional[int] = None  # Средние лайки
     engagement_rate: Optional[float] = None  # Процент вовлеченности
+
+    # Ссылки на изображения со статистикой
+    stats_images: List[str] = field(default_factory=list)
     
     description: Optional[str] = None
     created_at: datetime = field(default_factory=datetime.now)
