@@ -139,8 +139,7 @@ class Blogger:
     
     # Цены
     price_stories: Optional[int] = None  # Цена за 4 истории
-    price_post: Optional[int] = None  # Цена за пост
-    price_video: Optional[int] = None  # Цена за видео
+    price_reels: Optional[int] = None  # Цена за reels
     
     # Дополнительная информация
     has_reviews: bool = False
@@ -148,10 +147,9 @@ class Blogger:
     official_payment_possible: bool = False  # Возможна офиц. оплата (СЗ/ИП)
     
     # Статистика (будет разной для разных платформ)
-    subscribers_count: Optional[int] = None
-    avg_views: Optional[int] = None  # Средние просмотры
+    avg_stories_reach: Optional[int] = None  # Средний охват в историях
+    avg_reels_reach: Optional[int] = None  # Средний охват в рилс
     avg_likes: Optional[int] = None  # Средние лайки
-    engagement_rate: Optional[float] = None  # Процент вовлеченности
 
     # Ссылки на изображения со статистикой
     stats_images: List[str] = field(default_factory=list)

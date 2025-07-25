@@ -510,14 +510,12 @@ async def handle_blogger_selection(callback: CallbackQuery, state: FSMContext):
     info_text += f"🔗 <b>Ссылка:</b> {blogger.url}\n"
     info_text += f"📱 <b>Платформы:</b> {blogger.get_platforms_summary()}\n\n"
     
-    if blogger.subscribers_count:
-        info_text += f"📊 <b>Подписчиков:</b> {blogger.subscribers_count:,}\n"
-    if blogger.avg_views:
-        info_text += f"👁️ <b>Средние просмотры:</b> {blogger.avg_views:,}\n"
+    if blogger.avg_stories_reach:
+        info_text += f"📊 <b>Средний охват в историях:</b> {blogger.avg_stories_reach:,}\n"
+    if blogger.avg_reels_reach:
+        info_text += f"📱 <b>Средний охват в рилс:</b> {blogger.avg_reels_reach:,}\n"
     if blogger.avg_likes:
         info_text += f"❤️ <b>Средние лайки:</b> {blogger.avg_likes:,}\n"
-    if blogger.engagement_rate:
-        info_text += f"📈 <b>Вовлеченность:</b> {blogger.engagement_rate:.1f}%\n"
     
     info_text += f"\n👥 <b>Демография:</b>\n"
     info_text += f"• Возраст: {blogger.get_age_categories_summary()}\n"
@@ -528,10 +526,8 @@ async def handle_blogger_selection(callback: CallbackQuery, state: FSMContext):
     info_text += f"\n💰 <b>Цены:</b>\n"
     if blogger.price_stories:
         info_text += f"• Истории: {blogger.price_stories:,}₽\n"
-    if blogger.price_post:
-        info_text += f"• Пост: {blogger.price_post:,}₽\n"
-    if blogger.price_video:
-        info_text += f"• Видео: {blogger.price_video:,}₽\n"
+    if blogger.price_reels:
+        info_text += f"• Reels: {blogger.price_reels:,}₽\n"
     
     info_text += f"\n📋 <b>Дополнительно:</b>\n"
     info_text += f"• Отзывы: {'✅' if blogger.has_reviews else '❌'}\n"
