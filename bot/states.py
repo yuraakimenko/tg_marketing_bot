@@ -82,4 +82,7 @@ class ReviewStates(StatesGroup):
 class ComplaintStates(StatesGroup):
     """Состояния для жалоб"""
     waiting_for_complaint_reason = State()
-    waiting_for_reason = State()  # Альтернативное название для совместимости 
+    waiting_for_reason = State()  # Альтернативное название для совместимости
+    complaint_accepted = State()
+    complaint_declined = State()
+

@@ -641,7 +641,13 @@ async def handle_complaint_reason(message: Message, state: FSMContext):
             )
             
             # Логируем в Google Sheets
-            await log_complaint_to_sheets(user, blogger_name, reason)
+            await log_complaint_to_sheets(
+                blogger_id,
+                blogger_name,
+                user.id,
+                user.username or "Неизвестно",
+                reason,
+            )
         else:
             await message.answer(
                 "❌ <b>Ошибка при подаче жалобы</b>\n\n"
@@ -733,3 +739,4 @@ async def get_user_by_id(user_id: int):
                 updated_at=datetime.fromisoformat(row['updated_at']) if row['updated_at'] else datetime.now()
             )
         return None 
+
