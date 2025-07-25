@@ -80,6 +80,7 @@ async def test_database_migration():
         male_percent=30,
         price_stories=10000,
         price_post=20000,
+        stats_images=["path/to/screenshot1.png", "path/to/screenshot2.png"],
         price_video=50000,
         has_reviews=True,
         description="Тестовый блогер для проверки функций"
@@ -87,6 +88,8 @@ async def test_database_migration():
     logger.info(f"✅ Создан тестовый блогер: {blogger.name}")
     logger.info(f"   Платформы: {blogger.get_platforms_summary()}")
     logger.info(f"   Возрастные категории: {blogger.get_age_categories_summary()}")
+
+    assert len(blogger.stats_images) == 2
     
     # Проверка валидации
     logger.info("🧪 Тестирование валидации...")
