@@ -82,6 +82,10 @@ async def init_db():
                 
                 -- Статистика
                 subscribers_count INTEGER,
+                stories_reach_min INTEGER,
+                stories_reach_max INTEGER,
+                reels_reach_min INTEGER,
+                reels_reach_max INTEGER,
                 avg_views INTEGER,
                 avg_likes INTEGER,
                 engagement_rate REAL,
@@ -335,6 +339,23 @@ async def init_db():
                 await db.execute("ALTER TABLE bloggers ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
                 logger.info("Added updated_at column to bloggers table")
                 
+            # Добавляем новые колонки охватов, если их нет (вилка охватов для сторис и рилс)
+            if 'stories_reach_min' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN stories_reach_min INTEGER")
+                logger.info("Added stories_reach_min column to bloggers table")
+
+            if 'stories_reach_max' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN stories_reach_max INTEGER")
+                logger.info("Added stories_reach_max column to bloggers table")
+
+            if 'reels_reach_min' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN reels_reach_min INTEGER")
+                logger.info("Added reels_reach_min column to bloggers table")
+
+            if 'reels_reach_max' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN reels_reach_max INTEGER")
+                logger.info("Added reels_reach_max column to bloggers table")
+                
         except Exception as e:
             logger.error(f"Error during migration: {e}")
         
@@ -575,11 +596,11 @@ async def create_blogger(
                 female_percent, male_percent,
                 price_stories, price_post, price_video,
                 has_reviews, is_registered_rkn, official_payment_possible,
-                subscribers_count, avg_views, avg_likes, engagement_rate,
+                subscribers_count, stories_reach_min, stories_reach_max, reels_reach_min, reels_reach_max, avg_views, avg_likes, engagement_rate,
                 stats_images,
                 description
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 seller_id,
@@ -600,6 +621,10 @@ async def create_blogger(
                 kwargs.get("is_registered_rkn", False),
                 kwargs.get("official_payment_possible", False),
                 kwargs.get("subscribers_count"),
+                kwargs.get("stories_reach_min"),
+                kwargs.get("stories_reach_max"),
+                kwargs.get("reels_reach_min"),
+                kwargs.get("reels_reach_max"),
                 kwargs.get("avg_views"),
                 kwargs.get("avg_likes"),
                 kwargs.get("engagement_rate"),
@@ -666,6 +691,10 @@ async def get_blogger(blogger_id: int) -> Optional[Blogger]:
                 is_registered_rkn=bool(row['is_registered_rkn']),
                 official_payment_possible=bool(row['official_payment_possible']),
                 subscribers_count=row['subscribers_count'],
+                stories_reach_min=row['stories_reach_min'],
+                stories_reach_max=row['stories_reach_max'],
+                reels_reach_min=row['reels_reach_min'],
+                reels_reach_max=row['reels_reach_max'],
                 avg_views=row['avg_views'],
                 avg_likes=row['avg_likes'],
                 engagement_rate=row['engagement_rate'],
@@ -731,6 +760,10 @@ async def get_user_bloggers(seller_id: int) -> List[Blogger]:
                 is_registered_rkn=bool(row['is_registered_rkn']),
                 official_payment_possible=bool(row['official_payment_possible']),
                 subscribers_count=row['subscribers_count'],
+                stories_reach_min=row['stories_reach_min'],
+                stories_reach_max=row['stories_reach_max'],
+                reels_reach_min=row['reels_reach_min'],
+                reels_reach_max=row['reels_reach_max'],
                 avg_views=row['avg_views'],
                 avg_likes=row['avg_likes'],
                 engagement_rate=row['engagement_rate'],
@@ -921,7 +954,8 @@ async def update_blogger(blogger_id: int, seller_id: int, **kwargs) -> bool:
     allowed_fields = [
         'name', 'url', 'platforms', 'categories',
         'price_stories', 'price_post', 'price_video',
-        'has_reviews', 'description', 'stats_images'
+        'has_reviews', 'description', 'stats_images',
+        'stories_reach_min', 'stories_reach_max', 'reels_reach_min', 'reels_reach_max'
     ]
     
     # Фильтруем только разрешенные поля
