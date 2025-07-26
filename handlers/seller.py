@@ -774,16 +774,17 @@ async def handle_statistics(message: Message, state: FSMContext):
     await state.update_data(subscribers_count=subscribers)
     
     await message.answer(
-        f"📊 Укажите средние просмотры:\n\n"
-        f"Уже указано: Подписчики: {subscribers}",
+        f"📊 Укажите минимальный охват сторис:\n\n"
+        f"Уже указано: Подписчики: {subscribers}\n\n"
+        f"💡 <i>Введите минимальное количество охватов в сторис</i>",
         parse_mode="HTML"
     )
-    await state.set_state(SellerStates.waiting_for_avg_views)
+    await state.set_state(SellerStates.waiting_for_stories_reach_min)
 
 
-@router.message(SellerStates.waiting_for_avg_views)
-async def handle_avg_views(message: Message, state: FSMContext):
-    """Обработка ввода средних просмотров"""
+@router.message(SellerStates.waiting_for_stories_reach_min)
+async def handle_stories_reach_min(message: Message, state: FSMContext):
+    """Обработка ввода минимального охвата сторис"""
     input_text = message.text.strip()
     
     try:
@@ -793,13 +794,13 @@ async def handle_avg_views(message: Message, state: FSMContext):
         if not clean_input:
             raise ValueError("No digits found")
             
-        avg_views = int(clean_input)
+        stories_reach_min = int(clean_input)
         
-        if avg_views < 0:
-            raise ValueError("Negative views")
+        if stories_reach_min < 0:
+            raise ValueError("Negative reach")
             
     except ValueError as e:
-        logger.error(f"Ошибка валидации просмотров: {e}, ввод: '{input_text}'")
+        logger.error(f"Ошибка валидации охвата сторис: {e}, ввод: '{input_text}'")
         await message.answer(
             "❌ <b>Неверный формат</b>\n\n"
             "Введите целое положительное число.\n"
@@ -809,14 +810,172 @@ async def handle_avg_views(message: Message, state: FSMContext):
         )
         return
     
-    await state.update_data(avg_views=avg_views)
+    await state.update_data(stories_reach_min=stories_reach_min)
+    
+    await message.answer(
+        f"📊 Укажите максимальный охват сторис:\n\n"
+        f"Уже указано: Минимальный охват сторис: {stories_reach_min}\n\n"
+        f"💡 <i>Введите максимальное количество охватов в сторис</i>",
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_stories_reach_max)
+
+
+@router.message(SellerStates.waiting_for_stories_reach_max)
+async def handle_stories_reach_max(message: Message, state: FSMContext):
+    """Обработка ввода максимального охвата сторис"""
+    input_text = message.text.strip()
+    data = await state.get_data()
+    stories_reach_min = data.get('stories_reach_min', 0)
+    
+    try:
+        # Убираем возможные пробелы и нечисловые символы
+        clean_input = ''.join(filter(str.isdigit, input_text))
+        
+        if not clean_input:
+            raise ValueError("No digits found")
+            
+        stories_reach_max = int(clean_input)
+        
+        if stories_reach_max < 0:
+            raise ValueError("Negative reach")
+            
+        if stories_reach_max < stories_reach_min:
+            await message.answer(
+                f"❌ <b>Ошибка</b>\n\n"
+                f"Максимальный охват ({stories_reach_max}) не может быть меньше минимального ({stories_reach_min}).\n"
+                f"Попробуйте еще раз:",
+                parse_mode="HTML"
+            )
+            return
+            
+    except ValueError as e:
+        logger.error(f"Ошибка валидации охвата сторис: {e}, ввод: '{input_text}'")
+        await message.answer(
+            "❌ <b>Неверный формат</b>\n\n"
+            "Введите целое положительное число.\n"
+            f"Ваш ввод: '{input_text}'\n"
+            "Попробуйте еще раз:",
+            parse_mode="HTML"
+        )
+        return
+    
+    await state.update_data(stories_reach_max=stories_reach_max)
+    
+    await message.answer(
+        f"📊 Укажите минимальный охват рилс:\n\n"
+        f"Уже указано:\n"
+        f"• Охват сторис: {stories_reach_min} - {stories_reach_max}\n\n"
+        f"💡 <i>Введите минимальное количество охватов в рилс</i>",
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_reels_reach_min)
+
+
+@router.message(SellerStates.waiting_for_reels_reach_min)
+async def handle_reels_reach_min(message: Message, state: FSMContext):
+    """Обработка ввода минимального охвата рилс"""
+    input_text = message.text.strip()
+    
+    try:
+        # Убираем возможные пробелы и нечисловые символы
+        clean_input = ''.join(filter(str.isdigit, input_text))
+        
+        if not clean_input:
+            raise ValueError("No digits found")
+            
+        reels_reach_min = int(clean_input)
+        
+        if reels_reach_min < 0:
+            raise ValueError("Negative reach")
+            
+    except ValueError as e:
+        logger.error(f"Ошибка валидации охвата рилс: {e}, ввод: '{input_text}'")
+        await message.answer(
+            "❌ <b>Неверный формат</b>\n\n"
+            "Введите целое положительное число.\n"
+            f"Ваш ввод: '{input_text}'\n"
+            "Попробуйте еще раз:",
+            parse_mode="HTML"
+        )
+        return
+    
+    await state.update_data(reels_reach_min=reels_reach_min)
+    
+    await message.answer(
+        f"📊 Укажите максимальный охват рилс:\n\n"
+        f"Уже указано: Минимальный охват рилс: {reels_reach_min}\n\n"
+        f"💡 <i>Введите максимальное количество охватов в рилс</i>",
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_reels_reach_max)
+
+
+@router.message(SellerStates.waiting_for_reels_reach_max)
+async def handle_reels_reach_max(message: Message, state: FSMContext):
+    """Обработка ввода максимального охвата рилс"""
+    input_text = message.text.strip()
+    data = await state.get_data()
+    reels_reach_min = data.get('reels_reach_min', 0)
+    
+    try:
+        # Убираем возможные пробелы и нечисловые символы
+        clean_input = ''.join(filter(str.isdigit, input_text))
+        
+        if not clean_input:
+            raise ValueError("No digits found")
+            
+        reels_reach_max = int(clean_input)
+        
+        if reels_reach_max < 0:
+            raise ValueError("Negative reach")
+            
+        if reels_reach_max < reels_reach_min:
+            await message.answer(
+                f"❌ <b>Ошибка</b>\n\n"
+                f"Максимальный охват ({reels_reach_max}) не может быть меньше минимального ({reels_reach_min}).\n"
+                f"Попробуйте еще раз:",
+                parse_mode="HTML"
+            )
+            return
+            
+    except ValueError as e:
+        logger.error(f"Ошибка валидации охвата рилс: {e}, ввод: '{input_text}'")
+        await message.answer(
+            "❌ <b>Неверный формат</b>\n\n"
+            "Введите целое положительное число.\n"
+            f"Ваш ввод: '{input_text}'\n"
+            "Попробуйте еще раз:",
+            parse_mode="HTML"
+        )
+        return
+    
+    await state.update_data(reels_reach_max=reels_reach_max)
+    
+    data = await state.get_data()
+    stories_reach_min = data.get('stories_reach_min')
+    stories_reach_max = data.get('stories_reach_max')
     
     await message.answer(
         f"📊 Укажите средние лайки:\n\n"
-        f"Уже указано: Просмотры: {avg_views}",
+        f"Уже указано:\n"
+        f"• Охват сторис: {stories_reach_min} - {stories_reach_max}\n"
+        f"• Охват рилс: {reels_reach_min} - {reels_reach_max}",
         parse_mode="HTML"
     )
     await state.set_state(SellerStates.waiting_for_avg_likes)
+
+
+# Обработчик для обратной совместимости
+@router.message(SellerStates.waiting_for_avg_views)
+async def handle_avg_views_legacy(message: Message, state: FSMContext):
+    """Обработчик для обратной совместимости - перенаправляет на новый процесс"""
+    await message.answer(
+        f"📊 Укажите минимальный охват сторис:\n\n"
+        f"💡 <i>Введите минимальное количество охватов в сторис</i>",
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_stories_reach_min)
 
 
 @router.message(SellerStates.waiting_for_avg_likes)
@@ -966,6 +1125,10 @@ async def handle_blogger_description(message: Message, state: FSMContext):
             official_payment_possible=data.get('official_payment_possible', False),
             subscribers_count=data.get('subscribers_count'),
             avg_views=data.get('avg_views'),
+            stories_reach_min=data.get('stories_reach_min'),
+            stories_reach_max=data.get('stories_reach_max'),
+            reels_reach_min=data.get('reels_reach_min'),
+            reels_reach_max=data.get('reels_reach_max'),
             avg_likes=data.get('avg_likes'),
             engagement_rate=data.get('engagement_rate'),
             description=description
@@ -1042,8 +1205,10 @@ async def handle_blogger_selection(callback: CallbackQuery, state: FSMContext):
         
         if blogger.subscribers_count:
             info_text += f"📊 <b>Подписчиков:</b> {blogger.subscribers_count:,}\n"
-        if blogger.avg_views:
-            info_text += f"👁️ <b>Средние просмотры:</b> {blogger.avg_views:,}\n"
+        if blogger.stories_reach_min and blogger.stories_reach_max:
+            info_text += f"👁️ <b>Охват сторис:</b> {blogger.stories_reach_min:,} - {blogger.stories_reach_max:,}\n"
+        if blogger.reels_reach_min and blogger.reels_reach_max:
+            info_text += f"🎬 <b>Охват рилс:</b> {blogger.reels_reach_min:,} - {blogger.reels_reach_max:,}\n"
         if blogger.avg_likes:
             info_text += f"❤️ <b>Средние лайки:</b> {blogger.avg_likes:,}\n"
         if blogger.engagement_rate:

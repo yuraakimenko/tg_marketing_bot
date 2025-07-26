@@ -149,9 +149,17 @@ class Blogger:
     
     # Статистика (будет разной для разных платформ)
     subscribers_count: Optional[int] = None
-    avg_views: Optional[int] = None  # Средние просмотры
+    avg_views: Optional[int] = None  # Средние охваты (устаревшее поле, оставлено для совместимости)
     avg_likes: Optional[int] = None  # Средние лайки
     engagement_rate: Optional[float] = None  # Процент вовлеченности
+    
+    # Охваты сторис (вилка)
+    stories_reach_min: Optional[int] = None  # Минимальный охват сторис
+    stories_reach_max: Optional[int] = None  # Максимальный охват сторис
+    
+    # Охваты рилс (вилка)
+    reels_reach_min: Optional[int] = None  # Минимальный охват рилс
+    reels_reach_max: Optional[int] = None  # Максимальный охват рилс
 
     # Ссылки на изображения со статистикой
     stats_images: List[str] = field(default_factory=list)
