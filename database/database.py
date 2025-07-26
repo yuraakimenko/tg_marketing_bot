@@ -82,7 +82,12 @@ async def init_db():
                 
                 -- Статистика
                 subscribers_count INTEGER,
-                avg_views INTEGER,
+                -- Охваты для историй (вилка)
+                stories_reach_min INTEGER,
+                stories_reach_max INTEGER,
+                -- Охваты для рилс (вилка)
+                reels_reach_min INTEGER,
+                reels_reach_max INTEGER,
                 avg_likes INTEGER,
                 engagement_rate REAL,
 
@@ -311,9 +316,57 @@ async def init_db():
                 await db.execute("ALTER TABLE bloggers ADD COLUMN subscribers_count INTEGER")
                 logger.info("Added subscribers_count column to bloggers table")
             
-            if 'avg_views' not in columns:
-                await db.execute("ALTER TABLE bloggers ADD COLUMN avg_views INTEGER")
-                logger.info("Added avg_views column to bloggers table")
+            if 'stories_reach_min' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN stories_reach_min INTEGER")
+                logger.info("Added stories_reach_min column to bloggers table")
+            
+            if 'stories_reach_max' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN stories_reach_max INTEGER")
+                logger.info("Added stories_reach_max column to bloggers table")
+            
+            if 'reels_reach_min' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN reels_reach_min INTEGER")
+                logger.info("Added reels_reach_min column to bloggers table")
+            
+            if 'reels_reach_max' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN reels_reach_max INTEGER")
+                logger.info("Added reels_reach_max column to bloggers table")
+    
+            # Миграция данных из avg_views в новые поля reach (если avg_views еще существует)
+            try:
+                cursor = await db.execute("PRAGMA table_info(bloggers)")
+                table_info = await cursor.fetchall()
+                avg_views_exists = any(col[1] == 'avg_views' for col in table_info)
+                
+                if avg_views_exists:
+                    # Проверяем, есть ли данные в avg_views, которые нужно мигрировать
+                    cursor = await db.execute("SELECT id, avg_views FROM bloggers WHERE avg_views IS NOT NULL AND avg_views > 0")
+                    rows = await cursor.fetchall()
+                    
+                    for row in rows:
+                        avg_views = row['avg_views']
+                        blogger_id = row['id']
+                        
+                        # Копируем avg_views в stories_reach_min и stories_reach_max (с небольшим диапазоном)
+                        stories_reach_min = max(1, int(avg_views * 0.9))  # 90% от avg_views
+                        stories_reach_max = int(avg_views * 1.1)  # 110% от avg_views
+                        
+                        # Копируем avg_views в reels_reach_min и reels_reach_max (с небольшим диапазоном)
+                        reels_reach_min = max(1, int(avg_views * 0.9))  # 90% от avg_views
+                        reels_reach_max = int(avg_views * 1.1)  # 110% от avg_views
+                        
+                        await db.execute("""
+                            UPDATE bloggers 
+                            SET stories_reach_min = ?, stories_reach_max = ?, 
+                                reels_reach_min = ?, reels_reach_max = ?
+                            WHERE id = ?
+                        """, (stories_reach_min, stories_reach_max, reels_reach_min, reels_reach_max, blogger_id))
+                    
+                    # Удаляем старую колонку avg_views
+                    await db.execute("ALTER TABLE bloggers DROP COLUMN avg_views")
+                    logger.info("Migrated avg_views data to new reach fields and dropped avg_views column")
+            except Exception as e:
+                logger.warning(f"Migration from avg_views failed: {e}")
             
             if 'avg_likes' not in columns:
                 await db.execute("ALTER TABLE bloggers ADD COLUMN avg_likes INTEGER")
@@ -574,12 +627,12 @@ async def create_blogger(
                 audience_13_17_percent, audience_18_24_percent, audience_25_35_percent, audience_35_plus_percent,
                 female_percent, male_percent,
                 price_stories, price_post, price_video,
-                has_reviews, is_registered_rkn, official_payment_possible,
-                subscribers_count, avg_views, avg_likes, engagement_rate,
+                    has_reviews, is_registered_rkn, official_payment_possible,
+    subscribers_count, stories_reach_min, stories_reach_max, reels_reach_min, reels_reach_max, avg_likes, engagement_rate,
                 stats_images,
                 description
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 seller_id,
@@ -600,7 +653,10 @@ async def create_blogger(
                 kwargs.get("is_registered_rkn", False),
                 kwargs.get("official_payment_possible", False),
                 kwargs.get("subscribers_count"),
-                kwargs.get("avg_views"),
+                kwargs.get("stories_reach_min"),
+                kwargs.get("stories_reach_max"),
+                kwargs.get("reels_reach_min"),
+                kwargs.get("reels_reach_max"),
                 kwargs.get("avg_likes"),
                 kwargs.get("engagement_rate"),
                 json.dumps(kwargs.get("stats_images", [])),
@@ -666,7 +722,10 @@ async def get_blogger(blogger_id: int) -> Optional[Blogger]:
                 is_registered_rkn=bool(row['is_registered_rkn']),
                 official_payment_possible=bool(row['official_payment_possible']),
                 subscribers_count=row['subscribers_count'],
-                avg_views=row['avg_views'],
+                stories_reach_min=row['stories_reach_min'],
+                stories_reach_max=row['stories_reach_max'],
+                reels_reach_min=row['reels_reach_min'],
+                reels_reach_max=row['reels_reach_max'],
                 avg_likes=row['avg_likes'],
                 engagement_rate=row['engagement_rate'],
                 stats_images=json.loads(row['stats_images']) if row['stats_images'] else [],
@@ -731,7 +790,10 @@ async def get_user_bloggers(seller_id: int) -> List[Blogger]:
                 is_registered_rkn=bool(row['is_registered_rkn']),
                 official_payment_possible=bool(row['official_payment_possible']),
                 subscribers_count=row['subscribers_count'],
-                avg_views=row['avg_views'],
+                stories_reach_min=row['stories_reach_min'],
+                stories_reach_max=row['stories_reach_max'],
+                reels_reach_min=row['reels_reach_min'],
+                reels_reach_max=row['reels_reach_max'],
                 avg_likes=row['avg_likes'],
                 engagement_rate=row['engagement_rate'],
                 stats_images=json.loads(row['stats_images']) if row['stats_images'] else [],
@@ -877,7 +939,10 @@ async def search_bloggers(platforms: List[str] = None, categories: List[str] = N
                     is_registered_rkn=bool(row['is_registered_rkn']),
                     official_payment_possible=bool(row['official_payment_possible']),
                     subscribers_count=row['subscribers_count'],
-                    avg_views=row['avg_views'],
+                    stories_reach_min=row['stories_reach_min'],
+                    stories_reach_max=row['stories_reach_max'],
+                    reels_reach_min=row['reels_reach_min'],
+                    reels_reach_max=row['reels_reach_max'],
                     avg_likes=row['avg_likes'],
                     engagement_rate=row['engagement_rate'],
                     stats_images=json.loads(row['stats_images']) if row['stats_images'] else [],
