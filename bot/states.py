@@ -30,7 +30,7 @@ class SellerStates(StatesGroup):
     # Цены (кратные 1000)
     waiting_for_price_stories = State()  # Цена за 4 истории
     waiting_for_price_post = State()  # Цена за пост
-    waiting_for_price_video = State()  # Цена за видео
+    waiting_for_price_reels = State()  # Цена за рилс
     
     # Дополнительная информация
     waiting_for_has_reviews = State()  # Наличие отзывов
@@ -40,7 +40,8 @@ class SellerStates(StatesGroup):
     # Статистика (загрузка)
     waiting_for_statistics = State()  # Загрузка статистики
     waiting_for_subscribers_count = State()  # Количество подписчиков
-    waiting_for_avg_views = State()  # Средние просмотры
+    waiting_for_avg_story_reach = State()  # Средние охваты сторис
+    waiting_for_avg_reels_reach = State()  # Средние охваты рилс
     waiting_for_avg_likes = State()  # Средние лайки
     waiting_for_engagement_rate = State()  # Процент вовлеченности
     

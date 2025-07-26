@@ -173,14 +173,14 @@ def get_price_post_keyboard() -> InlineKeyboardMarkup:
     ])
 
 
-def get_price_video_keyboard() -> InlineKeyboardMarkup:
-    """Клавиатура выбора цены за видео"""
+def get_price_reels_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура выбора цены за рилс"""
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="20 000₽", callback_data="price_video_20000")],
-        [InlineKeyboardButton(text="50 000₽", callback_data="price_video_50000")],
-        [InlineKeyboardButton(text="100 000₽", callback_data="price_video_100000")],
-        [InlineKeyboardButton(text="200 000₽", callback_data="price_video_200000")],
-        [InlineKeyboardButton(text="Другая цена", callback_data="price_video_custom")]
+        [InlineKeyboardButton(text="20 000₽", callback_data="price_reels_20000")],
+        [InlineKeyboardButton(text="50 000₽", callback_data="price_reels_50000")],
+        [InlineKeyboardButton(text="100 000₽", callback_data="price_reels_100000")],
+        [InlineKeyboardButton(text="200 000₽", callback_data="price_reels_200000")],
+        [InlineKeyboardButton(text="Другая цена", callback_data="price_reels_custom")]
     ])
 
 

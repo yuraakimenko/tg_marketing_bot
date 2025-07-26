@@ -13,7 +13,7 @@ from bot.keyboards import (
     get_platform_keyboard, get_category_keyboard, 
     get_yes_no_keyboard, get_blogger_list_keyboard,
     get_blogger_details_keyboard, get_price_stories_keyboard,
-    get_price_post_keyboard, get_price_video_keyboard,
+    get_price_post_keyboard, get_price_reels_keyboard,
     get_platforms_multi_keyboard # добавлен импорт
 )
 from bot.states import SellerStates
@@ -638,18 +638,18 @@ async def handle_price_post(message: Message, state: FSMContext):
     data = await state.get_data()
     
     await message.answer(
-        f"💰 Укажите цену за видео (в рублях):\n\n"
+        f"💰 Укажите цену за рилс (в рублях):\n\n"
         f"Уже указано: Истории: {data.get('price_stories', 0)}₽, "
         f"Пост: {price}₽\n\n"
         f"💡 <b>Важно:</b> Цена должна быть кратна 1000",
         parse_mode="HTML"
     )
-    await state.set_state(SellerStates.waiting_for_price_video)
+    await state.set_state(SellerStates.waiting_for_price_reels)
 
 
-@router.message(SellerStates.waiting_for_price_video)
-async def handle_price_video(message: Message, state: FSMContext):
-    """Обработка ввода цены за видео"""
+@router.message(SellerStates.waiting_for_price_reels)
+async def handle_price_reels(message: Message, state: FSMContext):
+    """Обработка ввода цены за рилс"""
     try:
         price = int(message.text.strip())
         if price < 0:
@@ -671,7 +671,7 @@ async def handle_price_video(message: Message, state: FSMContext):
         )
         return
     
-    await state.update_data(price_video=price)
+    await state.update_data(price_reels=price)
     
     await message.answer(
         "📝 <b>Дополнительная информация</b>\n\n"
@@ -774,16 +774,16 @@ async def handle_statistics(message: Message, state: FSMContext):
     await state.update_data(subscribers_count=subscribers)
     
     await message.answer(
-        f"📊 Укажите средние просмотры:\n\n"
+        f"📊 Укажите средние охваты сторис:\n\n"
         f"Уже указано: Подписчики: {subscribers}",
         parse_mode="HTML"
     )
-    await state.set_state(SellerStates.waiting_for_avg_views)
+    await state.set_state(SellerStates.waiting_for_avg_story_reach)
 
 
-@router.message(SellerStates.waiting_for_avg_views)
-async def handle_avg_views(message: Message, state: FSMContext):
-    """Обработка ввода средних просмотров"""
+@router.message(SellerStates.waiting_for_avg_story_reach)
+async def handle_avg_story_reach(message: Message, state: FSMContext):
+    """Обработка ввода средних охватов сторис"""
     input_text = message.text.strip()
     
     try:
@@ -793,10 +793,10 @@ async def handle_avg_views(message: Message, state: FSMContext):
         if not clean_input:
             raise ValueError("No digits found")
             
-        avg_views = int(clean_input)
+        avg_story_reach = int(clean_input)
         
-        if avg_views < 0:
-            raise ValueError("Negative views")
+        if avg_story_reach < 0:
+            raise ValueError("Negative reach")
             
     except ValueError as e:
         logger.error(f"Ошибка валидации просмотров: {e}, ввод: '{input_text}'")
@@ -809,11 +809,49 @@ async def handle_avg_views(message: Message, state: FSMContext):
         )
         return
     
-    await state.update_data(avg_views=avg_views)
+    await state.update_data(avg_story_reach=avg_story_reach)
+    
+    await message.answer(
+        f"📊 Укажите средние охваты рилс:\n\n"
+        f"Уже указано: Охваты сторис: {avg_story_reach}",
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_avg_reels_reach)
+
+
+@router.message(SellerStates.waiting_for_avg_reels_reach)
+async def handle_avg_reels_reach(message: Message, state: FSMContext):
+    """Обработка ввода средних охватов рилс"""
+    input_text = message.text.strip()
+    
+    try:
+        # Убираем возможные пробелы и нечисловые символы
+        clean_input = ''.join(filter(str.isdigit, input_text))
+        
+        if not clean_input:
+            raise ValueError("No digits found")
+            
+        avg_reels_reach = int(clean_input)
+        
+        if avg_reels_reach < 0:
+            raise ValueError("Negative reach")
+            
+    except ValueError as e:
+        logger.error(f"Ошибка валидации охватов рилс: {e}, ввод: '{input_text}'")
+        await message.answer(
+            "❌ <b>Неверный формат</b>\n\n"
+            "Введите целое положительное число.\n"
+            f"Ваш ввод: '{input_text}'\n"
+            "Попробуйте еще раз:",
+            parse_mode="HTML"
+        )
+        return
+    
+    await state.update_data(avg_reels_reach=avg_reels_reach)
     
     await message.answer(
         f"📊 Укажите средние лайки:\n\n"
-        f"Уже указано: Просмотры: {avg_views}",
+        f"Уже указано: Охваты рилс: {avg_reels_reach}",
         parse_mode="HTML"
     )
     await state.set_state(SellerStates.waiting_for_avg_likes)
@@ -960,12 +998,13 @@ async def handle_blogger_description(message: Message, state: FSMContext):
             male_percent=data.get('male_percent'),
             price_stories=data.get('price_stories'),
             price_post=data.get('price_post'),
-            price_video=data.get('price_video'),
+            price_reels=data.get('price_reels'),
             has_reviews=data.get('has_reviews', False),
             is_registered_rkn=data.get('is_registered_rkn', False),
             official_payment_possible=data.get('official_payment_possible', False),
             subscribers_count=data.get('subscribers_count'),
-            avg_views=data.get('avg_views'),
+            avg_story_reach=data.get('avg_story_reach'),
+            avg_reels_reach=data.get('avg_reels_reach'),
             avg_likes=data.get('avg_likes'),
             engagement_rate=data.get('engagement_rate'),
             description=description
@@ -1042,8 +1081,10 @@ async def handle_blogger_selection(callback: CallbackQuery, state: FSMContext):
         
         if blogger.subscribers_count:
             info_text += f"📊 <b>Подписчиков:</b> {blogger.subscribers_count:,}\n"
-        if blogger.avg_views:
-            info_text += f"👁️ <b>Средние просмотры:</b> {blogger.avg_views:,}\n"
+        if blogger.avg_story_reach:
+            info_text += f"👁️ <b>Средние охваты сторис:</b> {blogger.avg_story_reach:,}\n"
+        if blogger.avg_reels_reach:
+            info_text += f"🎬 <b>Средние охваты рилс:</b> {blogger.avg_reels_reach:,}\n"
         if blogger.avg_likes:
             info_text += f"❤️ <b>Средние лайки:</b> {blogger.avg_likes:,}\n"
         if blogger.engagement_rate:
@@ -1060,8 +1101,8 @@ async def handle_blogger_selection(callback: CallbackQuery, state: FSMContext):
             info_text += f"• Истории: {blogger.price_stories:,}₽\n"
         if blogger.price_post:
             info_text += f"• Пост: {blogger.price_post:,}₽\n"
-        if blogger.price_video:
-            info_text += f"• Видео: {blogger.price_video:,}₽\n"
+        if blogger.price_reels:
+            info_text += f"• Рилс: {blogger.price_reels:,}₽\n"
         
         info_text += f"\n📋 <b>Дополнительно:</b>\n"
         info_text += f"• Отзывы: {'✅' if blogger.has_reviews else '❌'}\n"

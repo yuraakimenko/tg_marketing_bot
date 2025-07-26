@@ -73,7 +73,7 @@ async def init_db():
                 -- Цены
                 price_stories INTEGER,
                 price_post INTEGER,
-                price_video INTEGER,
+                price_reels INTEGER,
                 
                 -- Дополнительная информация
                 has_reviews BOOLEAN DEFAULT FALSE,
@@ -82,7 +82,8 @@ async def init_db():
                 
                 -- Статистика
                 subscribers_count INTEGER,
-                avg_views INTEGER,
+                avg_story_reach INTEGER,
+                avg_reels_reach INTEGER,
                 avg_likes INTEGER,
                 engagement_rate REAL,
 
@@ -291,9 +292,9 @@ async def init_db():
                 await db.execute("ALTER TABLE bloggers ADD COLUMN price_post INTEGER")
                 logger.info("Added price_post column to bloggers table")
             
-            if 'price_video' not in columns:
-                await db.execute("ALTER TABLE bloggers ADD COLUMN price_video INTEGER")
-                logger.info("Added price_video column to bloggers table")
+            if 'price_reels' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN price_reels INTEGER")
+                logger.info("Added price_reels column to bloggers table")
             
             if 'has_reviews' not in columns:
                 await db.execute("ALTER TABLE bloggers ADD COLUMN has_reviews BOOLEAN DEFAULT FALSE")
@@ -311,9 +312,13 @@ async def init_db():
                 await db.execute("ALTER TABLE bloggers ADD COLUMN subscribers_count INTEGER")
                 logger.info("Added subscribers_count column to bloggers table")
             
-            if 'avg_views' not in columns:
-                await db.execute("ALTER TABLE bloggers ADD COLUMN avg_views INTEGER")
-                logger.info("Added avg_views column to bloggers table")
+            if 'avg_story_reach' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN avg_story_reach INTEGER")
+                logger.info("Added avg_story_reach column to bloggers table")
+            
+            if 'avg_reels_reach' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN avg_reels_reach INTEGER")
+                logger.info("Added avg_reels_reach column to bloggers table")
             
             if 'avg_likes' not in columns:
                 await db.execute("ALTER TABLE bloggers ADD COLUMN avg_likes INTEGER")
@@ -326,6 +331,18 @@ async def init_db():
             if 'stats_images' not in columns:
                 await db.execute("ALTER TABLE bloggers ADD COLUMN stats_images TEXT")
                 logger.info("Added stats_images column to bloggers table")
+            
+            # Миграция price_video -> price_reels
+            if 'price_video' in columns and 'price_reels' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN price_reels INTEGER")
+                await db.execute("UPDATE bloggers SET price_reels = price_video WHERE price_video IS NOT NULL")
+                logger.info("Migrated price_video to price_reels column")
+            
+            # Миграция avg_views -> avg_story_reach
+            if 'avg_views' in columns and 'avg_story_reach' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN avg_story_reach INTEGER")
+                await db.execute("UPDATE bloggers SET avg_story_reach = avg_views WHERE avg_views IS NOT NULL")
+                logger.info("Migrated avg_views to avg_story_reach column")
 
             if 'description' not in columns:
                 await db.execute("ALTER TABLE bloggers ADD COLUMN description TEXT")
@@ -573,13 +590,13 @@ async def create_blogger(
                 seller_id, name, url, platforms, categories,
                 audience_13_17_percent, audience_18_24_percent, audience_25_35_percent, audience_35_plus_percent,
                 female_percent, male_percent,
-                price_stories, price_post, price_video,
+                price_stories, price_post, price_reels,
                 has_reviews, is_registered_rkn, official_payment_possible,
-                subscribers_count, avg_views, avg_likes, engagement_rate,
+                subscribers_count, avg_story_reach, avg_reels_reach, avg_likes, engagement_rate,
                 stats_images,
                 description
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 seller_id,
@@ -595,12 +612,13 @@ async def create_blogger(
                 kwargs.get("male_percent"),
                 kwargs.get("price_stories"),
                 kwargs.get("price_post"),
-                kwargs.get("price_video"),
+                kwargs.get("price_reels"),
                 kwargs.get("has_reviews", False),
                 kwargs.get("is_registered_rkn", False),
                 kwargs.get("official_payment_possible", False),
                 kwargs.get("subscribers_count"),
-                kwargs.get("avg_views"),
+                kwargs.get("avg_story_reach"),
+                kwargs.get("avg_reels_reach"),
                 kwargs.get("avg_likes"),
                 kwargs.get("engagement_rate"),
                 json.dumps(kwargs.get("stats_images", [])),
@@ -661,12 +679,13 @@ async def get_blogger(blogger_id: int) -> Optional[Blogger]:
                 categories=categories,
                 price_stories=row['price_stories'],
                 price_post=row['price_post'],
-                price_video=row['price_video'],
+                price_reels=row.get('price_reels') or row.get('price_video'),
                 has_reviews=bool(row['has_reviews']),
                 is_registered_rkn=bool(row['is_registered_rkn']),
                 official_payment_possible=bool(row['official_payment_possible']),
                 subscribers_count=row['subscribers_count'],
-                avg_views=row['avg_views'],
+                avg_story_reach=row.get('avg_story_reach') or row.get('avg_views'),
+                avg_reels_reach=row.get('avg_reels_reach'),
                 avg_likes=row['avg_likes'],
                 engagement_rate=row['engagement_rate'],
                 stats_images=json.loads(row['stats_images']) if row['stats_images'] else [],
@@ -726,12 +745,13 @@ async def get_user_bloggers(seller_id: int) -> List[Blogger]:
                 categories=categories,
                 price_stories=row['price_stories'],
                 price_post=row['price_post'],
-                price_video=row['price_video'],
+                price_reels=row.get('price_reels') or row.get('price_video'),
                 has_reviews=bool(row['has_reviews']),
                 is_registered_rkn=bool(row['is_registered_rkn']),
                 official_payment_possible=bool(row['official_payment_possible']),
                 subscribers_count=row['subscribers_count'],
-                avg_views=row['avg_views'],
+                avg_story_reach=row.get('avg_story_reach') or row.get('avg_views'),
+                avg_reels_reach=row.get('avg_reels_reach'),
                 avg_likes=row['avg_likes'],
                 engagement_rate=row['engagement_rate'],
                 stats_images=json.loads(row['stats_images']) if row['stats_images'] else [],
@@ -804,10 +824,10 @@ async def search_bloggers(platforms: List[str] = None, categories: List[str] = N
             if budget_min is not None or budget_max is not None:
                 budget_conditions = []
                 if budget_min is not None:
-                    budget_conditions.append("(b.price_stories >= ? OR b.price_post >= ? OR b.price_video >= ?)")
+                    budget_conditions.append("(b.price_stories >= ? OR b.price_post >= ? OR b.price_reels >= ?)")
                     params.extend([budget_min, budget_min, budget_min])
                 if budget_max is not None:
-                    budget_conditions.append("(b.price_stories <= ? OR b.price_post <= ? OR b.price_video <= ?)")
+                    budget_conditions.append("(b.price_stories <= ? OR b.price_post <= ? OR b.price_reels <= ?)")
                     params.extend([budget_max, budget_max, budget_max])
                 
                 if budget_conditions:
@@ -872,12 +892,13 @@ async def search_bloggers(platforms: List[str] = None, categories: List[str] = N
                     categories=categories_data,
                     price_stories=row['price_stories'],
                     price_post=row['price_post'],
-                    price_video=row['price_video'],
+                    price_reels=row.get('price_reels') or row.get('price_video'),
                     has_reviews=bool(row['has_reviews']),
                     is_registered_rkn=bool(row['is_registered_rkn']),
                     official_payment_possible=bool(row['official_payment_possible']),
                     subscribers_count=row['subscribers_count'],
-                    avg_views=row['avg_views'],
+                    avg_story_reach=row.get('avg_story_reach') or row.get('avg_views'),
+                    avg_reels_reach=row.get('avg_reels_reach'),
                     avg_likes=row['avg_likes'],
                     engagement_rate=row['engagement_rate'],
                     stats_images=json.loads(row['stats_images']) if row['stats_images'] else [],
@@ -920,7 +941,7 @@ async def update_blogger(blogger_id: int, seller_id: int, **kwargs) -> bool:
     # Список полей, которые можно обновлять
     allowed_fields = [
         'name', 'url', 'platforms', 'categories',
-        'price_stories', 'price_post', 'price_video',
+                    'price_stories', 'price_post', 'price_reels',
         'has_reviews', 'description', 'stats_images'
     ]
     
