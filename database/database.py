@@ -85,6 +85,12 @@ async def init_db():
                 avg_views INTEGER,
                 avg_likes INTEGER,
                 engagement_rate REAL,
+                
+                -- Охваты (новая система)
+                stories_reach_min INTEGER,
+                stories_reach_max INTEGER,
+                reels_reach_min INTEGER,
+                reels_reach_max INTEGER,
 
                 -- Скриншоты/фотографии статистики (JSON массив путей или URL)
                 stats_images TEXT,
@@ -576,10 +582,11 @@ async def create_blogger(
                 price_stories, price_post, price_video,
                 has_reviews, is_registered_rkn, official_payment_possible,
                 subscribers_count, avg_views, avg_likes, engagement_rate,
+                stories_reach_min, stories_reach_max, reels_reach_min, reels_reach_max,
                 stats_images,
                 description
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 seller_id,
@@ -603,6 +610,10 @@ async def create_blogger(
                 kwargs.get("avg_views"),
                 kwargs.get("avg_likes"),
                 kwargs.get("engagement_rate"),
+                kwargs.get("stories_reach_min"),
+                kwargs.get("stories_reach_max"),
+                kwargs.get("reels_reach_min"),
+                kwargs.get("reels_reach_max"),
                 json.dumps(kwargs.get("stats_images", [])),
                 kwargs.get("description"),
             ),
@@ -669,6 +680,10 @@ async def get_blogger(blogger_id: int) -> Optional[Blogger]:
                 avg_views=row['avg_views'],
                 avg_likes=row['avg_likes'],
                 engagement_rate=row['engagement_rate'],
+                stories_reach_min=row.get('stories_reach_min'),
+                stories_reach_max=row.get('stories_reach_max'),
+                reels_reach_min=row.get('reels_reach_min'),
+                reels_reach_max=row.get('reels_reach_max'),
                 stats_images=json.loads(row['stats_images']) if row['stats_images'] else [],
                 description=row['description'],
                 created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else datetime.now(),
@@ -734,6 +749,10 @@ async def get_user_bloggers(seller_id: int) -> List[Blogger]:
                 avg_views=row['avg_views'],
                 avg_likes=row['avg_likes'],
                 engagement_rate=row['engagement_rate'],
+                stories_reach_min=row.get('stories_reach_min'),
+                stories_reach_max=row.get('stories_reach_max'),
+                reels_reach_min=row.get('reels_reach_min'),
+                reels_reach_max=row.get('reels_reach_max'),
                 stats_images=json.loads(row['stats_images']) if row['stats_images'] else [],
                 description=row['description'],
                 created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else datetime.now(),
@@ -880,6 +899,10 @@ async def search_bloggers(platforms: List[str] = None, categories: List[str] = N
                     avg_views=row['avg_views'],
                     avg_likes=row['avg_likes'],
                     engagement_rate=row['engagement_rate'],
+                    stories_reach_min=row.get('stories_reach_min'),
+                    stories_reach_max=row.get('stories_reach_max'),
+                    reels_reach_min=row.get('reels_reach_min'),
+                    reels_reach_max=row.get('reels_reach_max'),
                     stats_images=json.loads(row['stats_images']) if row['stats_images'] else [],
                     description=row['description'],
                     created_at=datetime.fromisoformat(row['created_at']),
