@@ -512,8 +512,10 @@ async def handle_blogger_selection(callback: CallbackQuery, state: FSMContext):
     
     if blogger.subscribers_count:
         info_text += f"📊 <b>Подписчиков:</b> {blogger.subscribers_count:,}\n"
-    if blogger.avg_views:
-        info_text += f"👁️ <b>Средние просмотры:</b> {blogger.avg_views:,}\n"
+    if blogger.avg_story_reach:
+        info_text += f"👁️ <b>Средние охваты сторис:</b> {blogger.avg_story_reach:,}\n"
+    if blogger.avg_reels_reach:
+        info_text += f"🎬 <b>Средние охваты рилс:</b> {blogger.avg_reels_reach:,}\n"
     if blogger.avg_likes:
         info_text += f"❤️ <b>Средние лайки:</b> {blogger.avg_likes:,}\n"
     if blogger.engagement_rate:
@@ -530,8 +532,8 @@ async def handle_blogger_selection(callback: CallbackQuery, state: FSMContext):
         info_text += f"• Истории: {blogger.price_stories:,}₽\n"
     if blogger.price_post:
         info_text += f"• Пост: {blogger.price_post:,}₽\n"
-    if blogger.price_video:
-        info_text += f"• Видео: {blogger.price_video:,}₽\n"
+    if blogger.price_reels:
+        info_text += f"• Рилс: {blogger.price_reels:,}₽\n"
     
     info_text += f"\n📋 <b>Дополнительно:</b>\n"
     info_text += f"• Отзывы: {'✅' if blogger.has_reviews else '❌'}\n"
