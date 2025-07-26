@@ -85,6 +85,14 @@ async def init_db():
                 avg_views INTEGER,
                 avg_likes INTEGER,
                 engagement_rate REAL,
+                
+                -- Охваты сторис (вилка)
+                stories_reach_min INTEGER,
+                stories_reach_max INTEGER,
+                
+                -- Охваты рилс (вилка)
+                reels_reach_min INTEGER,
+                reels_reach_max INTEGER,
 
                 -- Скриншоты/фотографии статистики (JSON массив путей или URL)
                 stats_images TEXT,
@@ -322,6 +330,23 @@ async def init_db():
             if 'engagement_rate' not in columns:
                 await db.execute("ALTER TABLE bloggers ADD COLUMN engagement_rate REAL")
                 logger.info("Added engagement_rate column to bloggers table")
+            
+            # Добавляем новые колонки для охватов
+            if 'stories_reach_min' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN stories_reach_min INTEGER")
+                logger.info("Added stories_reach_min column to bloggers table")
+            
+            if 'stories_reach_max' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN stories_reach_max INTEGER")
+                logger.info("Added stories_reach_max column to bloggers table")
+            
+            if 'reels_reach_min' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN reels_reach_min INTEGER")
+                logger.info("Added reels_reach_min column to bloggers table")
+            
+            if 'reels_reach_max' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN reels_reach_max INTEGER")
+                logger.info("Added reels_reach_max column to bloggers table")
 
             if 'stats_images' not in columns:
                 await db.execute("ALTER TABLE bloggers ADD COLUMN stats_images TEXT")
@@ -576,10 +601,11 @@ async def create_blogger(
                 price_stories, price_post, price_video,
                 has_reviews, is_registered_rkn, official_payment_possible,
                 subscribers_count, avg_views, avg_likes, engagement_rate,
+                stories_reach_min, stories_reach_max, reels_reach_min, reels_reach_max,
                 stats_images,
                 description
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 seller_id,
@@ -603,6 +629,10 @@ async def create_blogger(
                 kwargs.get("avg_views"),
                 kwargs.get("avg_likes"),
                 kwargs.get("engagement_rate"),
+                kwargs.get("stories_reach_min"),
+                kwargs.get("stories_reach_max"),
+                kwargs.get("reels_reach_min"),
+                kwargs.get("reels_reach_max"),
                 json.dumps(kwargs.get("stats_images", [])),
                 kwargs.get("description"),
             ),
@@ -669,6 +699,10 @@ async def get_blogger(blogger_id: int) -> Optional[Blogger]:
                 avg_views=row['avg_views'],
                 avg_likes=row['avg_likes'],
                 engagement_rate=row['engagement_rate'],
+                stories_reach_min=row['stories_reach_min'] if 'stories_reach_min' in row.keys() else None,
+                stories_reach_max=row['stories_reach_max'] if 'stories_reach_max' in row.keys() else None,
+                reels_reach_min=row['reels_reach_min'] if 'reels_reach_min' in row.keys() else None,
+                reels_reach_max=row['reels_reach_max'] if 'reels_reach_max' in row.keys() else None,
                 stats_images=json.loads(row['stats_images']) if row['stats_images'] else [],
                 description=row['description'],
                 created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else datetime.now(),
@@ -734,6 +768,10 @@ async def get_user_bloggers(seller_id: int) -> List[Blogger]:
                 avg_views=row['avg_views'],
                 avg_likes=row['avg_likes'],
                 engagement_rate=row['engagement_rate'],
+                stories_reach_min=row['stories_reach_min'] if 'stories_reach_min' in row.keys() else None,
+                stories_reach_max=row['stories_reach_max'] if 'stories_reach_max' in row.keys() else None,
+                reels_reach_min=row['reels_reach_min'] if 'reels_reach_min' in row.keys() else None,
+                reels_reach_max=row['reels_reach_max'] if 'reels_reach_max' in row.keys() else None,
                 stats_images=json.loads(row['stats_images']) if row['stats_images'] else [],
                 description=row['description'],
                 created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else datetime.now(),
@@ -880,6 +918,10 @@ async def search_bloggers(platforms: List[str] = None, categories: List[str] = N
                     avg_views=row['avg_views'],
                     avg_likes=row['avg_likes'],
                     engagement_rate=row['engagement_rate'],
+                    stories_reach_min=row['stories_reach_min'] if 'stories_reach_min' in row.keys() else None,
+                    stories_reach_max=row['stories_reach_max'] if 'stories_reach_max' in row.keys() else None,
+                    reels_reach_min=row['reels_reach_min'] if 'reels_reach_min' in row.keys() else None,
+                    reels_reach_max=row['reels_reach_max'] if 'reels_reach_max' in row.keys() else None,
                     stats_images=json.loads(row['stats_images']) if row['stats_images'] else [],
                     description=row['description'],
                     created_at=datetime.fromisoformat(row['created_at']),
