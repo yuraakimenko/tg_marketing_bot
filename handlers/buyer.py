@@ -512,8 +512,10 @@ async def handle_blogger_selection(callback: CallbackQuery, state: FSMContext):
     
     if blogger.subscribers_count:
         info_text += f"📊 <b>Подписчиков:</b> {blogger.subscribers_count:,}\n"
-    if blogger.avg_views:
-        info_text += f"👁️ <b>Средние просмотры:</b> {blogger.avg_views:,}\n"
+    if blogger.stories_reach_min and blogger.stories_reach_max:
+        info_text += f"📊 <b>Охват историй:</b> {blogger.stories_reach_min:,}-{blogger.stories_reach_max:,}\n"
+    if blogger.reels_reach_min and blogger.reels_reach_max:
+        info_text += f"📊 <b>Охват рилс:</b> {blogger.reels_reach_min:,}-{blogger.reels_reach_max:,}\n"
     if blogger.avg_likes:
         info_text += f"❤️ <b>Средние лайки:</b> {blogger.avg_likes:,}\n"
     if blogger.engagement_rate:
