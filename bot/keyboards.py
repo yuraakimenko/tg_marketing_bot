@@ -59,21 +59,26 @@ def get_settings_keyboard() -> InlineKeyboardMarkup:
     ])
 
 
-def get_platform_keyboard() -> InlineKeyboardMarkup:
+def get_platform_keyboard(with_navigation: bool = False) -> InlineKeyboardMarkup:
     """Клавиатура множественного выбора платформ"""
-    return InlineKeyboardMarkup(inline_keyboard=[
+    keyboard = [
         [InlineKeyboardButton(text="📱 Instagram", callback_data="platform_instagram")],
         [InlineKeyboardButton(text="📺 YouTube", callback_data="platform_youtube")],
         [InlineKeyboardButton(text="📱 TikTok", callback_data="platform_tiktok")],
         [InlineKeyboardButton(text="📱 Telegram", callback_data="platform_telegram")],
         [InlineKeyboardButton(text="📱 VK", callback_data="platform_vk")],
         [InlineKeyboardButton(text="✅ Подтвердить выбор", callback_data="confirm_platforms")]
-    ])
+    ]
+    
+    if with_navigation:
+        keyboard.append([InlineKeyboardButton(text="❌ Отменить добавление", callback_data="blogger_cancel")])
+    
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
-def get_category_keyboard() -> InlineKeyboardMarkup:
+def get_category_keyboard(with_navigation: bool = False) -> InlineKeyboardMarkup:
     """Клавиатура выбора категорий"""
-    return InlineKeyboardMarkup(inline_keyboard=[
+    keyboard = [
         [InlineKeyboardButton(text="🏠 Лайфстайл", callback_data="category_lifestyle")],
         [InlineKeyboardButton(text="⚽ Спорт", callback_data="category_sport")],
         [InlineKeyboardButton(text="🥗 Питание", callback_data="category_nutrition")],
@@ -89,7 +94,17 @@ def get_category_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="👶 Родительство", callback_data="category_parenting")],
         [InlineKeyboardButton(text="💰 Финансы", callback_data="category_finance")],
         [InlineKeyboardButton(text="✅ Подтвердить выбор", callback_data="confirm_categories")]
-    ])
+    ]
+    
+    if with_navigation:
+        keyboard.extend([
+            [
+                InlineKeyboardButton(text="⬅️ Назад", callback_data="blogger_back"),
+                InlineKeyboardButton(text="❌ Отменить", callback_data="blogger_cancel")
+            ]
+        ])
+    
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
 def get_yes_no_keyboard() -> InlineKeyboardMarkup:
@@ -338,3 +353,89 @@ def get_blogger_success_keyboard(blogger_id: int) -> InlineKeyboardMarkup:
     ]
     
     return InlineKeyboardMarkup(inline_keyboard=buttons) 
+
+
+def get_blogger_addition_navigation() -> InlineKeyboardMarkup:
+    """Навигационные кнопки для добавления блогера"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="⬅️ Назад", callback_data="blogger_back"),
+            InlineKeyboardButton(text="❌ Отменить", callback_data="blogger_cancel")
+        ]
+    ])
+
+
+def get_blogger_addition_navigation_with_back() -> InlineKeyboardMarkup:
+    """Навигационные кнопки с возможностью возврата"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="⬅️ Назад", callback_data="blogger_back")
+        ],
+        [
+            InlineKeyboardButton(text="❌ Отменить добавление", callback_data="blogger_cancel")
+        ]
+    ])
+
+
+def get_blogger_addition_navigation_first_step() -> InlineKeyboardMarkup:
+    """Навигационные кнопки для первого шага (только отмена)"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="❌ Отменить добавление", callback_data="blogger_cancel")
+        ]
+    ])
+
+
+def get_blogger_edit_field_keyboard(blogger_id: int) -> InlineKeyboardMarkup:
+    """Клавиатура для редактирования полей блогера"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="📝 Имя", callback_data=f"edit_field_name_{blogger_id}"),
+            InlineKeyboardButton(text="🔗 Ссылка", callback_data=f"edit_field_url_{blogger_id}")
+        ],
+        [
+            InlineKeyboardButton(text="📱 Платформы", callback_data=f"edit_field_platforms_{blogger_id}"),
+            InlineKeyboardButton(text="🏷️ Категории", callback_data=f"edit_field_categories_{blogger_id}")
+        ],
+        [
+            InlineKeyboardButton(text="👥 Подписчики", callback_data=f"edit_field_subscribers_{blogger_id}"),
+            InlineKeyboardButton(text="📖 Охват сторис", callback_data=f"edit_field_stories_reach_{blogger_id}")
+        ],
+        [
+            InlineKeyboardButton(text="💰 Цена сторис", callback_data=f"edit_field_price_stories_{blogger_id}"),
+            InlineKeyboardButton(text="🎬 Охват рилс", callback_data=f"edit_field_reels_reach_{blogger_id}")
+        ],
+        [
+            InlineKeyboardButton(text="💸 Цена рилс", callback_data=f"edit_field_price_reels_{blogger_id}"),
+            InlineKeyboardButton(text="📄 Описание", callback_data=f"edit_field_description_{blogger_id}")
+        ],
+        [
+            InlineKeyboardButton(text="✅ Готово", callback_data="edit_blogger_done")
+        ]
+    ])
+
+
+def get_blogger_success_keyboard_enhanced(blogger_id: int) -> InlineKeyboardMarkup:
+    """Расширенная клавиатура после успешного добавления блогера"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✏️ Редактировать поля", callback_data=f"edit_blogger_fields_{blogger_id}")
+        ],
+        [
+            InlineKeyboardButton(text="📝 Добавить еще", callback_data="add_another_blogger"),
+            InlineKeyboardButton(text="📋 Мои блогеры", callback_data="show_my_bloggers")
+        ],
+        [
+            InlineKeyboardButton(text="🏠 Главное меню", callback_data="main_menu")
+        ]
+    ])
+
+
+def get_confirmation_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура подтверждения действия"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✅ Да", callback_data="confirm_yes"),
+            InlineKeyboardButton(text="❌ Нет", callback_data="confirm_no")
+        ]
+    ]) 

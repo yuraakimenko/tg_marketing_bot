@@ -14,7 +14,11 @@ from bot.keyboards import (
     get_yes_no_keyboard, get_blogger_list_keyboard,
     get_blogger_details_keyboard, get_price_stories_keyboard,
     get_price_post_keyboard, get_price_video_keyboard,
-    get_platforms_multi_keyboard, get_blogger_success_keyboard
+    get_platforms_multi_keyboard, get_blogger_success_keyboard,
+    get_blogger_addition_navigation_with_back,
+    get_blogger_addition_navigation_first_step,
+    get_blogger_edit_field_keyboard,
+    get_blogger_success_keyboard_enhanced
 )
 from bot.states import SellerStates
 
@@ -74,7 +78,7 @@ async def universal_add_blogger(message: Message, state: FSMContext):
         "📝 <b>Добавление блогера</b>\n\n"
         "Давайте добавим нового блогера в базу данных.\n\n"
         "🎯 <b>Шаг 1:</b> Выберите платформу:",
-        reply_markup=get_platform_keyboard(),
+        reply_markup=get_platform_keyboard(with_navigation=True),
         parse_mode="HTML"
     )
     await state.set_state(SellerStates.waiting_for_platform)
@@ -191,7 +195,7 @@ async def handle_platform_selection(callback: CallbackQuery, state: FSMContext):
         f"🎯 <b>Шаг 1:</b> Выберите платформы\n\n"
         f"Выбранные платформы: <b>{platforms_text}</b>\n\n"
         f"Выберите платформы для блогера:",
-        reply_markup=get_platform_keyboard(),
+        reply_markup=get_platform_keyboard(with_navigation=True),
         parse_mode="HTML"
     )
 
@@ -221,6 +225,7 @@ async def confirm_platforms(callback: CallbackQuery, state: FSMContext):
         "• TikTok: https://tiktok.com/@username\n"
         "• Telegram: https://t.me/username\n"
         "• VK: https://vk.com/username",
+        reply_markup=get_blogger_addition_navigation_with_back(),
         parse_mode="HTML"
     )
     await state.set_state(SellerStates.waiting_for_blogger_url)
@@ -287,6 +292,7 @@ async def handle_blogger_url(message: Message, state: FSMContext):
     await message.answer(
         "🎯 <b>Шаг 3:</b> Введите имя блогера\n\n"
         "Укажите имя или никнейм блогера:",
+        reply_markup=get_blogger_addition_navigation_with_back(),
         parse_mode="HTML"
     )
     await state.set_state(SellerStates.waiting_for_blogger_name)
@@ -312,6 +318,7 @@ async def handle_blogger_name(message: Message, state: FSMContext):
     await message.answer(
         "📊 <b>Статистика блогера</b>\n\n"
         "Укажите количество подписчиков:",
+        reply_markup=get_blogger_addition_navigation_with_back(),
         parse_mode="HTML"
     )
     await state.set_state(SellerStates.waiting_for_subscribers_count)
@@ -339,6 +346,7 @@ async def handle_subscribers_count(message: Message, state: FSMContext):
         "📖 <b>Охват сторис</b>\n\n"
         "Укажите МИНИМАЛЬНЫЙ охват сторис:\n\n"
         "💡 <b>Важно:</b> Указывайте именно ОХВАТЫ, а не просмотры!",
+        reply_markup=get_blogger_addition_navigation_with_back(),
         parse_mode="HTML"
     )
     await state.set_state(SellerStates.waiting_for_stories_reach_min)
@@ -366,6 +374,7 @@ async def handle_stories_reach_min(message: Message, state: FSMContext):
         f"📖 <b>Охват сторис</b>\n\n"
         f"Укажите МАКСИМАЛЬНЫЙ охват сторис:\n\n"
         f"Уже указано: Минимальный охват: {reach:,}",
+        reply_markup=get_blogger_addition_navigation_with_back(),
         parse_mode="HTML"
     )
     await state.set_state(SellerStates.waiting_for_stories_reach_max)
@@ -405,6 +414,7 @@ async def handle_stories_reach_max(message: Message, state: FSMContext):
     await message.answer(
         "💰 <b>Цена на 4 истории</b>\n\n"
         "Укажите цену за 4 истории в рублях:",
+        reply_markup=get_blogger_addition_navigation_with_back(),
         parse_mode="HTML"
     )
     await state.set_state(SellerStates.waiting_for_price_stories)
@@ -432,6 +442,7 @@ async def handle_price_stories(message: Message, state: FSMContext):
         "🎬 <b>Охват рилс</b>\n\n"
         "Укажите МИНИМАЛЬНЫЙ охват рилс:\n\n"
         "💡 <b>Важно:</b> Указывайте именно ОХВАТЫ, а не просмотры!",
+        reply_markup=get_blogger_addition_navigation_with_back(),
         parse_mode="HTML"
     )
     await state.set_state(SellerStates.waiting_for_reels_reach_min)
@@ -459,6 +470,7 @@ async def handle_reels_reach_min(message: Message, state: FSMContext):
         f"🎬 <b>Охват рилс</b>\n\n"
         f"Укажите МАКСИМАЛЬНЫЙ охват рилс:\n\n"
         f"Уже указано: Минимальный охват: {reach:,}",
+        reply_markup=get_blogger_addition_navigation_with_back(),
         parse_mode="HTML"
     )
     await state.set_state(SellerStates.waiting_for_reels_reach_max)
@@ -498,6 +510,7 @@ async def handle_reels_reach_max(message: Message, state: FSMContext):
     await message.answer(
         "💸 <b>Цена рилс</b>\n\n"
         "Укажите цену за рилс в рублях:",
+        reply_markup=get_blogger_addition_navigation_with_back(),
         parse_mode="HTML"
     )
     await state.set_state(SellerStates.waiting_for_price_reels)
@@ -524,7 +537,7 @@ async def handle_price_reels(message: Message, state: FSMContext):
     await message.answer(
         "🏷️ <b>Категории блога</b>\n\n"
         "Выберите категории (максимум 3):",
-        reply_markup=get_category_keyboard(),
+        reply_markup=get_category_keyboard(with_navigation=True),
         parse_mode="HTML"
     )
     await state.set_state(SellerStates.waiting_for_categories)
@@ -560,7 +573,7 @@ async def handle_category_selection(callback: CallbackQuery, state: FSMContext):
         f"🏷️ <b>Категории блога</b>\n\n"
         f"Выбранные категории: <b>{categories_text}</b>\n\n"
         f"Выберите категории (максимум 3):",
-        reply_markup=get_category_keyboard(),
+        reply_markup=get_category_keyboard(with_navigation=True),
         parse_mode="HTML"
     )
 
@@ -580,6 +593,7 @@ async def confirm_categories(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text(
         "📄 <b>Описание блогера</b>\n\n"
         "Напишите краткое описание блогера (или напишите 'пропустить'):",
+        reply_markup=get_blogger_addition_navigation_with_back(),
         parse_mode="HTML"
     )
     await state.set_state(SellerStates.waiting_for_blogger_description)
@@ -669,7 +683,7 @@ async def handle_blogger_description(message: Message, state: FSMContext):
         
         await message.answer(
             success_text,
-            reply_markup=get_blogger_success_keyboard(blogger.id),
+            reply_markup=get_blogger_success_keyboard_enhanced(blogger.id),
             parse_mode="HTML"
         )
         
@@ -859,3 +873,277 @@ def format_full_blogger_info(blogger) -> str:
         info_text += f"\n📄 <b>Описание:</b>\n<i>{blogger.description}</i>\n"
     
     return info_text 
+
+# === ОБРАБОТЧИКИ НАВИГАЦИИ ===
+
+@router.callback_query(F.data == "blogger_cancel")
+async def handle_blogger_cancel(callback: CallbackQuery, state: FSMContext):
+    """Отмена добавления блогера"""
+    await callback.answer()
+    await state.clear()
+    
+    await callback.message.edit_text(
+        "❌ <b>Добавление блогера отменено</b>\n\n"
+        "Вы можете начать заново или вернуться в главное меню.",
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data == "blogger_back")
+async def handle_blogger_back(callback: CallbackQuery, state: FSMContext):
+    """Возврат к предыдущему шагу"""
+    await callback.answer()
+    
+    current_state = await state.get_state()
+    data = await state.get_data()
+    
+    if current_state == SellerStates.waiting_for_blogger_url.state:
+        # Возврат к выбору платформ
+        platforms = data.get('platforms', [])
+        platforms_text = ", ".join([p.value for p in platforms]) if platforms else "Не выбрано"
+        
+        await callback.message.edit_text(
+            f"🎯 <b>Шаг 1:</b> Выберите платформы\n\n"
+            f"Выбранные платформы: <b>{platforms_text}</b>\n\n"
+            f"Выберите платформы для блогера:",
+            reply_markup=get_platform_keyboard(with_navigation=True),
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_platform)
+        
+    elif current_state == SellerStates.waiting_for_blogger_name.state:
+        # Возврат к вводу URL
+        platforms = data.get('platforms', [])
+        await callback.message.edit_text(
+            f"🎯 <b>Шаг 2:</b> Введите ссылку на профиль блогера\n\n"
+            f"Выбранные платформы: <b>{', '.join([p.value for p in platforms])}</b>\n\n"
+            "Примеры ссылок:\n"
+            "• Instagram: https://instagram.com/username\n"
+            "• YouTube: https://youtube.com/@channel\n"
+            "• TikTok: https://tiktok.com/@username\n"
+            "• Telegram: https://t.me/username\n"
+            "• VK: https://vk.com/username",
+            reply_markup=get_blogger_addition_navigation_with_back(),
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_blogger_url)
+        
+    elif current_state == SellerStates.waiting_for_subscribers_count.state:
+        # Возврат к вводу имени
+        await callback.message.edit_text(
+            "🎯 <b>Шаг 3:</b> Введите имя блогера\n\n"
+            "Укажите имя или никнейм блогера:",
+            reply_markup=get_blogger_addition_navigation_with_back(),
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_blogger_name)
+        
+    elif current_state == SellerStates.waiting_for_stories_reach_min.state:
+        # Возврат к вводу подписчиков
+        await callback.message.edit_text(
+            "📊 <b>Статистика блогера</b>\n\n"
+            "Укажите количество подписчиков:",
+            reply_markup=get_blogger_addition_navigation_with_back(),
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_subscribers_count)
+        
+    elif current_state == SellerStates.waiting_for_stories_reach_max.state:
+        # Возврат к вводу минимального охвата сторис
+        await callback.message.edit_text(
+            "📖 <b>Охват сторис</b>\n\n"
+            "Укажите МИНИМАЛЬНЫЙ охват сторис:\n\n"
+            "💡 <b>Важно:</b> Указывайте именно ОХВАТЫ, а не просмотры!",
+            reply_markup=get_blogger_addition_navigation_with_back(),
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_stories_reach_min)
+        
+    elif current_state == SellerStates.waiting_for_price_stories.state:
+        # Возврат к вводу максимального охвата сторис
+        reach_min = data.get('stories_reach_min', 0)
+        await callback.message.edit_text(
+            f"📖 <b>Охват сторис</b>\n\n"
+            f"Укажите МАКСИМАЛЬНЫЙ охват сторис:\n\n"
+            f"Уже указано: Минимальный охват: {reach_min:,}",
+            reply_markup=get_blogger_addition_navigation_with_back(),
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_stories_reach_max)
+        
+    elif current_state == SellerStates.waiting_for_reels_reach_min.state:
+        # Возврат к вводу цены сторис
+        await callback.message.edit_text(
+            "💰 <b>Цена на 4 истории</b>\n\n"
+            "Укажите цену за 4 истории в рублях:",
+            reply_markup=get_blogger_addition_navigation_with_back(),
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_price_stories)
+        
+    elif current_state == SellerStates.waiting_for_reels_reach_max.state:
+        # Возврат к вводу минимального охвата рилс
+        await callback.message.edit_text(
+            "🎬 <b>Охват рилс</b>\n\n"
+            "Укажите МИНИМАЛЬНЫЙ охват рилс:\n\n"
+            "💡 <b>Важно:</b> Указывайте именно ОХВАТЫ, а не просмотры!",
+            reply_markup=get_blogger_addition_navigation_with_back(),
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_reels_reach_min)
+        
+    elif current_state == SellerStates.waiting_for_price_reels.state:
+        # Возврат к вводу максимального охвата рилс
+        reach_min = data.get('reels_reach_min', 0)
+        await callback.message.edit_text(
+            f"🎬 <b>Охват рилс</b>\n\n"
+            f"Укажите МАКСИМАЛЬНЫЙ охват рилс:\n\n"
+            f"Уже указано: Минимальный охват: {reach_min:,}",
+            reply_markup=get_blogger_addition_navigation_with_back(),
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_reels_reach_max)
+        
+    elif current_state == SellerStates.waiting_for_categories.state:
+        # Возврат к вводу цены рилс
+        await callback.message.edit_text(
+            "💸 <b>Цена рилс</b>\n\n"
+            "Укажите цену за рилс в рублях:",
+            reply_markup=get_blogger_addition_navigation_with_back(),
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_price_reels)
+        
+    elif current_state == SellerStates.waiting_for_blogger_description.state:
+        # Возврат к выбору категорий
+        categories = data.get('categories', [])
+        categories_text = ", ".join([cat.get_russian_name() for cat in categories]) if categories else "Не выбрано"
+        
+        await callback.message.edit_text(
+            f"🏷️ <b>Категории блога</b>\n\n"
+            f"Выбранные категории: <b>{categories_text}</b>\n\n"
+            f"Выберите категории (максимум 3):",
+            reply_markup=get_category_keyboard(with_navigation=True),
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_categories)
+        
+    else:
+        # Если состояние неизвестно, отменяем
+        await handle_blogger_cancel(callback, state)
+
+
+# === БЛОКИРОВКА ДРУГИХ ФУНКЦИЙ ===
+
+@router.message(F.text.in_(["👥 Мои блогеры", "✏️ Редактировать блогера"]), StateFilter(SellerStates))
+async def block_during_addition(message: Message, state: FSMContext):
+    """Блокировка других функций во время добавления блогера"""
+    current_state = await state.get_state()
+    if current_state and "waiting_for" in current_state:
+        await message.answer(
+            "⚠️ <b>Добавление блогера в процессе</b>\n\n"
+            "Завершите добавление текущего блогера или нажмите 'Отменить' для доступа к другим функциям.",
+            parse_mode="HTML"
+        )
+
+
+# === ОБРАБОТЧИКИ РЕДАКТИРОВАНИЯ ПОЛЕЙ ===
+
+@router.callback_query(F.data.startswith("edit_blogger_fields_"))
+async def handle_edit_blogger_fields(callback: CallbackQuery, state: FSMContext):
+    """Показать меню редактирования полей блогера"""
+    blogger_id = int(callback.data.split("_")[3])
+    blogger = await get_blogger(blogger_id)
+    
+    if not blogger:
+        await callback.answer("❌ Блогер не найден")
+        return
+    
+    user = await get_user(callback.from_user.id)
+    if blogger.seller_id != user.id:
+        await callback.answer("❌ Это не ваш блогер")
+        return
+    
+    await callback.answer()
+    
+    info_text = f"✏️ <b>Редактирование полей блогера</b>\n\n"
+    info_text += format_full_blogger_info(blogger)
+    info_text += f"\n\n<b>Выберите поле для редактирования:</b>"
+    
+    await callback.message.edit_text(
+        info_text,
+        reply_markup=get_blogger_edit_field_keyboard(blogger.id),
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data == "edit_blogger_done")
+async def handle_edit_blogger_done(callback: CallbackQuery):
+    """Завершение редактирования блогера"""
+    await callback.answer()
+    
+    await callback.message.edit_text(
+        "✅ <b>Редактирование завершено</b>\n\n"
+        "Изменения сохранены успешно!",
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data == "add_another_blogger")
+async def handle_add_another_blogger(callback: CallbackQuery, state: FSMContext):
+    """Добавить еще одного блогера"""
+    await callback.answer()
+    await state.clear()
+    
+    await callback.message.edit_text(
+        "📝 <b>Добавление блогера</b>\n\n"
+        "Давайте добавим нового блогера в базу данных.\n\n"
+        "🎯 <b>Шаг 1:</b> Выберите платформу:",
+        reply_markup=get_platform_keyboard(with_navigation=True),
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_platform)
+
+
+@router.callback_query(F.data == "show_my_bloggers")
+async def handle_show_my_bloggers_callback(callback: CallbackQuery, state: FSMContext):
+    """Показать всех блогеров пользователя"""
+    await callback.answer()
+    await state.clear()
+    
+    user = await get_user(callback.from_user.id)
+    if not user:
+        await callback.message.edit_text("❌ Пользователь не найден в базе данных.")
+        return
+    
+    bloggers = await get_user_bloggers(user.id)
+    
+    if not bloggers:
+        await callback.message.edit_text(
+            "📝 <b>У вас пока нет блогеров</b>\n\n"
+            "Добавьте первого блогера с помощью кнопки '📝 Добавить блогера'",
+            parse_mode="HTML"
+        )
+        return
+    
+    # Удаляем исходное сообщение и отправляем новые
+    await callback.message.delete()
+    
+    for blogger in bloggers:
+        info_text = f"📝 <b>Блогер #{blogger.id}</b>\n\n"
+        info_text += format_full_blogger_info(blogger)
+        
+        # Временная клавиатура управления
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        management_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="✏️ Редактировать", callback_data=f"edit_blogger_fields_{blogger.id}"),
+                InlineKeyboardButton(text="🗑️ Удалить", callback_data=f"delete_blogger_{blogger.id}")
+            ]
+        ])
+        
+        await callback.message.answer(
+            info_text,
+            reply_markup=management_keyboard,
+            parse_mode="HTML"
+        )
