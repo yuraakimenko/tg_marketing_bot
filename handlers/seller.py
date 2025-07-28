@@ -578,323 +578,8 @@ async def confirm_categories(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
     
     await callback.message.edit_text(
-        f"💰 <b>Цены</b>\n\n"
-        f"Укажите цену за 4 истории (в рублях):\n\n"
-        f"💡 <b>Важно:</b> Цена должна быть кратна 1000",
-        parse_mode="HTML"
-    )
-    await state.set_state(SellerStates.waiting_for_price_stories)
-
-
-@router.message(SellerStates.waiting_for_price_stories)
-async def handle_price_stories(message: Message, state: FSMContext):
-    """Обработка ввода цены за истории"""
-    try:
-        price = int(message.text.strip())
-        if price < 0:
-            raise ValueError("Negative price")
-        if price % 1000 != 0:
-            await message.answer(
-                "❌ <b>Цена должна быть кратна 1000</b>\n\n"
-                "Примеры: 5000, 10000, 15000\n"
-                "Попробуйте еще раз:",
-                parse_mode="HTML"
-            )
-            return
-    except ValueError:
-        await message.answer(
-            "❌ <b>Неверный формат</b>\n\n"
-            "Введите целое число, кратное 1000.\n"
-            "Попробуйте еще раз:",
-            parse_mode="HTML"
-        )
-        return
-    
-    await state.update_data(price_stories=price)
-    
-    await message.answer(
-        f"💰 Укажите цену за пост (в рублях):\n\n"
-        f"Уже указано: Истории: {price}₽\n\n"
-        f"💡 <b>Важно:</b> Цена должна быть кратна 1000",
-        parse_mode="HTML"
-    )
-    await state.set_state(SellerStates.waiting_for_price_post)
-
-
-@router.message(SellerStates.waiting_for_price_post)
-async def handle_price_post(message: Message, state: FSMContext):
-    """Обработка ввода цены за пост"""
-    try:
-        price = int(message.text.strip())
-        if price < 0:
-            raise ValueError("Negative price")
-        if price % 1000 != 0:
-            await message.answer(
-                "❌ <b>Цена должна быть кратна 1000</b>\n\n"
-                "Примеры: 5000, 10000, 15000\n"
-                "Попробуйте еще раз:",
-                parse_mode="HTML"
-            )
-            return
-    except ValueError:
-        await message.answer(
-            "❌ <b>Неверный формат</b>\n\n"
-            "Введите целое число, кратное 1000.\n"
-            "Попробуйте еще раз:",
-            parse_mode="HTML"
-        )
-        return
-    
-    await state.update_data(price_post=price)
-    
-    data = await state.get_data()
-    
-    await message.answer(
-        f"💰 Укажите цену за видео (в рублях):\n\n"
-        f"Уже указано: Истории: {data.get('price_stories', 0)}₽, "
-        f"Пост: {price}₽\n\n"
-        f"💡 <b>Важно:</b> Цена должна быть кратна 1000",
-        parse_mode="HTML"
-    )
-    await state.set_state(SellerStates.waiting_for_price_video)
-
-
-@router.message(SellerStates.waiting_for_price_video)
-async def handle_price_video(message: Message, state: FSMContext):
-    """Обработка ввода цены за видео"""
-    try:
-        price = int(message.text.strip())
-        if price < 0:
-            raise ValueError("Negative price")
-        if price % 1000 != 0:
-            await message.answer(
-                "❌ <b>Цена должна быть кратна 1000</b>\n\n"
-                "Примеры: 5000, 10000, 15000\n"
-                "Попробуйте еще раз:",
-                parse_mode="HTML"
-            )
-            return
-    except ValueError:
-        await message.answer(
-            "❌ <b>Неверный формат</b>\n\n"
-            "Введите целое число, кратное 1000.\n"
-            "Попробуйте еще раз:",
-            parse_mode="HTML"
-        )
-        return
-    
-    await state.update_data(price_video=price)
-    
-    await message.answer(
-        "📝 <b>Дополнительная информация</b>\n\n"
-        "У блогера есть отзывы от других заказчиков?",
-        reply_markup=get_yes_no_keyboard(),
-        parse_mode="HTML"
-    )
-    await state.set_state(SellerStates.waiting_for_has_reviews)
-
-
-@router.callback_query(F.data.startswith("yes_no_"), SellerStates.waiting_for_has_reviews)
-async def handle_has_reviews(callback: CallbackQuery, state: FSMContext):
-    """Обработка ответа о наличии отзывов"""
-    has_reviews = callback.data == "yes_no_yes"
-    await state.update_data(has_reviews=has_reviews)
-    
-    await callback.answer()
-    
-    await callback.message.edit_text(
-        "📋 <b>Регистрация в РКН</b>\n\n"
-        "Блогер зарегистрирован в Роскомнадзоре?",
-        reply_markup=get_yes_no_keyboard(),
-        parse_mode="HTML"
-    )
-    await state.set_state(SellerStates.waiting_for_is_registered_rkn)
-
-
-@router.callback_query(F.data.startswith("yes_no_"), SellerStates.waiting_for_is_registered_rkn)
-async def handle_is_registered_rkn(callback: CallbackQuery, state: FSMContext):
-    """Обработка ответа о регистрации в РКН"""
-    is_registered_rkn = callback.data == "yes_no_yes"
-    await state.update_data(is_registered_rkn=is_registered_rkn)
-    
-    await callback.answer()
-    
-    await callback.message.edit_text(
-        "💼 <b>Официальная оплата</b>\n\n"
-        "Возможна ли официальная оплата (СЗ/ИП)?",
-        reply_markup=get_yes_no_keyboard(),
-        parse_mode="HTML"
-    )
-    await state.set_state(SellerStates.waiting_for_official_payment)
-
-
-@router.callback_query(F.data.startswith("yes_no_"), SellerStates.waiting_for_official_payment)
-async def handle_official_payment(callback: CallbackQuery, state: FSMContext):
-    """Обработка ответа о возможности официальной оплаты"""
-    official_payment_possible = callback.data == "yes_no_yes"
-    await state.update_data(official_payment_possible=official_payment_possible)
-    
-    await callback.answer()
-    
-    await callback.message.edit_text(
-        "📊 <b>Статистика</b>\n\n"
-        "Укажите количество подписчиков:",
-        parse_mode="HTML"
-    )
-    await state.set_state(SellerStates.waiting_for_statistics)
-
-
-@router.message(SellerStates.waiting_for_statistics)
-async def handle_statistics(message: Message, state: FSMContext):
-    """Обработка ввода статистики"""
-    input_text = message.text.strip()
-    logger.info(f"Получен ввод статистики: '{input_text}' (длина: {len(input_text)})")
-    
-    try:
-        # Убираем возможные пробелы и нечисловые символы
-        clean_input = ''.join(filter(str.isdigit, input_text))
-        
-        if not clean_input:
-            raise ValueError("No digits found")
-            
-        subscribers = int(clean_input)
-        logger.info(f"Преобразованное число подписчиков: {subscribers}")
-        
-        if subscribers < 0:
-            raise ValueError("Negative subscribers")
-            
-        if subscribers > 1000000000:  # 1 миллиард - разумный лимит
-            await message.answer(
-                "❌ <b>Слишком большое число</b>\n\n"
-                "Максимальное количество подписчиков: 1,000,000,000\n"
-                "Попробуйте еще раз:",
-                parse_mode="HTML"
-            )
-            return
-            
-    except ValueError as e:
-        logger.error(f"Ошибка валидации статистики: {e}, ввод: '{input_text}'")
-        await message.answer(
-            "❌ <b>Неверный формат</b>\n\n"
-            "Введите целое положительное число.\n"
-            f"Ваш ввод: '{input_text}'\n"
-            "Попробуйте еще раз:",
-            parse_mode="HTML"
-        )
-        return
-    
-    await state.update_data(subscribers_count=subscribers)
-    
-    await message.answer(
-        f"📊 Укажите средние просмотры:\n\n"
-        f"Уже указано: Подписчики: {subscribers}",
-        parse_mode="HTML"
-    )
-    await state.set_state(SellerStates.waiting_for_avg_views)
-
-
-@router.message(SellerStates.waiting_for_avg_views)
-async def handle_avg_views(message: Message, state: FSMContext):
-    """Обработка ввода средних просмотров"""
-    input_text = message.text.strip()
-    
-    try:
-        # Убираем возможные пробелы и нечисловые символы
-        clean_input = ''.join(filter(str.isdigit, input_text))
-        
-        if not clean_input:
-            raise ValueError("No digits found")
-            
-        avg_views = int(clean_input)
-        
-        if avg_views < 0:
-            raise ValueError("Negative views")
-            
-    except ValueError as e:
-        logger.error(f"Ошибка валидации просмотров: {e}, ввод: '{input_text}'")
-        await message.answer(
-            "❌ <b>Неверный формат</b>\n\n"
-            "Введите целое положительное число.\n"
-            f"Ваш ввод: '{input_text}'\n"
-            "Попробуйте еще раз:",
-            parse_mode="HTML"
-        )
-        return
-    
-    await state.update_data(avg_views=avg_views)
-    
-    await message.answer(
-        f"📊 Укажите средние лайки:\n\n"
-        f"Уже указано: Просмотры: {avg_views}",
-        parse_mode="HTML"
-    )
-    await state.set_state(SellerStates.waiting_for_avg_likes)
-
-
-@router.message(SellerStates.waiting_for_avg_likes)
-async def handle_avg_likes(message: Message, state: FSMContext):
-    """Обработка ввода средних лайков"""
-    input_text = message.text.strip()
-    
-    try:
-        # Убираем возможные пробелы и нечисловые символы
-        clean_input = ''.join(filter(str.isdigit, input_text))
-        
-        if not clean_input:
-            raise ValueError("No digits found")
-            
-        avg_likes = int(clean_input)
-        
-        if avg_likes < 0:
-            raise ValueError("Negative likes")
-            
-    except ValueError as e:
-        logger.error(f"Ошибка валидации лайков: {e}, ввод: '{input_text}'")
-        await message.answer(
-            "❌ <b>Неверный формат</b>\n\n"
-            "Введите целое положительное число.\n"
-            f"Ваш ввод: '{input_text}'\n"
-            "Попробуйте еще раз:",
-            parse_mode="HTML"
-        )
-        return
-    
-    await state.update_data(avg_likes=avg_likes)
-    
-    await message.answer(
-        f"📊 Укажите процент вовлеченности (от 0 до 100):\n\n"
-        f"Уже указано: Лайки: {avg_likes}",
-        parse_mode="HTML"
-    )
-    await state.set_state(SellerStates.waiting_for_engagement_rate)
-
-
-@router.message(SellerStates.waiting_for_engagement_rate)
-async def handle_engagement_rate(message: Message, state: FSMContext):
-    """Обработка ввода процента вовлеченности"""
-    try:
-        engagement_rate = float(message.text.strip())
-        if engagement_rate < 0 or engagement_rate > 100:
-            raise ValueError("Invalid engagement rate")
-    except ValueError:
-        await message.answer(
-            "❌ <b>Неверный формат</b>\n\n"
-            "Введите число от 0 до 100.\n"
-            "Попробуйте еще раз:",
-            parse_mode="HTML"
-        )
-        return
-    
-    await state.update_data(engagement_rate=engagement_rate)
-    
-    await message.answer(
-        "📝 <b>Описание</b>\n\n"
-        "Добавьте описание блогера (необязательно):\n\n"
-        "Можно указать:\n"
-        "• Особенности контента\n"
-        "• Стиль подачи\n"
-        "• Дополнительную информацию\n\n"
-        "Или отправьте 'пропустить' для пропуска этого шага.",
+        "📄 <b>Описание блогера</b>\n\n"
+        "Напишите краткое описание блогера (или напишите 'пропустить'):",
         parse_mode="HTML"
     )
     await state.set_state(SellerStates.waiting_for_blogger_description)
@@ -998,308 +683,126 @@ async def handle_blogger_description(message: Message, state: FSMContext):
         await state.clear()
 
 
-# === ОБРАБОТЧИКИ ПРОСМОТРА И РЕДАКТИРОВАНИЯ БЛОГЕРОВ ===
+# === УПРАВЛЕНИЕ БЛОГЕРАМИ ===
 
-@router.callback_query(F.data.startswith("blogger_"))
-async def handle_blogger_selection(callback: CallbackQuery, state: FSMContext):
-    """Обработка выбора блогера"""
-    parts = callback.data.split("_")
-    blogger_id = int(parts[1])
-    action = parts[2] if len(parts) > 2 else "view"
+@router.message(F.text == "👥 Мои блогеры", StateFilter("*"))
+async def show_my_bloggers(message: Message, state: FSMContext):
+    """Показать список блогеров пользователя"""
+    await state.clear()
+    user = await get_user(message.from_user.id)
     
+    if not user:
+        await message.answer("❌ Пользователь не найден в базе данных.")
+        return
+    
+    bloggers = await get_user_bloggers(user.id)
+    
+    if not bloggers:
+        await message.answer(
+            "📝 <b>У вас пока нет блогеров</b>\n\n"
+            "Добавьте первого блогера с помощью кнопки '📝 Добавить блогера'",
+            parse_mode="HTML"
+        )
+        return
+    
+    for blogger in bloggers:
+        info_text = f"📝 <b>Блогер #{blogger.id}</b>\n\n"
+        info_text += format_full_blogger_info(blogger)
+        
+        await message.answer(
+            info_text,
+            reply_markup=get_blogger_management_keyboard(blogger.id),
+            parse_mode="HTML"
+        )
+
+
+@router.callback_query(F.data.startswith("edit_blogger_"))
+async def handle_edit_blogger(callback: CallbackQuery, state: FSMContext):
+    """Начало редактирования блогера"""
+    blogger_id = int(callback.data.split("_")[2])
     blogger = await get_blogger(blogger_id)
+    
     if not blogger:
         await callback.answer("❌ Блогер не найден")
         return
     
     user = await get_user(callback.from_user.id)
-    if not user or not user.has_role(UserRole.SELLER):
-        await callback.answer("❌ Доступ запрещен")
-        return
-    
-    # Проверяем, что блогер принадлежит пользователю
     if blogger.seller_id != user.id:
         await callback.answer("❌ Это не ваш блогер")
         return
     
-    if action == "edit":
-        await state.update_data(editing_blogger_id=blogger_id)
-        await state.set_state(SellerStates.editing_blogger)
-        
-        await callback.answer()
-        await callback.message.edit_text(
-            f"✏️ <b>Редактирование блогера</b>\n\n"
-            f"📝 <b>Имя:</b> {blogger.name}\n"
-            f"🔗 <b>Ссылка:</b> {blogger.url}\n\n"
-            f"Выберите, что хотите изменить:",
-            reply_markup=get_blogger_details_keyboard(blogger, action="edit"),
-            parse_mode="HTML"
-        )
-    else:
-        # Просмотр блогера
-        await callback.answer()
-        
-        # Формируем подробную информацию о блогере
-        info_text = f"📝 <b>Информация о блогере</b>\n\n"
-        info_text += f"👤 <b>Имя:</b> {blogger.name}\n"
-        info_text += f"🔗 <b>Ссылка:</b> {blogger.url}\n"
-        info_text += f"📱 <b>Платформы:</b> {blogger.get_platforms_summary()}\n\n"
-        
-        if blogger.subscribers_count:
-            info_text += f"📊 <b>Подписчиков:</b> {blogger.subscribers_count:,}\n"
-        if blogger.avg_views:
-            info_text += f"👁️ <b>Средние просмотры:</b> {blogger.avg_views:,}\n"
-        if blogger.avg_likes:
-            info_text += f"❤️ <b>Средние лайки:</b> {blogger.avg_likes:,}\n"
-        if blogger.engagement_rate:
-            info_text += f"📈 <b>Вовлеченность:</b> {blogger.engagement_rate:.1f}%\n"
-        
-        info_text += f"\n👥 <b>Демография:</b>\n"
-        info_text += f"• Возраст: {blogger.get_age_categories_summary()}\n"
-        info_text += f"• Пол: Женщины {blogger.female_percent}%, Мужчины {blogger.male_percent}%\n"
-        
-        info_text += f"\n🏷️ <b>Категории:</b> {', '.join([cat.get_russian_name() for cat in blogger.categories])}\n"
-        
-        info_text += f"\n💰 <b>Цены:</b>\n"
-        if blogger.price_stories:
-            info_text += f"• Истории: {blogger.price_stories:,}₽\n"
-        if blogger.price_post:
-            info_text += f"• Пост: {blogger.price_post:,}₽\n"
-        if blogger.price_video:
-            info_text += f"• Видео: {blogger.price_video:,}₽\n"
-        
-        info_text += f"\n📋 <b>Дополнительно:</b>\n"
-        info_text += f"• Отзывы: {'✅' if blogger.has_reviews else '❌'}\n"
-        info_text += f"• РКН: {'✅' if blogger.is_registered_rkn else '❌'}\n"
-        info_text += f"• Офиц. оплата: {'✅' if blogger.official_payment_possible else '❌'}\n"
-        
-        if blogger.description:
-            info_text += f"\n📝 <b>Описание:</b>\n{blogger.description}"
-        
-        await callback.message.edit_text(
-            info_text,
-            reply_markup=get_blogger_details_keyboard(blogger),
-            parse_mode="HTML"
-        )
+    await callback.answer()
+    
+    info_text = f"✏️ <b>Редактирование блогера</b>\n\n"
+    info_text += format_full_blogger_info(blogger)
+    info_text += f"\n\nВыберите, что хотите изменить:"
+    
+    await callback.message.edit_text(
+        info_text,
+        reply_markup=get_edit_blogger_keyboard(blogger.id),
+        parse_mode="HTML"
+    )
 
 
 @router.callback_query(F.data.startswith("delete_blogger_"))
 async def handle_delete_blogger(callback: CallbackQuery):
-    """Обработка удаления блогера"""
+    """Удаление блогера"""
     blogger_id = int(callback.data.split("_")[2])
+    blogger = await get_blogger(blogger_id)
     
-    user = await get_user(callback.from_user.id)
-    if not user or not user.has_role(UserRole.SELLER):
-        await callback.answer("❌ Доступ запрещен")
+    if not blogger:
+        await callback.answer("❌ Блогер не найден")
         return
     
-    success = await delete_blogger(blogger_id, user.id)
+    user = await get_user(callback.from_user.id)
+    if blogger.seller_id != user.id:
+        await callback.answer("❌ Это не ваш блогер")
+        return
+    
+    await callback.answer()
+    
+    await callback.message.edit_text(
+        f"❗ <b>Подтверждение удаления</b>\n\n"
+        f"Вы действительно хотите удалить блогера:\n"
+        f"<b>{blogger.name}</b> ({blogger.url})\n\n"
+        f"⚠️ <b>Это действие нельзя отменить!</b>",
+        reply_markup=get_delete_confirmation_keyboard(blogger.id),
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data.startswith("confirm_delete_"))
+async def handle_confirm_delete(callback: CallbackQuery):
+    """Подтверждение удаления блогера"""
+    blogger_id = int(callback.data.split("_")[2])
+    blogger = await get_blogger(blogger_id)
+    
+    if not blogger:
+        await callback.answer("❌ Блогер не найден")
+        return
+    
+    user = await get_user(callback.from_user.id)
+    if blogger.seller_id != user.id:
+        await callback.answer("❌ Это не ваш блогер")
+        return
+    
+    from database.database import delete_blogger
+    success = await delete_blogger(blogger_id)
     
     if success:
         await callback.answer("✅ Блогер удален")
         await callback.message.edit_text(
-            "✅ <b>Блогер успешно удален</b>\n\n"
-            "Блогер больше не будет отображаться в поиске.",
+            f"✅ <b>Блогер удален</b>\n\n"
+            f"Блогер <b>{blogger.name}</b> успешно удален из базы данных.",
             parse_mode="HTML"
         )
     else:
-        await callback.answer("❌ Ошибка при удалении")
+        await callback.answer("❌ Ошибка удаления")
         await callback.message.edit_text(
-            "❌ <b>Ошибка при удалении</b>\n\n"
-            "Не удалось удалить блогера.\n"
-            "Попробуйте еще раз или обратитесь в поддержку.",
+            "❌ <b>Ошибка</b>\n\n"
+            "Не удалось удалить блогера. Попробуйте еще раз.",
             parse_mode="HTML"
         )
-
-
-# === ОБРАБОТЧИКИ CALLBACK КНОПОК ===
-
-@router.callback_query(F.data == "add_blogger")
-async def callback_add_blogger(callback: CallbackQuery, state: FSMContext):
-    """Кнопка добавить еще блогера"""
-    await callback.answer()
-    await state.clear()
-    
-    user = await get_user(callback.from_user.id)
-    if not user or not user.has_role(UserRole.SELLER):
-        await callback.message.answer("❌ Эта функция доступна только продажникам.")
-        return
-    
-    await callback.message.delete()
-    await callback.message.answer(
-        f"🎯 <b>Шаг 1:</b> Выберите платформы\n\n"
-        f"Выбранные платформы: <b>Не выбрано</b>\n\n"
-        f"Выберите платформы для блогера:",
-        reply_markup=get_platform_keyboard(),
-        parse_mode="HTML"
-    )
-    await state.set_state(SellerStates.waiting_for_platforms)
-
-
-@router.callback_query(F.data == "my_bloggers")
-async def callback_my_bloggers(callback: CallbackQuery, state: FSMContext):
-    """Кнопка мои блогеры"""
-    await callback.answer()
-    await state.clear()
-    
-    user = await get_user(callback.from_user.id)
-    if not user or not user.has_role(UserRole.SELLER):
-        await callback.message.answer("❌ Эта функция доступна только продажникам.")
-        return
-    
-    await callback.message.delete()
-    
-    # Получаем блогеров пользователя
-    bloggers = await get_user_bloggers(user.id)
-    
-    if not bloggers:
-        await callback.message.answer(
-            "📋 <b>Ваши блогеры</b>\n\n"
-            "У вас пока нет добавленных блогеров.\n\n"
-            "Добавьте первого блогера с помощью кнопки \"📝 Добавить блогера\".",
-            parse_mode="HTML"
-        )
-        return
-    
-    await callback.message.answer(
-        f"📋 <b>Ваши блогеры ({len(bloggers)})</b>\n\n"
-        "Выберите блогера для просмотра или редактирования:",
-        reply_markup=get_blogger_list_keyboard(bloggers, action="edit"),
-        parse_mode="HTML"
-    )
-
-
-@router.callback_query(F.data.startswith("edit_blogger_"))
-async def handle_blogger_edit(callback: CallbackQuery, state: FSMContext):
-    """Обработка кнопки редактирования блогера - показ полной информации с вариантами редактирования"""
-    blogger_id = int(callback.data.split("_")[2])
-    
-    blogger = await get_blogger(blogger_id)
-    if not blogger:
-        await callback.answer("❌ Блогер не найден")
-        return
-    
-    user = await get_user(callback.from_user.id)
-    if not user or not user.has_role(UserRole.SELLER):
-        await callback.answer("❌ Доступ запрещен")
-        return
-    
-    # Проверяем, что блогер принадлежит пользователю
-    if blogger.seller_id != user.id:
-        await callback.answer("❌ Это не ваш блогер")
-        return
-    
-    await callback.answer()
-    
-    # Формируем полную информацию о блогере
-    info_text = "✏️ <b>РЕДАКТИРОВАНИЕ БЛОГЕРА</b>\n\n"
-    info_text += format_full_blogger_info(blogger)
-    info_text += "\n🔽 <b>Выберите что хотите изменить:</b>"
-    
-    # Создаем клавиатуру для выбора что редактировать
-    edit_keyboard = [
-        [
-            InlineKeyboardButton(text="📝 Имя", callback_data=f"edit_field_name_{blogger_id}"),
-            InlineKeyboardButton(text="🔗 Ссылка", callback_data=f"edit_field_url_{blogger_id}")
-        ],
-        [
-            InlineKeyboardButton(text="📱 Платформы", callback_data=f"edit_field_platforms_{blogger_id}"),
-            InlineKeyboardButton(text="🏷️ Категории", callback_data=f"edit_field_categories_{blogger_id}")
-        ],
-        [
-            InlineKeyboardButton(text="👥 Подписчики", callback_data=f"edit_field_subscribers_{blogger_id}"),
-            InlineKeyboardButton(text="👁️ Просмотры", callback_data=f"edit_field_views_{blogger_id}")
-        ],
-        [
-            InlineKeyboardButton(text="👫 Демография", callback_data=f"edit_field_demo_{blogger_id}"),
-            InlineKeyboardButton(text="💰 Цены", callback_data=f"edit_field_prices_{blogger_id}")
-        ],
-        [
-            InlineKeyboardButton(text="📋 Доп.инфо", callback_data=f"edit_field_additional_{blogger_id}"),
-            InlineKeyboardButton(text="📄 Описание", callback_data=f"edit_field_description_{blogger_id}")
-        ],
-        [
-            InlineKeyboardButton(text="🗑️ Удалить блогера", callback_data=f"delete_blogger_{blogger_id}")
-        ],
-        [
-            InlineKeyboardButton(text="↩️ Назад к блогеру", callback_data=f"view_blogger_{blogger_id}"),
-            InlineKeyboardButton(text="🏠 Главное меню", callback_data="main_menu")
-        ]
-    ]
-    
-    from aiogram.types import InlineKeyboardMarkup
-    keyboard = InlineKeyboardMarkup(inline_keyboard=edit_keyboard)
-    
-    await callback.message.edit_text(
-        info_text,
-        reply_markup=keyboard,
-        parse_mode="HTML"
-    )
-
-
-@router.callback_query(F.data.startswith("view_blogger_"))
-async def handle_view_blogger(callback: CallbackQuery, state: FSMContext):
-    """Просмотр блогера (кнопка 👀 Посмотреть)"""
-    blogger_id = int(callback.data.split("_")[2])
-    
-    blogger = await get_blogger(blogger_id)
-    if not blogger:
-        await callback.answer("❌ Блогер не найден")
-        return
-    
-    user = await get_user(callback.from_user.id)
-    if not user or not user.has_role(UserRole.SELLER):
-        await callback.answer("❌ Доступ запрещен")
-        return
-    
-    # Проверяем, что блогер принадлежит пользователю
-    if blogger.seller_id != user.id:
-        await callback.answer("❌ Это не ваш блогер")
-        return
-    
-    await callback.answer()
-    
-    # Показываем полную информацию
-    info_text = "👀 <b>ПРОСМОТР БЛОГЕРА</b>\n\n"
-    info_text += format_full_blogger_info(blogger)
-    
-    # Создаем клавиатуру для действий
-    view_keyboard = [
-        [
-            InlineKeyboardButton(text="✏️ Редактировать", callback_data=f"edit_blogger_{blogger_id}"),
-            InlineKeyboardButton(text="🗑️ Удалить", callback_data=f"delete_blogger_{blogger_id}")
-        ],
-        [
-            InlineKeyboardButton(text="📋 Мои блогеры", callback_data="my_bloggers"),
-            InlineKeyboardButton(text="🏠 Главное меню", callback_data="main_menu")
-        ]
-    ]
-    
-    from aiogram.types import InlineKeyboardMarkup
-    keyboard = InlineKeyboardMarkup(inline_keyboard=view_keyboard)
-    
-    await callback.message.edit_text(
-        info_text,
-        reply_markup=keyboard,
-        parse_mode="HTML"
-    )
-
-
-@router.callback_query(F.data == "main_menu")
-async def callback_main_menu(callback: CallbackQuery, state: FSMContext):
-    """Кнопка главное меню"""
-    await callback.answer()
-    await state.clear()
-    
-    user = await get_user(callback.from_user.id)
-    if not user:
-        await callback.message.answer("❌ Пользователь не найден. Используйте /start")
-        return
-    
-    await callback.message.delete()
-    
-    from handlers.common import show_main_menu
-    await show_main_menu(callback.message, user)
 
 
 def format_full_blogger_info(blogger) -> str:
