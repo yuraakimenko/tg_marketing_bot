@@ -410,6 +410,9 @@ def get_blogger_edit_field_keyboard(blogger_id: int) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="📄 Описание", callback_data=f"edit_field_description_{blogger_id}")
         ],
         [
+            InlineKeyboardButton(text="📊 Фото статистики", callback_data=f"edit_field_stats_photos_{blogger_id}")
+        ],
+        [
             InlineKeyboardButton(text="✅ Готово", callback_data="edit_blogger_done")
         ]
     ])
@@ -427,6 +430,24 @@ def get_blogger_success_keyboard_enhanced(blogger_id: int) -> InlineKeyboardMark
         ],
         [
             InlineKeyboardButton(text="🏠 Главное меню", callback_data="main_menu")
+        ]
+    ])
+
+
+def get_edit_blogger_keyboard(blogger_id: int) -> InlineKeyboardMarkup:
+    """Клавиатура для редактирования блогера"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✏️ Изменить поля", callback_data=f"edit_blogger_fields_{blogger_id}")
+        ],
+        [
+            InlineKeyboardButton(text="📊 Посмотреть фото статистики", callback_data=f"view_stats_photos_{blogger_id}")
+        ],
+        [
+            InlineKeyboardButton(text="🗑 Удалить", callback_data=f"delete_blogger_{blogger_id}")
+        ],
+        [
+            InlineKeyboardButton(text="⬅️ Назад", callback_data="show_my_bloggers")
         ]
     ])
 

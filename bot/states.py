@@ -34,6 +34,9 @@ class SellerStates(StatesGroup):
     # Цена рилс
     waiting_for_price_reels = State()  # Цена за рилс
     
+    # Статистика - фото пруфы
+    waiting_for_stats_photos = State()  # Загрузка фото статистики
+    
     # Описание
     waiting_for_blogger_description = State()  # Описание блогера
     

@@ -3,6 +3,7 @@ from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from database.database import (
     get_user, create_blogger, get_user_bloggers, 
@@ -20,9 +21,11 @@ from bot.keyboards import (
     get_blogger_addition_navigation_first_step,
     get_blogger_edit_field_keyboard,
     get_blogger_success_keyboard_enhanced,
-    get_delete_confirmation_keyboard
+    get_delete_confirmation_keyboard,
+    get_edit_blogger_keyboard
 )
 from bot.states import SellerStates
+from typing import Union
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -537,12 +540,135 @@ async def handle_price_reels(message: Message, state: FSMContext):
     await state.update_data(price_reels=price)
     
     await message.answer(
+        "📊 <b>Статистика профиля</b>\n\n"
+        "Загрузите скриншоты статистики вашего блога (охваты, аудитория и т.д.).\n"
+        "Вы можете отправить несколько фото.\n\n"
+        "Когда закончите, нажмите кнопку 'Готово' или напишите 'готово':",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Готово", callback_data="stats_photos_done")],
+            [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_price_reels")]
+        ]),
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_stats_photos)
+
+
+@router.message(SellerStates.waiting_for_stats_photos, F.photo)
+async def handle_stats_photo(message: Message, state: FSMContext):
+    """Обработка загрузки фото статистики"""
+    data = await state.get_data()
+    stats_photos = data.get('stats_photos', [])
+    
+    # Получаем file_id самого большого размера фото
+    photo = message.photo[-1]
+    stats_photos.append(photo.file_id)
+    
+    await state.update_data(stats_photos=stats_photos)
+    
+    # Проверяем, редактируем ли мы существующего блогера
+    if 'editing_blogger_id' in data:
+        blogger_id = data['editing_blogger_id']
+        await message.answer(
+            f"✅ Фото добавлено (всего: {len(stats_photos)})\n\n"
+            "Отправьте еще фото или нажмите 'Готово':",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="✅ Готово", callback_data="edit_stats_photos_done")],
+                [InlineKeyboardButton(text="❌ Отмена", callback_data=f"edit_blogger_fields_{blogger_id}")]
+            ])
+        )
+    else:
+        # Это добавление нового блогера
+        await message.answer(
+            f"✅ Фото добавлено (всего: {len(stats_photos)})\n\n"
+            "Отправьте еще фото или нажмите 'Готово':",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="✅ Готово", callback_data="stats_photos_done")],
+                [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_price_reels")]
+            ])
+        )
+
+
+@router.message(SellerStates.waiting_for_stats_photos, F.text.lower() == "готово")
+@router.callback_query(F.data == "stats_photos_done", SellerStates.waiting_for_stats_photos)
+async def finish_stats_photos(update: Union[Message, CallbackQuery], state: FSMContext):
+    """Завершение загрузки фото статистики"""
+    if isinstance(update, CallbackQuery):
+        await update.answer()
+        message = update.message
+    else:
+        message = update
+    
+    data = await state.get_data()
+    stats_photos = data.get('stats_photos', [])
+    
+    if not stats_photos:
+        text = "⚠️ Вы не загрузили ни одного фото статистики.\n\nПродолжить без фото?"
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Продолжить", callback_data="continue_without_stats")],
+            [InlineKeyboardButton(text="📷 Загрузить фото", callback_data="back_to_stats_upload")]
+        ])
+    else:
+        text = f"✅ Загружено {len(stats_photos)} фото статистики.\n\nПродолжаем!"
+        keyboard = None
+    
+    if isinstance(update, CallbackQuery):
+        await message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+    else:
+        await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
+    
+    if stats_photos:
+        # Переходим к категориям
+        await message.answer(
+            "🏷️ <b>Категории блога</b>\n\n"
+            "Выберите категории (максимум 3):",
+            reply_markup=get_category_keyboard(with_navigation=True),
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_categories)
+
+
+@router.callback_query(F.data == "continue_without_stats", SellerStates.waiting_for_stats_photos)
+async def continue_without_stats(callback: CallbackQuery, state: FSMContext):
+    """Продолжить без фото статистики"""
+    await callback.answer()
+    
+    await callback.message.edit_text(
         "🏷️ <b>Категории блога</b>\n\n"
         "Выберите категории (максимум 3):",
         reply_markup=get_category_keyboard(with_navigation=True),
         parse_mode="HTML"
     )
     await state.set_state(SellerStates.waiting_for_categories)
+
+
+@router.callback_query(F.data == "back_to_stats_upload", SellerStates.waiting_for_stats_photos)
+async def back_to_stats_upload(callback: CallbackQuery):
+    """Вернуться к загрузке фото"""
+    await callback.answer()
+    await callback.message.edit_text(
+        "📊 <b>Статистика профиля</b>\n\n"
+        "Загрузите скриншоты статистики вашего блога (охваты, аудитория и т.д.).\n"
+        "Вы можете отправить несколько фото.\n\n"
+        "Когда закончите, нажмите кнопку 'Готово' или напишите 'готово':",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Готово", callback_data="stats_photos_done")],
+            [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_price_reels")]
+        ]),
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data == "back_to_price_reels")
+async def back_to_price_reels(callback: CallbackQuery, state: FSMContext):
+    """Вернуться к вводу цены рилс"""
+    await callback.answer()
+    await callback.message.edit_text(
+        "💸 <b>Цена за рилс</b>\n\n"
+        "Укажите цену за один рилс в рублях:",
+        reply_markup=get_blogger_addition_navigation_with_back(),
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_price_reels)
 
 
 @router.callback_query(F.data.startswith("category_"), SellerStates.waiting_for_categories)
@@ -675,6 +801,7 @@ async def handle_blogger_description(message: Message, state: FSMContext):
             stories_reach_max=data.get('stories_reach_max'),
             reels_reach_min=data.get('reels_reach_min'),
             reels_reach_max=data.get('reels_reach_max'),
+            stats_images=data.get('stats_photos', []),
             description=description
         )
         
@@ -881,7 +1008,11 @@ async def handle_confirm_delete(callback: CallbackQuery):
 def format_full_blogger_info(blogger) -> str:
     """Формирование информации о блогере согласно новому ТЗ"""
     info_text = f"👤 <b>Имя:</b> {blogger.name}\n"
-    info_text += f"🔗 <b>Чистая ссылка:</b> {blogger.url}\n"
+    
+    # Определяем текст для ссылки в зависимости от количества URL (если несколько разделены запятой)
+    urls = blogger.url.split(',') if ',' in blogger.url else [blogger.url]
+    link_text = "Ссылки на соцсети" if len(urls) > 1 else "Ссылка на соцсети"
+    info_text += f"🔗 <b>{link_text}:</b> {blogger.url}\n"
     
     # ===== ПОДПИСЧИКИ =====
     if blogger.subscribers_count:
@@ -890,7 +1021,10 @@ def format_full_blogger_info(blogger) -> str:
         info_text += f"👥 <b>Подписчики:</b> <i>не указано</i>\n"
     
     # ===== СТАТИСТИКА ПРОФИЛЯ =====
-    info_text += f"\n📊 <b>Статистика профиля:</b> <i>фотки должны быть</i>\n"
+    if blogger.stats_images and len(blogger.stats_images) > 0:
+        info_text += f"\n📊 <b>Статистика профиля:</b> <i>фото загружены ({len(blogger.stats_images)} шт.)</i>\n"
+    else:
+        info_text += f"\n📊 <b>Статистика профиля:</b> <i>фото не загружены</i>\n"
     
     # ===== ОХВАТ СТОРИС (ВИЛКА) =====
     if blogger.stories_reach_min and blogger.stories_reach_max:
@@ -1134,13 +1268,127 @@ async def handle_edit_blogger_fields(callback: CallbackQuery, state: FSMContext)
 @router.callback_query(F.data == "edit_blogger_done")
 async def handle_edit_blogger_done(callback: CallbackQuery):
     """Завершение редактирования блогера"""
+    await callback.answer("✅ Редактирование завершено")
+    await callback.message.delete()
+
+
+@router.callback_query(F.data.startswith("view_stats_photos_"))
+async def handle_view_stats_photos(callback: CallbackQuery):
+    """Просмотр фото статистики блогера"""
+    blogger_id = int(callback.data.split("_")[3])
+    blogger = await get_blogger(blogger_id)
+    
+    if not blogger:
+        await callback.answer("❌ Блогер не найден")
+        return
+    
     await callback.answer()
     
-    await callback.message.edit_text(
-        "✅ <b>Редактирование завершено</b>\n\n"
-        "Изменения сохранены успешно!",
+    if not blogger.stats_images or len(blogger.stats_images) == 0:
+        await callback.message.answer(
+            "📊 <b>Статистика профиля</b>\n\n"
+            "У этого блогера нет загруженных фото статистики.",
+            parse_mode="HTML"
+        )
+        return
+    
+    # Отправляем фото статистики
+    await callback.message.answer(
+        f"📊 <b>Статистика профиля блогера {blogger.name}</b>\n\n"
+        f"Всего фото: {len(blogger.stats_images)}",
         parse_mode="HTML"
     )
+    
+    # Отправляем каждое фото
+    for i, photo_id in enumerate(blogger.stats_images, 1):
+        try:
+            await callback.message.answer_photo(
+                photo=photo_id,
+                caption=f"Фото {i} из {len(blogger.stats_images)}"
+            )
+        except Exception as e:
+            logger.error(f"Ошибка при отправке фото статистики: {e}")
+            await callback.message.answer(f"❌ Не удалось загрузить фото {i}")
+
+
+@router.callback_query(F.data.startswith("edit_field_stats_photos_"))
+async def handle_edit_stats_photos(callback: CallbackQuery, state: FSMContext):
+    """Редактирование фото статистики"""
+    blogger_id = int(callback.data.split("_")[4])
+    blogger = await get_blogger(blogger_id)
+    
+    if not blogger:
+        await callback.answer("❌ Блогер не найден")
+        return
+    
+    await callback.answer()
+    
+    # Сохраняем ID блогера для обновления
+    await state.update_data(editing_blogger_id=blogger_id, stats_photos=[])
+    
+    text = "📊 <b>Редактирование фото статистики</b>\n\n"
+    if blogger.stats_images and len(blogger.stats_images) > 0:
+        text += f"Текущие фото: {len(blogger.stats_images)} шт.\n\n"
+        text += "⚠️ Загрузка новых фото заменит все существующие!\n\n"
+    
+    text += "Загрузите новые скриншоты статистики.\n"
+    text += "Когда закончите, нажмите кнопку 'Готово':"
+    
+    await callback.message.edit_text(
+        text,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Готово", callback_data="edit_stats_photos_done")],
+            [InlineKeyboardButton(text="❌ Отмена", callback_data=f"edit_blogger_fields_{blogger_id}")]
+        ]),
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_stats_photos)
+
+
+@router.callback_query(F.data == "edit_stats_photos_done")
+async def finish_edit_stats_photos(callback: CallbackQuery, state: FSMContext):
+    """Завершение редактирования фото статистики"""
+    await callback.answer()
+    
+    data = await state.get_data()
+    blogger_id = data.get('editing_blogger_id')
+    stats_photos = data.get('stats_photos', [])
+    
+    if not blogger_id:
+        await callback.message.edit_text("❌ Ошибка: не найден ID блогера")
+        return
+    
+    # Обновляем блогера
+    success = await update_blogger(blogger_id, stats_images=stats_photos)
+    
+    if success:
+        await callback.message.edit_text(
+            f"✅ <b>Фото статистики обновлены!</b>\n\n"
+            f"Загружено фото: {len(stats_photos)}",
+            parse_mode="HTML"
+        )
+        
+        # Очищаем состояние
+        await state.clear()
+        
+        # Показываем обновленную информацию о блогере
+        blogger = await get_blogger(blogger_id)
+        if blogger:
+            info_text = f"✏️ <b>Редактирование полей блогера</b>\n\n"
+            info_text += format_full_blogger_info(blogger)
+            info_text += f"\n\n<b>Выберите поле для редактирования:</b>"
+            
+            await callback.message.answer(
+                info_text,
+                reply_markup=get_blogger_edit_field_keyboard(blogger.id),
+                parse_mode="HTML"
+            )
+    else:
+        await callback.message.edit_text(
+            "❌ <b>Ошибка обновления</b>\n\n"
+            "Не удалось обновить фото статистики.",
+            parse_mode="HTML"
+        )
 
 
 @router.callback_query(F.data == "add_another_blogger")

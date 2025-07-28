@@ -603,9 +603,10 @@ async def create_blogger(
                 subscribers_count, 
                 stories_reach_min, stories_reach_max,
                 reels_reach_min, reels_reach_max,
+                stats_images,
                 description
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 seller_id,
@@ -620,6 +621,7 @@ async def create_blogger(
                 kwargs.get("stories_reach_max"),
                 kwargs.get("reels_reach_min"),
                 kwargs.get("reels_reach_max"),
+                json.dumps(kwargs.get("stats_images", [])),
                 kwargs.get("description"),
             ),
         )
