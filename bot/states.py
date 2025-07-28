@@ -8,31 +8,21 @@ class RegistrationStates(StatesGroup):
 
 class SellerStates(StatesGroup):
     """Состояния для продажника"""
-    # Добавление блогера (новый порядок)
-    waiting_for_platform = State()  # 1. Сначала соцсеть
-    waiting_for_blogger_url = State()  # 2. Потом ссылка
+    # Добавление блогера (упрощенный процесс)
+    waiting_for_platform = State()  # 1. Выбор платформ
+    waiting_for_blogger_url = State()  # 2. Ссылка на профиль
     waiting_for_blogger_name = State()  # 3. Имя блогера
     
     # Категории (максимум 3)
     waiting_for_categories = State()  # Выбор категорий
-    waiting_for_additional_category = State()  # Дополнительная категория
     
     # Статистика
     waiting_for_subscribers_count = State()  # Количество подписчиков
     
-    # Охваты сторис (вилка)
-    waiting_for_stories_reach_min = State()  # Минимальный охват сторис
-    waiting_for_stories_reach_max = State()  # Максимальный охват сторис
-    
-    # Цена за 4 истории
-    waiting_for_price_stories = State()  # Цена за 4 истории
-    
-    # Охваты рилс (вилка)
-    waiting_for_reels_reach_min = State()  # Минимальный охват рилс
-    waiting_for_reels_reach_max = State()  # Максимальный охват рилс
-    
-    # Цена рилс
-    waiting_for_price_reels = State()  # Цена за рилс
+    # Цены
+    waiting_for_price_stories = State()  # Цена за сторис
+    waiting_for_price_reels = State()  # Цена за пост/рилс
+    waiting_for_price_video = State()  # Цена за видео
     
     # Описание
     waiting_for_blogger_description = State()  # Описание блогера

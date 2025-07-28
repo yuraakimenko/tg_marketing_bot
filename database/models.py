@@ -138,19 +138,20 @@ class Blogger:
     categories: List[BlogCategory] = field(default_factory=list)  # Список категорий
     
     # Цены
-    price_stories: Optional[int] = None  # Цена за 4 истории
-    price_reels: Optional[int] = None  # Цена за рилс
+    price_stories: Optional[int] = None  # Цена за сторис
+    price_post: Optional[int] = None  # Цена за пост
+    price_video: Optional[int] = None  # Цена за видео
     
-    # Статистика (будет разной для разных платформ)
+    # Статистика
     subscribers_count: Optional[int] = None
+    avg_views: Optional[int] = None
+    avg_likes: Optional[int] = None
+    engagement_rate: Optional[float] = None
     
-    # Охваты сторис (вилка)
-    stories_reach_min: Optional[int] = None  # Минимальный охват сторис
-    stories_reach_max: Optional[int] = None  # Максимальный охват сторис
-    
-    # Охваты рилс (вилка)
-    reels_reach_min: Optional[int] = None  # Минимальный охват рилс
-    reels_reach_max: Optional[int] = None  # Максимальный охват рилс
+    # Дополнительные поля
+    has_reviews: bool = False
+    is_registered_rkn: bool = False
+    official_payment_possible: bool = False
 
     # Ссылки на изображения со статистикой
     stats_images: List[str] = field(default_factory=list)
@@ -159,39 +160,16 @@ class Blogger:
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
     
-    def validate_reach_ranges(self) -> bool:
-        """Проверка корректности диапазонов охватов"""
-        # Проверка диапазона сторис
-        if self.stories_reach_min is not None and self.stories_reach_max is not None:
-            if self.stories_reach_min > self.stories_reach_max:
-                return False
-        
-        # Проверка диапазона рилс
-        if self.reels_reach_min is not None and self.reels_reach_max is not None:
-            if self.reels_reach_min > self.reels_reach_max:
-                return False
-        
-        return True
-    
-    def get_stories_reach_summary(self) -> str:
-        """Получить сводку по охвату сторис"""
-        if self.stories_reach_min and self.stories_reach_max:
-            return f"{self.stories_reach_min:,} - {self.stories_reach_max:,}"
-        elif self.stories_reach_min or self.stories_reach_max:
-            reach = self.stories_reach_min or self.stories_reach_max
-            return f"~{reach:,}"
-        else:
-            return "Не указано"
-    
-    def get_reels_reach_summary(self) -> str:
-        """Получить сводку по охвату рилс"""
-        if self.reels_reach_min and self.reels_reach_max:
-            return f"{self.reels_reach_min:,} - {self.reels_reach_max:,}"
-        elif self.reels_reach_min or self.reels_reach_max:
-            reach = self.reels_reach_min or self.reels_reach_max
-            return f"~{reach:,}"
-        else:
-            return "Не указано"
+    def get_price_summary(self) -> str:
+        """Получить сводку по ценам"""
+        prices = []
+        if self.price_stories:
+            prices.append(f"Сторис: {self.price_stories:,} ₽")
+        if self.price_post:
+            prices.append(f"Пост: {self.price_post:,} ₽")
+        if self.price_video:
+            prices.append(f"Видео: {self.price_video:,} ₽")
+        return "\n".join(prices) if prices else "Не указано"
     
     def get_platforms_summary(self) -> str:
         """Получить сводку по платформам"""

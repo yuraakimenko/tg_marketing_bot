@@ -571,13 +571,11 @@ async def create_blogger(
             """
             INSERT INTO bloggers (
                 seller_id, name, url, platforms, categories,
-                price_stories, price_reels,
+                price_stories, price_post, price_video,
                 subscribers_count, 
-                stories_reach_min, stories_reach_max,
-                reels_reach_min, reels_reach_max,
                 description
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 seller_id,
@@ -586,12 +584,9 @@ async def create_blogger(
                 platforms_json,
                 categories_json,
                 kwargs.get("price_stories"),
-                kwargs.get("price_reels"),
+                kwargs.get("price_reels"),  # Маппим price_reels на price_post
+                kwargs.get("price_video"),
                 kwargs.get("subscribers_count"),
-                kwargs.get("stories_reach_min"),
-                kwargs.get("stories_reach_max"),
-                kwargs.get("reels_reach_min"),
-                kwargs.get("reels_reach_max"),
                 kwargs.get("description"),
             ),
         )
@@ -635,6 +630,14 @@ async def get_blogger(blogger_id: int) -> Optional[Blogger]:
                 except (json.JSONDecodeError, ValueError):
                     pass
             
+            # Парсим stats_images из JSON, если есть
+            stats_images = []
+            if row['stats_images']:
+                try:
+                    stats_images = json.loads(row['stats_images'])
+                except (json.JSONDecodeError, ValueError):
+                    pass
+            
             return Blogger(
                 id=row['id'],
                 seller_id=row['seller_id'],
@@ -642,13 +645,23 @@ async def get_blogger(blogger_id: int) -> Optional[Blogger]:
                 url=row['url'],
                 platforms=platforms,
                 categories=categories,
+                audience_13_17_percent=row['audience_13_17_percent'],
+                audience_18_24_percent=row['audience_18_24_percent'],
+                audience_25_35_percent=row['audience_25_35_percent'],
+                audience_35_plus_percent=row['audience_35_plus_percent'],
+                female_percent=row['female_percent'],
+                male_percent=row['male_percent'],
                 price_stories=row['price_stories'],
-                price_reels=row['price_reels'] if 'price_reels' in row.keys() else None,
+                price_post=row['price_post'],
+                price_video=row['price_video'],
+                has_reviews=bool(row['has_reviews'] or False),
+                is_registered_rkn=bool(row['is_registered_rkn'] or False),
+                official_payment_possible=bool(row['official_payment_possible'] or False),
                 subscribers_count=row['subscribers_count'],
-                stories_reach_min=row['stories_reach_min'] if 'stories_reach_min' in row.keys() else None,
-                stories_reach_max=row['stories_reach_max'] if 'stories_reach_max' in row.keys() else None,
-                reels_reach_min=row['reels_reach_min'] if 'reels_reach_min' in row.keys() else None,
-                reels_reach_max=row['reels_reach_max'] if 'reels_reach_max' in row.keys() else None,
+                avg_views=row['avg_views'],
+                avg_likes=row['avg_likes'],
+                engagement_rate=row['engagement_rate'],
+                stats_images=stats_images,
                 description=row['description'],
                 created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else datetime.now(),
                 updated_at=datetime.fromisoformat(row['updated_at']) if row['updated_at'] else datetime.now()
@@ -691,6 +704,14 @@ async def get_user_bloggers(seller_id: int) -> List[Blogger]:
                     except (KeyError, ValueError):
                         pass
 
+            # Парсим stats_images из JSON, если есть
+            stats_images = []
+            if row['stats_images']:
+                try:
+                    stats_images = json.loads(row['stats_images'])
+                except (json.JSONDecodeError, ValueError):
+                    pass
+
             bloggers.append(Blogger(
                 id=row['id'],
                 seller_id=row['seller_id'],
@@ -698,13 +719,23 @@ async def get_user_bloggers(seller_id: int) -> List[Blogger]:
                 url=row['url'],
                 platforms=platforms,
                 categories=categories,
+                audience_13_17_percent=row['audience_13_17_percent'],
+                audience_18_24_percent=row['audience_18_24_percent'],
+                audience_25_35_percent=row['audience_25_35_percent'],
+                audience_35_plus_percent=row['audience_35_plus_percent'],
+                female_percent=row['female_percent'],
+                male_percent=row['male_percent'],
                 price_stories=row['price_stories'],
-                price_reels=row['price_reels'] if 'price_reels' in row.keys() else None,
+                price_post=row['price_post'],
+                price_video=row['price_video'],
+                has_reviews=bool(row['has_reviews'] or False),
+                is_registered_rkn=bool(row['is_registered_rkn'] or False),
+                official_payment_possible=bool(row['official_payment_possible'] or False),
                 subscribers_count=row['subscribers_count'],
-                stories_reach_min=row['stories_reach_min'] if 'stories_reach_min' in row.keys() else None,
-                stories_reach_max=row['stories_reach_max'] if 'stories_reach_max' in row.keys() else None,
-                reels_reach_min=row['reels_reach_min'] if 'reels_reach_min' in row.keys() else None,
-                reels_reach_max=row['reels_reach_max'] if 'reels_reach_max' in row.keys() else None,
+                avg_views=row['avg_views'],
+                avg_likes=row['avg_likes'],
+                engagement_rate=row['engagement_rate'],
+                stats_images=stats_images,
                 description=row['description'],
                 created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else datetime.now(),
                 updated_at=datetime.fromisoformat(row['updated_at']) if row['updated_at'] else datetime.now()

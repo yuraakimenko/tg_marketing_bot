@@ -343,77 +343,8 @@ async def handle_subscribers_count(message: Message, state: FSMContext):
     await state.update_data(subscribers_count=count)
     
     await message.answer(
-        "📖 <b>Охват сторис</b>\n\n"
-        "Укажите МИНИМАЛЬНЫЙ охват сторис:\n\n"
-        "💡 <b>Важно:</b> Указывайте именно ОХВАТЫ, а не просмотры!",
-        reply_markup=get_blogger_addition_navigation_with_back(),
-        parse_mode="HTML"
-    )
-    await state.set_state(SellerStates.waiting_for_stories_reach_min)
-
-
-@router.message(SellerStates.waiting_for_stories_reach_min)
-async def handle_stories_reach_min(message: Message, state: FSMContext):
-    """Обработка ввода минимального охвата сторис"""
-    try:
-        reach = int(message.text.strip().replace(',', '').replace(' ', ''))
-        if reach < 0:
-            raise ValueError("Negative reach")
-    except ValueError:
-        await message.answer(
-            "❌ <b>Неверный формат</b>\n\n"
-            "Введите число минимального охвата сторис.\n"
-            "Попробуйте еще раз:",
-            parse_mode="HTML"
-        )
-        return
-    
-    await state.update_data(stories_reach_min=reach)
-    
-    await message.answer(
-        f"📖 <b>Охват сторис</b>\n\n"
-        f"Укажите МАКСИМАЛЬНЫЙ охват сторис:\n\n"
-        f"Уже указано: Минимальный охват: {reach:,}",
-        reply_markup=get_blogger_addition_navigation_with_back(),
-        parse_mode="HTML"
-    )
-    await state.set_state(SellerStates.waiting_for_stories_reach_max)
-
-
-@router.message(SellerStates.waiting_for_stories_reach_max)
-async def handle_stories_reach_max(message: Message, state: FSMContext):
-    """Обработка ввода максимального охвата сторис"""
-    try:
-        reach = int(message.text.strip().replace(',', '').replace(' ', ''))
-        if reach < 0:
-            raise ValueError("Negative reach")
-    except ValueError:
-        await message.answer(
-            "❌ <b>Неверный формат</b>\n\n"
-            "Введите число максимального охвата сторис.\n"
-            "Попробуйте еще раз:",
-            parse_mode="HTML"
-        )
-        return
-    
-    data = await state.get_data()
-    min_reach = data.get('stories_reach_min', 0)
-    
-    if reach < min_reach:
-        await message.answer(
-            f"❌ <b>Неверное значение</b>\n\n"
-            f"Максимальный охват не может быть меньше минимального.\n"
-            f"Минимальный охват: {min_reach:,}\n"
-            f"Попробуйте еще раз:",
-            parse_mode="HTML"
-        )
-        return
-    
-    await state.update_data(stories_reach_max=reach)
-    
-    await message.answer(
-        "💰 <b>Цена на 4 истории</b>\n\n"
-        "Укажите цену за 4 истории в рублях:",
+        "💰 <b>Цена сторис</b>\n\n"
+        "Укажите цену за сторис в рублях:",
         reply_markup=get_blogger_addition_navigation_with_back(),
         parse_mode="HTML"
     )
@@ -422,7 +353,7 @@ async def handle_stories_reach_max(message: Message, state: FSMContext):
 
 @router.message(SellerStates.waiting_for_price_stories)
 async def handle_price_stories(message: Message, state: FSMContext):
-    """Обработка ввода цены за 4 истории"""
+    """Обработка ввода цены за сторис"""
     try:
         price = int(message.text.strip().replace(',', '').replace(' ', ''))
         if price < 0:
@@ -437,75 +368,6 @@ async def handle_price_stories(message: Message, state: FSMContext):
         return
     
     await state.update_data(price_stories=price)
-    
-    await message.answer(
-        "🎬 <b>Охват рилс</b>\n\n"
-        "Укажите МИНИМАЛЬНЫЙ охват рилс:\n\n"
-        "💡 <b>Важно:</b> Указывайте именно ОХВАТЫ, а не просмотры!",
-        reply_markup=get_blogger_addition_navigation_with_back(),
-        parse_mode="HTML"
-    )
-    await state.set_state(SellerStates.waiting_for_reels_reach_min)
-
-
-@router.message(SellerStates.waiting_for_reels_reach_min)
-async def handle_reels_reach_min(message: Message, state: FSMContext):
-    """Обработка ввода минимального охвата рилс"""
-    try:
-        reach = int(message.text.strip().replace(',', '').replace(' ', ''))
-        if reach < 0:
-            raise ValueError("Negative reach")
-    except ValueError:
-        await message.answer(
-            "❌ <b>Неверный формат</b>\n\n"
-            "Введите число минимального охвата рилс.\n"
-            "Попробуйте еще раз:",
-            parse_mode="HTML"
-        )
-        return
-    
-    await state.update_data(reels_reach_min=reach)
-    
-    await message.answer(
-        f"🎬 <b>Охват рилс</b>\n\n"
-        f"Укажите МАКСИМАЛЬНЫЙ охват рилс:\n\n"
-        f"Уже указано: Минимальный охват: {reach:,}",
-        reply_markup=get_blogger_addition_navigation_with_back(),
-        parse_mode="HTML"
-    )
-    await state.set_state(SellerStates.waiting_for_reels_reach_max)
-
-
-@router.message(SellerStates.waiting_for_reels_reach_max)
-async def handle_reels_reach_max(message: Message, state: FSMContext):
-    """Обработка ввода максимального охвата рилс"""
-    try:
-        reach = int(message.text.strip().replace(',', '').replace(' ', ''))
-        if reach < 0:
-            raise ValueError("Negative reach")
-    except ValueError:
-        await message.answer(
-            "❌ <b>Неверный формат</b>\n\n"
-            "Введите число максимального охвата рилс.\n"
-            "Попробуйте еще раз:",
-            parse_mode="HTML"
-        )
-        return
-    
-    data = await state.get_data()
-    min_reach = data.get('reels_reach_min', 0)
-    
-    if reach < min_reach:
-        await message.answer(
-            f"❌ <b>Неверное значение</b>\n\n"
-            f"Максимальный охват не может быть меньше минимального.\n"
-            f"Минимальный охват: {min_reach:,}\n"
-            f"Попробуйте еще раз:",
-            parse_mode="HTML"
-        )
-        return
-    
-    await state.update_data(reels_reach_max=reach)
     
     await message.answer(
         "💸 <b>Цена рилс</b>\n\n"
@@ -533,6 +395,33 @@ async def handle_price_reels(message: Message, state: FSMContext):
         return
     
     await state.update_data(price_reels=price)
+    
+    await message.answer(
+        "🎬 <b>Цена видео</b>\n\n"
+        "Укажите цену за видео в рублях:",
+        reply_markup=get_blogger_addition_navigation_with_back(),
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_price_video)
+
+
+@router.message(SellerStates.waiting_for_price_video)
+async def handle_price_video(message: Message, state: FSMContext):
+    """Обработка ввода цены за видео"""
+    try:
+        price = int(message.text.strip().replace(',', '').replace(' ', ''))
+        if price < 0:
+            raise ValueError("Negative price")
+    except ValueError:
+        await message.answer(
+            "❌ <b>Неверный формат</b>\n\n"
+            "Введите цену в рублях (например: 15000).\n"
+            "Попробуйте еще раз:",
+            parse_mode="HTML"
+        )
+        return
+    
+    await state.update_data(price_video=price)
     
     await message.answer(
         "🏷️ <b>Категории блога</b>\n\n"
@@ -667,12 +556,9 @@ async def handle_blogger_description(message: Message, state: FSMContext):
             platforms=data['platforms'],
             categories=data['categories'],
             price_stories=data.get('price_stories'),
-            price_reels=data.get('price_reels'),
+            price_reels=data.get('price_reels'),  # Маппится на price_post
+            price_video=data.get('price_video'),
             subscribers_count=data.get('subscribers_count'),
-            stories_reach_min=data.get('stories_reach_min'),
-            stories_reach_max=data.get('stories_reach_max'),
-            reels_reach_min=data.get('reels_reach_min'),
-            reels_reach_max=data.get('reels_reach_max'),
             description=description
         )
         
@@ -825,48 +711,42 @@ async def handle_confirm_delete(callback: CallbackQuery):
 
 
 def format_full_blogger_info(blogger) -> str:
-    """Формирование информации о блогере согласно новому ТЗ"""
+    """Формирование информации о блогере"""
     info_text = f"👤 <b>Имя:</b> {blogger.name}\n"
-    info_text += f"🔗 <b>Чистая ссылка:</b> {blogger.url}\n"
+    info_text += f"🔗 <b>Ссылка:</b> {blogger.url}\n"
+    
+    # ===== ПЛАТФОРМЫ =====
+    if blogger.platforms:
+        platforms_text = ", ".join([p.value.title() for p in blogger.platforms])
+        info_text += f"📱 <b>Платформы:</b> {platforms_text}\n"
+    
+    # ===== КАТЕГОРИИ =====
+    if blogger.categories:
+        categories_text = ", ".join([cat.get_russian_name() for cat in blogger.categories])
+        info_text += f"🏷️ <b>Категории:</b> {categories_text}\n"
     
     # ===== ПОДПИСЧИКИ =====
     if blogger.subscribers_count:
         info_text += f"👥 <b>Подписчики:</b> {blogger.subscribers_count:,}\n"
-    else:
-        info_text += f"👥 <b>Подписчики:</b> <i>не указано</i>\n"
     
-    # ===== СТАТИСТИКА ПРОФИЛЯ =====
-    info_text += f"\n📊 <b>Статистика профиля:</b> <i>фотки должны быть</i>\n"
-    
-    # ===== ОХВАТ СТОРИС (ВИЛКА) =====
-    if blogger.stories_reach_min and blogger.stories_reach_max:
-        info_text += f"📖 <b>Средний охват сторис:</b> {blogger.stories_reach_min:,} - {blogger.stories_reach_max:,}\n"
-    elif blogger.stories_reach_min or blogger.stories_reach_max:
-        reach = blogger.stories_reach_min or blogger.stories_reach_max
-        info_text += f"📖 <b>Средний охват сторис:</b> ~{reach:,}\n"
-    else:
-        info_text += f"📖 <b>Средний охват сторис:</b> <i>не указано</i>\n"
-    
-    # ===== ЦЕНА НА 4 ИСТОРИИ =====
+    # ===== ЦЕНЫ =====
+    info_text += f"\n💰 <b>Цены:</b>\n"
     if blogger.price_stories:
-        info_text += f"💰 <b>Цена на 4 истории:</b> {blogger.price_stories:,}₽\n"
-    else:
-        info_text += f"💰 <b>Цена на 4 истории:</b> <i>не указано</i>\n"
+        info_text += f"• Сторис: {blogger.price_stories:,}₽\n"
+    if blogger.price_post:
+        info_text += f"• Пост: {blogger.price_post:,}₽\n" 
+    if blogger.price_video:
+        info_text += f"• Видео: {blogger.price_video:,}₽\n"
     
-    # ===== ОХВАТ РИЛС (ВИЛКА) =====
-    if blogger.reels_reach_min and blogger.reels_reach_max:
-        info_text += f"🎬 <b>Средний охват рилс:</b> {blogger.reels_reach_min:,} - {blogger.reels_reach_max:,}\n"
-    elif blogger.reels_reach_min or blogger.reels_reach_max:
-        reach = blogger.reels_reach_min or blogger.reels_reach_max
-        info_text += f"🎬 <b>Средний охват рилс:</b> ~{reach:,}\n"
-    else:
-        info_text += f"🎬 <b>Средний охват рилс:</b> <i>не указано</i>\n"
-    
-    # ===== ЦЕНА РИЛС =====
-    if blogger.price_reels:
-        info_text += f"💸 <b>Цена рилс:</b> {blogger.price_reels:,}₽\n"
-    else:
-        info_text += f"💸 <b>Цена рилс:</b> <i>не указано</i>\n"
+    # ===== СТАТИСТИКА =====
+    if blogger.avg_views or blogger.avg_likes or blogger.engagement_rate:
+        info_text += f"\n📊 <b>Статистика:</b>\n"
+        if blogger.avg_views:
+            info_text += f"• Просмотры: {blogger.avg_views:,}\n"
+        if blogger.avg_likes:
+            info_text += f"• Лайки: {blogger.avg_likes:,}\n"
+        if blogger.engagement_rate:
+            info_text += f"• Вовлеченность: {blogger.engagement_rate:.2f}%\n"
     
     # ===== ОПИСАНИЕ (если есть) =====
     if blogger.description and blogger.description.strip():
@@ -938,7 +818,7 @@ async def handle_blogger_back(callback: CallbackQuery, state: FSMContext):
         )
         await state.set_state(SellerStates.waiting_for_blogger_name)
         
-    elif current_state == SellerStates.waiting_for_stories_reach_min.state:
+    elif current_state == SellerStates.waiting_for_price_stories.state:
         # Возврат к вводу подписчиков
         await callback.message.edit_text(
             "📊 <b>Статистика блогера</b>\n\n"
@@ -948,71 +828,35 @@ async def handle_blogger_back(callback: CallbackQuery, state: FSMContext):
         )
         await state.set_state(SellerStates.waiting_for_subscribers_count)
         
-    elif current_state == SellerStates.waiting_for_stories_reach_max.state:
-        # Возврат к вводу минимального охвата сторис
-        await callback.message.edit_text(
-            "📖 <b>Охват сторис</b>\n\n"
-            "Укажите МИНИМАЛЬНЫЙ охват сторис:\n\n"
-            "💡 <b>Важно:</b> Указывайте именно ОХВАТЫ, а не просмотры!",
-            reply_markup=get_blogger_addition_navigation_with_back(),
-            parse_mode="HTML"
-        )
-        await state.set_state(SellerStates.waiting_for_stories_reach_min)
-        
-    elif current_state == SellerStates.waiting_for_price_stories.state:
-        # Возврат к вводу максимального охвата сторис
-        reach_min = data.get('stories_reach_min', 0)
-        await callback.message.edit_text(
-            f"📖 <b>Охват сторис</b>\n\n"
-            f"Укажите МАКСИМАЛЬНЫЙ охват сторис:\n\n"
-            f"Уже указано: Минимальный охват: {reach_min:,}",
-            reply_markup=get_blogger_addition_navigation_with_back(),
-            parse_mode="HTML"
-        )
-        await state.set_state(SellerStates.waiting_for_stories_reach_max)
-        
-    elif current_state == SellerStates.waiting_for_reels_reach_min.state:
+    elif current_state == SellerStates.waiting_for_price_reels.state:
         # Возврат к вводу цены сторис
         await callback.message.edit_text(
-            "💰 <b>Цена на 4 истории</b>\n\n"
-            "Укажите цену за 4 истории в рублях:",
+            "💰 <b>Цена сторис</b>\n\n"
+            "Укажите цену за сторис в рублях:",
             reply_markup=get_blogger_addition_navigation_with_back(),
             parse_mode="HTML"
         )
         await state.set_state(SellerStates.waiting_for_price_stories)
         
-    elif current_state == SellerStates.waiting_for_reels_reach_max.state:
-        # Возврат к вводу минимального охвата рилс
+    elif current_state == SellerStates.waiting_for_price_video.state:
+        # Возврат к вводу цены рилс/поста
         await callback.message.edit_text(
-            "🎬 <b>Охват рилс</b>\n\n"
-            "Укажите МИНИМАЛЬНЫЙ охват рилс:\n\n"
-            "💡 <b>Важно:</b> Указывайте именно ОХВАТЫ, а не просмотры!",
-            reply_markup=get_blogger_addition_navigation_with_back(),
-            parse_mode="HTML"
-        )
-        await state.set_state(SellerStates.waiting_for_reels_reach_min)
-        
-    elif current_state == SellerStates.waiting_for_price_reels.state:
-        # Возврат к вводу максимального охвата рилс
-        reach_min = data.get('reels_reach_min', 0)
-        await callback.message.edit_text(
-            f"🎬 <b>Охват рилс</b>\n\n"
-            f"Укажите МАКСИМАЛЬНЫЙ охват рилс:\n\n"
-            f"Уже указано: Минимальный охват: {reach_min:,}",
-            reply_markup=get_blogger_addition_navigation_with_back(),
-            parse_mode="HTML"
-        )
-        await state.set_state(SellerStates.waiting_for_reels_reach_max)
-        
-    elif current_state == SellerStates.waiting_for_categories.state:
-        # Возврат к вводу цены рилс
-        await callback.message.edit_text(
-            "💸 <b>Цена рилс</b>\n\n"
-            "Укажите цену за рилс в рублях:",
+            "💸 <b>Цена пост/рилс</b>\n\n"
+            "Укажите цену за пост/рилс в рублях:",
             reply_markup=get_blogger_addition_navigation_with_back(),
             parse_mode="HTML"
         )
         await state.set_state(SellerStates.waiting_for_price_reels)
+        
+    elif current_state == SellerStates.waiting_for_categories.state:
+        # Возврат к вводу цены видео
+        await callback.message.edit_text(
+            "🎬 <b>Цена видео</b>\n\n"
+            "Укажите цену за видео в рублях:",
+            reply_markup=get_blogger_addition_navigation_with_back(),
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_price_video)
         
     elif current_state == SellerStates.waiting_for_blogger_description.state:
         # Возврат к выбору категорий
