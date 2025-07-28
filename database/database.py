@@ -74,6 +74,13 @@ async def init_db():
                 price_stories INTEGER,
                 price_post INTEGER,
                 price_video INTEGER,
+                price_reels INTEGER,
+                
+                -- Охваты
+                stories_reach_min INTEGER,
+                stories_reach_max INTEGER,
+                reels_reach_min INTEGER,
+                reels_reach_max INTEGER,
                 
                 -- Дополнительная информация
                 has_reviews BOOLEAN DEFAULT FALSE,
@@ -294,6 +301,26 @@ async def init_db():
             if 'price_video' not in columns:
                 await db.execute("ALTER TABLE bloggers ADD COLUMN price_video INTEGER")
                 logger.info("Added price_video column to bloggers table")
+            
+            if 'price_reels' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN price_reels INTEGER")
+                logger.info("Added price_reels column to bloggers table")
+            
+            if 'stories_reach_min' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN stories_reach_min INTEGER")
+                logger.info("Added stories_reach_min column to bloggers table")
+            
+            if 'stories_reach_max' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN stories_reach_max INTEGER")
+                logger.info("Added stories_reach_max column to bloggers table")
+            
+            if 'reels_reach_min' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN reels_reach_min INTEGER")
+                logger.info("Added reels_reach_min column to bloggers table")
+            
+            if 'reels_reach_max' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN reels_reach_max INTEGER")
+                logger.info("Added reels_reach_max column to bloggers table")
             
             if 'has_reviews' not in columns:
                 await db.execute("ALTER TABLE bloggers ADD COLUMN has_reviews BOOLEAN DEFAULT FALSE")
@@ -571,13 +598,13 @@ async def create_blogger(
             """
             INSERT INTO bloggers (
                 seller_id, name, url, platforms, categories,
-                price_stories, price_reels,
+                price_stories, price_post, price_video, price_reels,
                 subscribers_count, 
                 stories_reach_min, stories_reach_max,
                 reels_reach_min, reels_reach_max,
                 description
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 seller_id,
@@ -586,6 +613,8 @@ async def create_blogger(
                 platforms_json,
                 categories_json,
                 kwargs.get("price_stories"),
+                kwargs.get("price_post"),
+                kwargs.get("price_video"),
                 kwargs.get("price_reels"),
                 kwargs.get("subscribers_count"),
                 kwargs.get("stories_reach_min"),
@@ -843,6 +872,11 @@ async def search_bloggers(platforms: List[str] = None, categories: List[str] = N
                     price_stories=row['price_stories'],
                     price_post=row['price_post'],
                     price_video=row['price_video'],
+                    price_reels=row['price_reels'] if 'price_reels' in row.keys() else None,
+                    stories_reach_min=row['stories_reach_min'] if 'stories_reach_min' in row.keys() else None,
+                    stories_reach_max=row['stories_reach_max'] if 'stories_reach_max' in row.keys() else None,
+                    reels_reach_min=row['reels_reach_min'] if 'reels_reach_min' in row.keys() else None,
+                    reels_reach_max=row['reels_reach_max'] if 'reels_reach_max' in row.keys() else None,
                     has_reviews=bool(row['has_reviews']),
                     is_registered_rkn=bool(row['is_registered_rkn']),
                     official_payment_possible=bool(row['official_payment_possible']),
