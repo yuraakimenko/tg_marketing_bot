@@ -74,17 +74,24 @@ async def init_db():
                 price_stories INTEGER,
                 price_post INTEGER,
                 price_video INTEGER,
-                
+                price_reels INTEGER,                -- Цена за рилс
+
                 -- Дополнительная информация
                 has_reviews BOOLEAN DEFAULT FALSE,
                 is_registered_rkn BOOLEAN DEFAULT FALSE,
                 official_payment_possible BOOLEAN DEFAULT FALSE,
-                
+
                 -- Статистика
                 subscribers_count INTEGER,
                 avg_views INTEGER,
                 avg_likes INTEGER,
                 engagement_rate REAL,
+
+                -- Охваты
+                stories_reach_min INTEGER,          -- Минимальный охват сторис
+                stories_reach_max INTEGER,          -- Максимальный охват сторис
+                reels_reach_min INTEGER,            -- Минимальный охват рилс
+                reels_reach_max INTEGER,            -- Максимальный охват рилс
 
                 -- Скриншоты/фотографии статистики (JSON массив путей или URL)
                 stats_images TEXT,
@@ -294,6 +301,27 @@ async def init_db():
             if 'price_video' not in columns:
                 await db.execute("ALTER TABLE bloggers ADD COLUMN price_video INTEGER")
                 logger.info("Added price_video column to bloggers table")
+
+            # New pricing and reach columns
+            if 'price_reels' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN price_reels INTEGER")
+                logger.info("Added price_reels column to bloggers table")
+
+            if 'stories_reach_min' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN stories_reach_min INTEGER")
+                logger.info("Added stories_reach_min column to bloggers table")
+
+            if 'stories_reach_max' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN stories_reach_max INTEGER")
+                logger.info("Added stories_reach_max column to bloggers table")
+
+            if 'reels_reach_min' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN reels_reach_min INTEGER")
+                logger.info("Added reels_reach_min column to bloggers table")
+
+            if 'reels_reach_max' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN reels_reach_max INTEGER")
+                logger.info("Added reels_reach_max column to bloggers table")
             
             if 'has_reviews' not in columns:
                 await db.execute("ALTER TABLE bloggers ADD COLUMN has_reviews BOOLEAN DEFAULT FALSE")
@@ -774,11 +802,11 @@ async def search_bloggers(platforms: List[str] = None, categories: List[str] = N
             if budget_min is not None or budget_max is not None:
                 budget_conditions = []
                 if budget_min is not None:
-                    budget_conditions.append("(b.price_stories >= ? OR b.price_post >= ? OR b.price_video >= ?)")
-                    params.extend([budget_min, budget_min, budget_min])
+                    budget_conditions.append("(b.price_stories >= ? OR b.price_post >= ? OR b.price_video >= ? OR b.price_reels >= ?)")
+                    params.extend([budget_min, budget_min, budget_min, budget_min])
                 if budget_max is not None:
-                    budget_conditions.append("(b.price_stories <= ? OR b.price_post <= ? OR b.price_video <= ?)")
-                    params.extend([budget_max, budget_max, budget_max])
+                    budget_conditions.append("(b.price_stories <= ? OR b.price_post <= ? OR b.price_video <= ? OR b.price_reels <= ?)")
+                    params.extend([budget_max, budget_max, budget_max, budget_max])
                 
                 if budget_conditions:
                     query += f" AND ({' OR '.join(budget_conditions)})"
@@ -843,6 +871,7 @@ async def search_bloggers(platforms: List[str] = None, categories: List[str] = N
                     price_stories=row['price_stories'],
                     price_post=row['price_post'],
                     price_video=row['price_video'],
+                    price_reels=row['price_reels'] if 'price_reels' in row.keys() else None,
                     has_reviews=bool(row['has_reviews']),
                     is_registered_rkn=bool(row['is_registered_rkn']),
                     official_payment_possible=bool(row['official_payment_possible']),
@@ -891,6 +920,8 @@ async def update_blogger(blogger_id: int, seller_id: int, **kwargs) -> bool:
     allowed_fields = [
         'name', 'url', 'platforms', 'categories',
         'price_stories', 'price_post', 'price_video',
+        'price_reels',
+        'stories_reach_min', 'stories_reach_max', 'reels_reach_min', 'reels_reach_max',
         'has_reviews', 'description', 'stats_images'
     ]
     
