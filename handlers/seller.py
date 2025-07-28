@@ -173,6 +173,17 @@ async def universal_edit_blogger(message: Message, state: FSMContext):
 
 # === ОБРАБОТЧИКИ ДОБАВЛЕНИЯ БЛОГЕРА ===
 
+@router.message(SellerStates.waiting_for_platform)
+async def handle_platform_state(message: Message, state: FSMContext):
+    """Обработка состояния waiting_for_platform - перенаправляем к выбору платформ"""
+    await message.answer(
+        "🎯 <b>Шаг 1:</b> Выберите платформы\n\n"
+        "Выберите платформы для блогера:",
+        reply_markup=get_platform_keyboard(with_navigation=True),
+        parse_mode="HTML"
+    )
+
+
 @router.callback_query(F.data.startswith("platform_"))
 async def handle_platform_selection(callback: CallbackQuery, state: FSMContext):
     """Обработка множественного выбора платформ"""
@@ -181,6 +192,14 @@ async def handle_platform_selection(callback: CallbackQuery, state: FSMContext):
     
     data = await state.get_data()
     platforms = data.get('platforms', [])
+    editing_blogger_id = data.get('editing_blogger_id')
+    
+    # Если это редактирование и платформы еще не инициализированы, загружаем текущие
+    if editing_blogger_id and not platforms:
+        blogger = await get_blogger(editing_blogger_id)
+        if blogger and blogger.platforms:
+            platforms = blogger.platforms.copy()
+            await state.update_data(platforms=platforms)
     
     if platform in platforms:
         # Убираем платформу
@@ -210,6 +229,7 @@ async def confirm_platforms(callback: CallbackQuery, state: FSMContext):
     """Подтверждение выбора платформ"""
     data = await state.get_data()
     platforms = data.get('platforms', [])
+    editing_blogger_id = data.get('editing_blogger_id')
     
     if not platforms:
         await callback.answer("❌ Выберите хотя бы одну платформу")
@@ -217,6 +237,38 @@ async def confirm_platforms(callback: CallbackQuery, state: FSMContext):
     
     await callback.answer()
     
+    # Если это редактирование существующего блогера
+    if editing_blogger_id:
+        from database.database import update_blogger
+        success = await update_blogger(editing_blogger_id, platforms=platforms)
+        
+        if success:
+            await callback.message.edit_text(
+                f"✅ <b>Платформы обновлены!</b>\n\n"
+                f"Платформы успешно изменены на: <b>{', '.join([p.value for p in platforms])}</b>",
+                parse_mode="HTML"
+            )
+            
+            # Показываем обновленную информацию о блогере
+            updated_blogger = await get_blogger(editing_blogger_id)
+            if updated_blogger:
+                info_text = f"✏️ <b>Редактирование полей блогера</b>\n\n"
+                info_text += format_full_blogger_info(updated_blogger)
+                info_text += f"\n\n<b>Выберите поле для редактирования:</b>"
+                
+                await send_blogger_info_with_photos(
+                    callback.message, 
+                    updated_blogger, 
+                    info_text, 
+                    get_blogger_edit_field_keyboard(editing_blogger_id)
+                )
+        else:
+            await callback.message.edit_text("❌ Ошибка при обновлении платформ")
+        
+        await state.clear()
+        return
+    
+    # Если это добавление нового блогера
     # Устанавливаем основную платформу для совместимости
     main_platform = platforms[0].value
     await state.update_data(platform=main_platform)
@@ -713,6 +765,14 @@ async def handle_category_selection(callback: CallbackQuery, state: FSMContext):
     
     data = await state.get_data()
     categories = data.get('categories', [])
+    editing_blogger_id = data.get('editing_blogger_id')
+    
+    # Если это редактирование и категории еще не инициализированы, загружаем текущие
+    if editing_blogger_id and not categories:
+        blogger = await get_blogger(editing_blogger_id)
+        if blogger and blogger.categories:
+            categories = blogger.categories.copy()
+            await state.update_data(categories=categories)
     
     if category in categories:
         # Убираем категорию
@@ -745,6 +805,7 @@ async def confirm_categories(callback: CallbackQuery, state: FSMContext):
     """Подтверждение выбора категорий"""
     data = await state.get_data()
     categories = data.get('categories', [])
+    editing_blogger_id = data.get('editing_blogger_id')
     
     if not categories:
         await callback.answer("❌ Выберите хотя бы одну категорию")
@@ -752,6 +813,38 @@ async def confirm_categories(callback: CallbackQuery, state: FSMContext):
     
     await callback.answer()
     
+    # Если это редактирование существующего блогера
+    if editing_blogger_id:
+        from database.database import update_blogger
+        success = await update_blogger(editing_blogger_id, categories=categories)
+        
+        if success:
+            await callback.message.edit_text(
+                f"✅ <b>Категории обновлены!</b>\n\n"
+                f"Категории успешно изменены на: <b>{', '.join([cat.get_russian_name() for cat in categories])}</b>",
+                parse_mode="HTML"
+            )
+            
+            # Показываем обновленную информацию о блогере
+            updated_blogger = await get_blogger(editing_blogger_id)
+            if updated_blogger:
+                info_text = f"✏️ <b>Редактирование полей блогера</b>\n\n"
+                info_text += format_full_blogger_info(updated_blogger)
+                info_text += f"\n\n<b>Выберите поле для редактирования:</b>"
+                
+                await send_blogger_info_with_photos(
+                    callback.message, 
+                    updated_blogger, 
+                    info_text, 
+                    get_blogger_edit_field_keyboard(editing_blogger_id)
+                )
+        else:
+            await callback.message.edit_text("❌ Ошибка при обновлении категорий")
+        
+        await state.clear()
+        return
+    
+    # Если это добавление нового блогера
     await callback.message.edit_text(
         "📄 <b>Описание блогера</b>\n\n"
         "Напишите краткое описание блогера (или напишите 'пропустить'):",
@@ -1305,8 +1398,52 @@ async def handle_blogger_back(callback: CallbackQuery, state: FSMContext):
         )
         await state.set_state(SellerStates.waiting_for_reels_reach_max)
         
+    elif current_state == SellerStates.waiting_for_platform.state:
+        # Проверяем, это редактирование или добавление
+        editing_blogger_id = data.get('editing_blogger_id')
+        
+        if editing_blogger_id:
+            # Если это редактирование, возвращаемся к меню редактирования полей
+            blogger = await get_blogger(editing_blogger_id)
+            if blogger:
+                info_text = f"✏️ <b>Редактирование полей блогера</b>\n\n"
+                info_text += format_full_blogger_info(blogger)
+                info_text += f"\n\n<b>Выберите поле для редактирования:</b>"
+                
+                await send_blogger_info_with_photos(
+                    callback.message, 
+                    blogger, 
+                    info_text, 
+                    get_blogger_edit_field_keyboard(editing_blogger_id)
+                )
+                await state.clear()
+                return
+        
+        # Если это добавление нового блогера, отменяем (нет предыдущего шага)
+        await handle_blogger_cancel(callback, state)
+        
     elif current_state == SellerStates.waiting_for_categories.state:
-        # Возврат к вводу цены рилс
+        # Проверяем, это редактирование или добавление
+        editing_blogger_id = data.get('editing_blogger_id')
+        
+        if editing_blogger_id:
+            # Если это редактирование, возвращаемся к меню редактирования полей
+            blogger = await get_blogger(editing_blogger_id)
+            if blogger:
+                info_text = f"✏️ <b>Редактирование полей блогера</b>\n\n"
+                info_text += format_full_blogger_info(blogger)
+                info_text += f"\n\n<b>Выберите поле для редактирования:</b>"
+                
+                await send_blogger_info_with_photos(
+                    callback.message, 
+                    blogger, 
+                    info_text, 
+                    get_blogger_edit_field_keyboard(editing_blogger_id)
+                )
+                await state.clear()
+                return
+        
+        # Если это добавление нового блогера, возвращаемся к вводу цены рилс
         await callback.message.edit_text(
             "💸 <b>Цена рилс</b>\n\n"
             "Укажите цену за рилс в рублях:",
@@ -1653,9 +1790,12 @@ async def handle_edit_field_platforms(callback: CallbackQuery, state: FSMContext
     await callback.answer()
     await state.update_data(editing_blogger_id=blogger_id, editing_field="platforms")
     
+    # Правильно отображаем текущие платформы
+    current_platforms_text = ", ".join([p.value for p in blogger.platforms]) if blogger.platforms else "Не выбрано"
+    
     await callback.message.edit_text(
         f"✏️ <b>Редактирование платформ</b>\n\n"
-        f"Текущие платформы: <b>{blogger.platforms}</b>\n\n"
+        f"Текущие платформы: <b>{current_platforms_text}</b>\n\n"
         f"Выберите новые платформы:",
         reply_markup=get_platform_keyboard(with_navigation=True),
         parse_mode="HTML"
@@ -1676,9 +1816,12 @@ async def handle_edit_field_categories(callback: CallbackQuery, state: FSMContex
     await callback.answer()
     await state.update_data(editing_blogger_id=blogger_id, editing_field="categories")
     
+    # Правильно отображаем текущие категории
+    current_categories_text = ", ".join([cat.get_russian_name() for cat in blogger.categories]) if blogger.categories else "Не выбрано"
+    
     await callback.message.edit_text(
         f"✏️ <b>Редактирование категорий</b>\n\n"
-        f"Текущие категории: <b>{blogger.categories}</b>\n\n"
+        f"Текущие категории: <b>{current_categories_text}</b>\n\n"
         f"Выберите новые категории (максимум 3):",
         reply_markup=get_category_keyboard(with_navigation=True),
         parse_mode="HTML"
