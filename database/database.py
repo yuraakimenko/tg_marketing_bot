@@ -621,7 +621,8 @@ async def get_blogger(blogger_id: int) -> Optional[Blogger]:
                 except (json.JSONDecodeError, ValueError):
                     # Fallback для старых данных с одной платформой
                     try:
-                        platforms = [Platform(row['platform'])] if row.get('platform') else []
+                        platform_value = row.get('platform') if hasattr(row, 'get') else row['platform']
+                        platforms = [Platform(platform_value)] if platform_value else []
                     except (ValueError, KeyError):
                         pass
             
@@ -642,12 +643,12 @@ async def get_blogger(blogger_id: int) -> Optional[Blogger]:
                 platforms=platforms,
                 categories=categories,
                 price_stories=row['price_stories'],
-                price_reels=row.get('price_reels'),
+                price_reels=row['price_reels'] if 'price_reels' in row.keys() else None,
                 subscribers_count=row['subscribers_count'],
-                stories_reach_min=row.get('stories_reach_min'),
-                stories_reach_max=row.get('stories_reach_max'),
-                reels_reach_min=row.get('reels_reach_min'),
-                reels_reach_max=row.get('reels_reach_max'),
+                stories_reach_min=row['stories_reach_min'] if 'stories_reach_min' in row.keys() else None,
+                stories_reach_max=row['stories_reach_max'] if 'stories_reach_max' in row.keys() else None,
+                reels_reach_min=row['reels_reach_min'] if 'reels_reach_min' in row.keys() else None,
+                reels_reach_max=row['reels_reach_max'] if 'reels_reach_max' in row.keys() else None,
                 description=row['description'],
                 created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else datetime.now(),
                 updated_at=datetime.fromisoformat(row['updated_at']) if row['updated_at'] else datetime.now()
@@ -685,7 +686,8 @@ async def get_user_bloggers(seller_id: int) -> List[Blogger]:
                 except (json.JSONDecodeError, ValueError):
                     # Обратная совместимость со старым полем platform
                     try:
-                        platforms = [Platform(row['platform'])] if row.get('platform') else []
+                        platform_value = row['platform'] if 'platform' in row.keys() else None
+                        platforms = [Platform(platform_value)] if platform_value else []
                     except (KeyError, ValueError):
                         pass
 
@@ -697,12 +699,12 @@ async def get_user_bloggers(seller_id: int) -> List[Blogger]:
                 platforms=platforms,
                 categories=categories,
                 price_stories=row['price_stories'],
-                price_reels=row.get('price_reels'),
+                price_reels=row['price_reels'] if 'price_reels' in row.keys() else None,
                 subscribers_count=row['subscribers_count'],
-                stories_reach_min=row.get('stories_reach_min'),
-                stories_reach_max=row.get('stories_reach_max'),
-                reels_reach_min=row.get('reels_reach_min'),
-                reels_reach_max=row.get('reels_reach_max'),
+                stories_reach_min=row['stories_reach_min'] if 'stories_reach_min' in row.keys() else None,
+                stories_reach_max=row['stories_reach_max'] if 'stories_reach_max' in row.keys() else None,
+                reels_reach_min=row['reels_reach_min'] if 'reels_reach_min' in row.keys() else None,
+                reels_reach_max=row['reels_reach_max'] if 'reels_reach_max' in row.keys() else None,
                 description=row['description'],
                 created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else datetime.now(),
                 updated_at=datetime.fromisoformat(row['updated_at']) if row['updated_at'] else datetime.now()

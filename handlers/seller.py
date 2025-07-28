@@ -628,6 +628,7 @@ async def handle_blogger_description(message: Message, state: FSMContext):
     for field in required_fields:
         if field not in data or not data[field]:
             missing_fields.append(field)
+            logger.error(f"Отсутствует поле: {field}, данные: {data.get(field)}")
     
     if missing_fields:
         logger.error(f"Отсутствуют обязательные поля: {missing_fields}")
@@ -642,6 +643,8 @@ async def handle_blogger_description(message: Message, state: FSMContext):
     
     try:
         logger.info(f"Создание блогера для пользователя {user.id} с данными: {data}")
+        logger.info(f"Платформы: {data.get('platforms')}, тип: {type(data.get('platforms'))}")
+        logger.info(f"Категории: {data.get('categories')}, тип: {type(data.get('categories'))}")
         
         blogger = await create_blogger(
             seller_id=user.id,
@@ -673,7 +676,9 @@ async def handle_blogger_description(message: Message, state: FSMContext):
         await state.clear()
         
     except Exception as e:
+        import traceback
         logger.error(f"Ошибка при создании блогера: {e}")
+        logger.error(f"Полный traceback: {traceback.format_exc()}")
         await message.answer(
             "❌ <b>Ошибка при создании блогера</b>\n\n"
             "Произошла ошибка при сохранении данных.\n"
