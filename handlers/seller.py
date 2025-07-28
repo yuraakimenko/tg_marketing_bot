@@ -1022,7 +1022,19 @@ def format_full_blogger_info(blogger) -> str:
     
     # ===== СТАТИСТИКА ПРОФИЛЯ =====
     if blogger.stats_images and len(blogger.stats_images) > 0:
-        info_text += f"\n📊 <b>Статистика профиля:</b> <i>фото загружены ({len(blogger.stats_images)} шт.)</i>\n"
+        # Добавляем проверку типа данных
+        if isinstance(blogger.stats_images, str):
+            try:
+                import json
+                stats_images_list = json.loads(blogger.stats_images)
+                if stats_images_list and len(stats_images_list) > 0:
+                    info_text += f"\n📊 <b>Статистика профиля:</b> <i>фото загружены ({len(stats_images_list)} шт.)</i>\n"
+                else:
+                    info_text += f"\n📊 <b>Статистика профиля:</b> <i>фото не загружены</i>\n"
+            except:
+                info_text += f"\n📊 <b>Статистика профиля:</b> <i>фото не загружены</i>\n"
+        else:
+            info_text += f"\n📊 <b>Статистика профиля:</b> <i>фото загружены ({len(blogger.stats_images)} шт.)</i>\n"
     else:
         info_text += f"\n📊 <b>Статистика профиля:</b> <i>фото не загружены</i>\n"
     
@@ -1284,7 +1296,16 @@ async def handle_view_stats_photos(callback: CallbackQuery):
     
     await callback.answer()
     
-    if not blogger.stats_images or len(blogger.stats_images) == 0:
+    # Проверяем и преобразуем stats_images если нужно
+    stats_images = blogger.stats_images
+    if isinstance(stats_images, str):
+        try:
+            import json
+            stats_images = json.loads(stats_images)
+        except:
+            stats_images = []
+    
+    if not stats_images or len(stats_images) == 0:
         await callback.message.answer(
             "📊 <b>Статистика профиля</b>\n\n"
             "У этого блогера нет загруженных фото статистики.",
@@ -1295,16 +1316,16 @@ async def handle_view_stats_photos(callback: CallbackQuery):
     # Отправляем фото статистики
     await callback.message.answer(
         f"📊 <b>Статистика профиля блогера {blogger.name}</b>\n\n"
-        f"Всего фото: {len(blogger.stats_images)}",
+        f"Всего фото: {len(stats_images)}",
         parse_mode="HTML"
     )
     
     # Отправляем каждое фото
-    for i, photo_id in enumerate(blogger.stats_images, 1):
+    for i, photo_id in enumerate(stats_images, 1):
         try:
             await callback.message.answer_photo(
                 photo=photo_id,
-                caption=f"Фото {i} из {len(blogger.stats_images)}"
+                caption=f"Фото {i} из {len(stats_images)}"
             )
         except Exception as e:
             logger.error(f"Ошибка при отправке фото статистики: {e}")
@@ -1326,9 +1347,18 @@ async def handle_edit_stats_photos(callback: CallbackQuery, state: FSMContext):
     # Сохраняем ID блогера для обновления
     await state.update_data(editing_blogger_id=blogger_id, stats_photos=[])
     
+    # Проверяем и преобразуем stats_images если нужно
+    stats_images = blogger.stats_images
+    if isinstance(stats_images, str):
+        try:
+            import json
+            stats_images = json.loads(stats_images)
+        except:
+            stats_images = []
+    
     text = "📊 <b>Редактирование фото статистики</b>\n\n"
-    if blogger.stats_images and len(blogger.stats_images) > 0:
-        text += f"Текущие фото: {len(blogger.stats_images)} шт.\n\n"
+    if stats_images and len(stats_images) > 0:
+        text += f"Текущие фото: {len(stats_images)} шт.\n\n"
         text += "⚠️ Загрузка новых фото заменит все существующие!\n\n"
     
     text += "Загрузите новые скриншоты статистики.\n"
@@ -1429,6 +1459,8 @@ async def handle_show_my_bloggers_callback(callback: CallbackQuery, state: FSMCo
         return
     
     # Удаляем исходное сообщение и отправляем новые
+    bot = callback.bot  # Сохраняем ссылку на бота
+    chat_id = callback.message.chat.id  # Сохраняем ID чата
     await callback.message.delete()
     
     for blogger in bloggers:
@@ -1444,7 +1476,8 @@ async def handle_show_my_bloggers_callback(callback: CallbackQuery, state: FSMCo
             ]
         ])
         
-        await callback.message.answer(
+        await bot.send_message(
+            chat_id,
             info_text,
             reply_markup=management_keyboard,
             parse_mode="HTML"
