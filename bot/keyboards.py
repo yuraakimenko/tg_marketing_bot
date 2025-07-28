@@ -438,4 +438,16 @@ def get_confirmation_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="✅ Да", callback_data="confirm_yes"),
             InlineKeyboardButton(text="❌ Нет", callback_data="confirm_no")
         ]
+    ])
+
+
+def get_delete_confirmation_keyboard(blogger_id: int) -> InlineKeyboardMarkup:
+    """Клавиатура подтверждения удаления блогера"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🗑️ Да, удалить", callback_data=f"confirm_delete_{blogger_id}")
+        ],
+        [
+            InlineKeyboardButton(text="❌ Отмена", callback_data="blogger_cancel")
+        ]
     ]) 

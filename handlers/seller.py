@@ -9,6 +9,7 @@ from database.database import (
     get_blogger, delete_blogger, update_blogger
 )
 from database.models import UserRole, SubscriptionStatus, Platform, BlogCategory
+from utils.google_sheets import log_blogger_action_to_sheets
 from bot.keyboards import (
     get_platform_keyboard, get_category_keyboard, 
     get_yes_no_keyboard, get_blogger_list_keyboard,
@@ -18,7 +19,8 @@ from bot.keyboards import (
     get_blogger_addition_navigation_with_back,
     get_blogger_addition_navigation_first_step,
     get_blogger_edit_field_keyboard,
-    get_blogger_success_keyboard_enhanced
+    get_blogger_success_keyboard_enhanced,
+    get_delete_confirmation_keyboard
 )
 from bot.states import SellerStates
 
@@ -687,6 +689,32 @@ async def handle_blogger_description(message: Message, state: FSMContext):
             parse_mode="HTML"
         )
         
+        # Логируем в Google Sheets
+        try:
+            user_data = {
+                'username': user.username,
+                'role': 'SELLER',
+                'telegram_id': user.telegram_id
+            }
+            
+            blogger_data = {
+                'name': blogger.name,
+                'url': blogger.url,
+                'platforms': blogger.platforms,
+                'categories': blogger.categories,
+                'subscribers_count': blogger.subscribers_count,
+                'price_stories': blogger.price_stories,
+                'price_reels': blogger.price_reels,
+                'audience_13_17_percent': blogger.audience_13_17_percent,
+                'audience_18_24_percent': blogger.audience_18_24_percent,
+                'audience_25_35_percent': blogger.audience_25_35_percent
+            }
+            
+            await log_blogger_action_to_sheets(user_data, blogger_data, "add")
+            logger.info(f"✅ Данные блогера {blogger.id} записаны в Google Sheets")
+        except Exception as e:
+            logger.error(f"❌ Ошибка при записи в Google Sheets: {e}")
+        
         await state.clear()
         
     except Exception as e:
@@ -809,6 +837,32 @@ async def handle_confirm_delete(callback: CallbackQuery):
     success = await delete_blogger(blogger_id)
     
     if success:
+        # Логируем удаление в Google Sheets
+        try:
+            user_data = {
+                'username': user.username,
+                'role': 'SELLER',
+                'telegram_id': user.telegram_id
+            }
+            
+            blogger_data = {
+                'name': blogger.name,
+                'url': blogger.url,
+                'platforms': blogger.platforms,
+                'categories': blogger.categories,
+                'subscribers_count': blogger.subscribers_count,
+                'price_stories': blogger.price_stories,
+                'price_reels': blogger.price_reels,
+                'audience_13_17_percent': blogger.audience_13_17_percent,
+                'audience_18_24_percent': blogger.audience_18_24_percent,
+                'audience_25_35_percent': blogger.audience_25_35_percent
+            }
+            
+            await log_blogger_action_to_sheets(user_data, blogger_data, "delete")
+            logger.info(f"✅ Удаление блогера {blogger.id} записано в Google Sheets")
+        except Exception as e:
+            logger.error(f"❌ Ошибка при записи удаления в Google Sheets: {e}")
+        
         await callback.answer("✅ Блогер удален")
         await callback.message.edit_text(
             f"✅ <b>Блогер удален</b>\n\n"
