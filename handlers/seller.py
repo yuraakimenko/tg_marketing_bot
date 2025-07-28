@@ -1439,7 +1439,7 @@ async def handle_view_stats_photos(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("edit_field_stats_photos_"))
 async def handle_edit_stats_photos(callback: CallbackQuery, state: FSMContext):
     """Редактирование фото статистики"""
-    blogger_id = int(callback.data.split("_")[4])
+    blogger_id = int(callback.data.split("_")[-1])
     blogger = await get_blogger(blogger_id)
     
     if not blogger:
@@ -1712,7 +1712,7 @@ async def handle_edit_field_subscribers(callback: CallbackQuery, state: FSMConte
 @router.callback_query(F.data.startswith("edit_field_stories_reach_"))
 async def handle_edit_field_stories_reach(callback: CallbackQuery, state: FSMContext):
     """Редактирование охвата сторис"""
-    blogger_id = int(callback.data.split("_")[3])
+    blogger_id = int(callback.data.split("_")[-1])
     blogger = await get_blogger(blogger_id)
     
     if not blogger:
@@ -1737,7 +1737,7 @@ async def handle_edit_field_stories_reach(callback: CallbackQuery, state: FSMCon
 @router.callback_query(F.data.startswith("edit_field_price_stories_"))
 async def handle_edit_field_price_stories(callback: CallbackQuery, state: FSMContext):
     """Редактирование цены сторис"""
-    blogger_id = int(callback.data.split("_")[3])
+    blogger_id = int(callback.data.split("_")[-1])
     blogger = await get_blogger(blogger_id)
     
     if not blogger:
@@ -1760,7 +1760,7 @@ async def handle_edit_field_price_stories(callback: CallbackQuery, state: FSMCon
 @router.callback_query(F.data.startswith("edit_field_reels_reach_"))
 async def handle_edit_field_reels_reach(callback: CallbackQuery, state: FSMContext):
     """Редактирование охвата рилс"""
-    blogger_id = int(callback.data.split("_")[3])
+    blogger_id = int(callback.data.split("_")[-1])
     blogger = await get_blogger(blogger_id)
     
     if not blogger:
@@ -1785,7 +1785,7 @@ async def handle_edit_field_reels_reach(callback: CallbackQuery, state: FSMConte
 @router.callback_query(F.data.startswith("edit_field_price_reels_"))
 async def handle_edit_field_price_reels(callback: CallbackQuery, state: FSMContext):
     """Редактирование цены рилс"""
-    blogger_id = int(callback.data.split("_")[3])
+    blogger_id = int(callback.data.split("_")[-1])
     blogger = await get_blogger(blogger_id)
     
     if not blogger:
