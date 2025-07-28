@@ -357,9 +357,16 @@ async def handle_subscribers_count(message: Message, state: FSMContext):
     await state.set_state(SellerStates.waiting_for_stories_reach_min)
 
 
-@router.message(SellerStates.waiting_for_stories_reach_min)
+@router.message(SellerStates.waiting_for_stories_reach_min, F.text)
 async def handle_stories_reach_min(message: Message, state: FSMContext):
-    """Обработка ввода минимального охвата сторис"""
+    """Обработка ввода минимального охвата сторис при добавлении нового блогера"""
+    # Проверяем, редактируем ли мы существующего блогера
+    data = await state.get_data()
+    if 'editing_blogger_id' in data:
+        # Это редактирование - передаем управление соответствующему обработчику
+        return await handle_edit_stories_reach_min(message, state)
+    
+    # Это добавление нового блогера
     try:
         reach = int(message.text.strip().replace(',', '').replace(' ', ''))
         if reach < 0:
@@ -385,9 +392,16 @@ async def handle_stories_reach_min(message: Message, state: FSMContext):
     await state.set_state(SellerStates.waiting_for_stories_reach_max)
 
 
-@router.message(SellerStates.waiting_for_stories_reach_max)
+@router.message(SellerStates.waiting_for_stories_reach_max, F.text)
 async def handle_stories_reach_max(message: Message, state: FSMContext):
-    """Обработка ввода максимального охвата сторис"""
+    """Обработка ввода максимального охвата сторис при добавлении нового блогера"""
+    # Проверяем, редактируем ли мы существующего блогера
+    data = await state.get_data()
+    if 'editing_blogger_id' in data:
+        # Это редактирование - передаем управление соответствующему обработчику
+        return await handle_edit_stories_reach_max(message, state)
+    
+    # Это добавление нового блогера
     try:
         reach = int(message.text.strip().replace(',', '').replace(' ', ''))
         if reach < 0:
@@ -453,9 +467,16 @@ async def handle_price_stories(message: Message, state: FSMContext):
     await state.set_state(SellerStates.waiting_for_reels_reach_min)
 
 
-@router.message(SellerStates.waiting_for_reels_reach_min)
+@router.message(SellerStates.waiting_for_reels_reach_min, F.text)
 async def handle_reels_reach_min(message: Message, state: FSMContext):
-    """Обработка ввода минимального охвата рилс"""
+    """Обработка ввода минимального охвата рилс при добавлении нового блогера"""
+    # Проверяем, редактируем ли мы существующего блогера
+    data = await state.get_data()
+    if 'editing_blogger_id' in data:
+        # Это редактирование - передаем управление соответствующему обработчику
+        return await handle_edit_reels_reach_min(message, state)
+    
+    # Это добавление нового блогера
     try:
         reach = int(message.text.strip().replace(',', '').replace(' ', ''))
         if reach < 0:
@@ -481,9 +502,16 @@ async def handle_reels_reach_min(message: Message, state: FSMContext):
     await state.set_state(SellerStates.waiting_for_reels_reach_max)
 
 
-@router.message(SellerStates.waiting_for_reels_reach_max)
+@router.message(SellerStates.waiting_for_reels_reach_max, F.text)
 async def handle_reels_reach_max(message: Message, state: FSMContext):
-    """Обработка ввода максимального охвата рилс"""
+    """Обработка ввода максимального охвата рилс при добавлении нового блогера"""
+    # Проверяем, редактируем ли мы существующего блогера
+    data = await state.get_data()
+    if 'editing_blogger_id' in data:
+        # Это редактирование - передаем управление соответствующему обработчику
+        return await handle_edit_reels_reach_max(message, state)
+    
+    # Это добавление нового блогера
     try:
         reach = int(message.text.strip().replace(',', '').replace(' ', ''))
         if reach < 0:
@@ -568,23 +596,29 @@ async def handle_stats_photo(message: Message, state: FSMContext):
     # Проверяем, редактируем ли мы существующего блогера
     if 'editing_blogger_id' in data:
         blogger_id = data['editing_blogger_id']
+        
+        # Отправляем одно сообщение с обновленной информацией
         await message.answer(
+            f"📊 <b>Статистика профиля</b>\n\n"
             f"✅ Фото добавлено (всего: {len(stats_photos)})\n\n"
-            "Отправьте еще фото или нажмите 'Готово':",
+            f"Отправьте еще фото или нажмите 'Готово':",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="✅ Готово", callback_data="edit_stats_photos_done")],
                 [InlineKeyboardButton(text="❌ Отмена", callback_data=f"edit_blogger_fields_{blogger_id}")]
-            ])
+            ]),
+            parse_mode="HTML"
         )
     else:
         # Это добавление нового блогера
         await message.answer(
+            f"📊 <b>Статистика профиля</b>\n\n"
             f"✅ Фото добавлено (всего: {len(stats_photos)})\n\n"
-            "Отправьте еще фото или нажмите 'Готово':",
+            f"Отправьте еще фото или нажмите 'Готово':",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="✅ Готово", callback_data="stats_photos_done")],
                 [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_price_reels")]
-            ])
+            ]),
+            parse_mode="HTML"
         )
 
 
@@ -893,6 +927,12 @@ async def show_my_bloggers(message: Message, state: FSMContext):
 @router.callback_query(F.data.startswith("edit_blogger_"))
 async def handle_edit_blogger(callback: CallbackQuery, state: FSMContext):
     """Начало редактирования блогера"""
+    # Проверяем, какой именно callback пришел
+    if callback.data.startswith("edit_blogger_fields_"):
+        # Это кнопка "Изменить поля" - передаем управление соответствующему обработчику
+        return await handle_edit_blogger_fields(callback, state)
+    
+    # Это основная кнопка редактирования
     blogger_id = int(callback.data.split("_")[2])
     blogger = await get_blogger(blogger_id)
     
@@ -911,10 +951,13 @@ async def handle_edit_blogger(callback: CallbackQuery, state: FSMContext):
     info_text += format_full_blogger_info(blogger)
     info_text += f"\n\nВыберите, что хотите изменить:"
     
-    await callback.message.edit_text(
-        info_text,
-        reply_markup=get_edit_blogger_keyboard(blogger.id),
-        parse_mode="HTML"
+    # Удаляем исходное сообщение и отправляем новое с фото
+    await callback.message.delete()
+    await send_blogger_info_with_photos(
+        callback.message, 
+        blogger, 
+        info_text, 
+        get_edit_blogger_keyboard(blogger.id)
     )
 
 
@@ -1072,7 +1115,65 @@ def format_full_blogger_info(blogger) -> str:
     if blogger.description and blogger.description.strip():
         info_text += f"\n📄 <b>Описание:</b>\n<i>{blogger.description}</i>\n"
     
-    return info_text 
+    return info_text
+
+
+def get_blogger_stats_images(blogger) -> list:
+    """Получение списка фото статистики блогера"""
+    if not blogger.stats_images:
+        return []
+    
+    if isinstance(blogger.stats_images, str):
+        try:
+            import json
+            return json.loads(blogger.stats_images)
+        except:
+            return []
+    else:
+        return blogger.stats_images
+
+
+async def send_blogger_info_with_photos(message, blogger, info_text, reply_markup=None):
+    """Отправка информации о блогере с фото статистики"""
+    stats_images = get_blogger_stats_images(blogger)
+    
+    if not stats_images:
+        # Если нет фото, отправляем только текст
+        await message.answer(
+            info_text,
+            reply_markup=reply_markup,
+            parse_mode="HTML"
+        )
+        return
+    
+    # Если есть фото, отправляем первое фото с текстом
+    try:
+        await message.answer_photo(
+            photo=stats_images[0],
+            caption=info_text,
+            reply_markup=reply_markup,
+            parse_mode="HTML"
+        )
+        
+        # Отправляем остальные фото без подписей
+        for i in range(1, len(stats_images)):
+            try:
+                await message.answer_photo(
+                    photo=stats_images[i],
+                    caption=f"📊 Фото статистики {i+1} из {len(stats_images)}"
+                )
+            except Exception as e:
+                logger.error(f"Ошибка при отправке фото статистики {i+1}: {e}")
+                await message.answer(f"❌ Не удалось загрузить фото {i+1}")
+                
+    except Exception as e:
+        logger.error(f"Ошибка при отправке основного фото статистики: {e}")
+        # Если не удалось отправить с фото, отправляем только текст
+        await message.answer(
+            info_text,
+            reply_markup=reply_markup,
+            parse_mode="HTML"
+        ) 
 
 # === ОБРАБОТЧИКИ НАВИГАЦИИ ===
 
@@ -1270,10 +1371,13 @@ async def handle_edit_blogger_fields(callback: CallbackQuery, state: FSMContext)
     info_text += format_full_blogger_info(blogger)
     info_text += f"\n\n<b>Выберите поле для редактирования:</b>"
     
-    await callback.message.edit_text(
-        info_text,
-        reply_markup=get_blogger_edit_field_keyboard(blogger.id),
-        parse_mode="HTML"
+    # Удаляем исходное сообщение и отправляем новое с фото
+    await callback.message.delete()
+    await send_blogger_info_with_photos(
+        callback.message, 
+        blogger, 
+        info_text, 
+        get_blogger_edit_field_keyboard(blogger.id)
     )
 
 
@@ -1408,10 +1512,11 @@ async def finish_edit_stats_photos(callback: CallbackQuery, state: FSMContext):
             info_text += format_full_blogger_info(blogger)
             info_text += f"\n\n<b>Выберите поле для редактирования:</b>"
             
-            await callback.message.answer(
-                info_text,
-                reply_markup=get_blogger_edit_field_keyboard(blogger.id),
-                parse_mode="HTML"
+            await send_blogger_info_with_photos(
+                callback.message, 
+                blogger, 
+                info_text, 
+                get_blogger_edit_field_keyboard(blogger.id)
             )
     else:
         await callback.message.edit_text(
@@ -1476,9 +1581,485 @@ async def handle_show_my_bloggers_callback(callback: CallbackQuery, state: FSMCo
             ]
         ])
         
-        await bot.send_message(
-            chat_id,
-            info_text,
-            reply_markup=management_keyboard,
+        # Создаем временный объект сообщения для передачи в функцию
+        temp_message = type('TempMessage', (), {
+            'answer': lambda text, reply_markup=None, parse_mode=None: bot.send_message(chat_id, text, reply_markup=reply_markup, parse_mode=parse_mode),
+            'answer_photo': lambda photo, caption=None, reply_markup=None, parse_mode=None: bot.send_photo(chat_id, photo, caption=caption, reply_markup=reply_markup, parse_mode=parse_mode)
+        })()
+        
+        await send_blogger_info_with_photos(
+            temp_message, 
+            blogger, 
+            info_text, 
+            management_keyboard
+        )
+
+# === ОБРАБОТЧИКИ РЕДАКТИРОВАНИЯ ОТДЕЛЬНЫХ ПОЛЕЙ ===
+
+@router.callback_query(F.data.startswith("edit_field_name_"))
+async def handle_edit_field_name(callback: CallbackQuery, state: FSMContext):
+    """Редактирование имени блогера"""
+    blogger_id = int(callback.data.split("_")[3])
+    blogger = await get_blogger(blogger_id)
+    
+    if not blogger:
+        await callback.answer("❌ Блогер не найден")
+        return
+    
+    await callback.answer()
+    await state.update_data(editing_blogger_id=blogger_id, editing_field="name")
+    
+    await callback.message.edit_text(
+        f"✏️ <b>Редактирование имени</b>\n\n"
+        f"Текущее имя: <b>{blogger.name}</b>\n\n"
+        f"Отправьте новое имя блогера:",
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_new_value)
+
+
+@router.callback_query(F.data.startswith("edit_field_url_"))
+async def handle_edit_field_url(callback: CallbackQuery, state: FSMContext):
+    """Редактирование ссылки блогера"""
+    blogger_id = int(callback.data.split("_")[3])
+    blogger = await get_blogger(blogger_id)
+    
+    if not blogger:
+        await callback.answer("❌ Блогер не найден")
+        return
+    
+    await callback.answer()
+    await state.update_data(editing_blogger_id=blogger_id, editing_field="url")
+    
+    await callback.message.edit_text(
+        f"✏️ <b>Редактирование ссылки</b>\n\n"
+        f"Текущая ссылка: <b>{blogger.url}</b>\n\n"
+        f"Отправьте новую ссылку на профиль блогера:",
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_new_value)
+
+
+@router.callback_query(F.data.startswith("edit_field_platforms_"))
+async def handle_edit_field_platforms(callback: CallbackQuery, state: FSMContext):
+    """Редактирование платформ блогера"""
+    blogger_id = int(callback.data.split("_")[3])
+    blogger = await get_blogger(blogger_id)
+    
+    if not blogger:
+        await callback.answer("❌ Блогер не найден")
+        return
+    
+    await callback.answer()
+    await state.update_data(editing_blogger_id=blogger_id, editing_field="platforms")
+    
+    await callback.message.edit_text(
+        f"✏️ <b>Редактирование платформ</b>\n\n"
+        f"Текущие платформы: <b>{blogger.platforms}</b>\n\n"
+        f"Выберите новые платформы:",
+        reply_markup=get_platform_keyboard(with_navigation=True),
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_platform)
+
+
+@router.callback_query(F.data.startswith("edit_field_categories_"))
+async def handle_edit_field_categories(callback: CallbackQuery, state: FSMContext):
+    """Редактирование категорий блогера"""
+    blogger_id = int(callback.data.split("_")[3])
+    blogger = await get_blogger(blogger_id)
+    
+    if not blogger:
+        await callback.answer("❌ Блогер не найден")
+        return
+    
+    await callback.answer()
+    await state.update_data(editing_blogger_id=blogger_id, editing_field="categories")
+    
+    await callback.message.edit_text(
+        f"✏️ <b>Редактирование категорий</b>\n\n"
+        f"Текущие категории: <b>{blogger.categories}</b>\n\n"
+        f"Выберите новые категории (максимум 3):",
+        reply_markup=get_category_keyboard(with_navigation=True),
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_categories)
+
+
+@router.callback_query(F.data.startswith("edit_field_subscribers_"))
+async def handle_edit_field_subscribers(callback: CallbackQuery, state: FSMContext):
+    """Редактирование количества подписчиков"""
+    blogger_id = int(callback.data.split("_")[3])
+    blogger = await get_blogger(blogger_id)
+    
+    if not blogger:
+        await callback.answer("❌ Блогер не найден")
+        return
+    
+    await callback.answer()
+    await state.update_data(editing_blogger_id=blogger_id, editing_field="subscribers_count")
+    
+    current_count = blogger.subscribers_count or "не указано"
+    await callback.message.edit_text(
+        f"✏️ <b>Редактирование количества подписчиков</b>\n\n"
+        f"Текущее количество: <b>{current_count}</b>\n\n"
+        f"Отправьте новое количество подписчиков (только число):",
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_new_value)
+
+
+@router.callback_query(F.data.startswith("edit_field_stories_reach_"))
+async def handle_edit_field_stories_reach(callback: CallbackQuery, state: FSMContext):
+    """Редактирование охвата сторис"""
+    blogger_id = int(callback.data.split("_")[3])
+    blogger = await get_blogger(blogger_id)
+    
+    if not blogger:
+        await callback.answer("❌ Блогер не найден")
+        return
+    
+    await callback.answer()
+    await state.update_data(editing_blogger_id=blogger_id, editing_field="stories_reach")
+    
+    current_min = blogger.stories_reach_min or "не указано"
+    current_max = blogger.stories_reach_max or "не указано"
+    
+    await callback.message.edit_text(
+        f"✏️ <b>Редактирование охвата сторис</b>\n\n"
+        f"Текущий охват: <b>{current_min} - {current_max}</b>\n\n"
+        f"Отправьте минимальный охват сторис (только число):",
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_stories_reach_min)
+
+
+@router.callback_query(F.data.startswith("edit_field_price_stories_"))
+async def handle_edit_field_price_stories(callback: CallbackQuery, state: FSMContext):
+    """Редактирование цены сторис"""
+    blogger_id = int(callback.data.split("_")[3])
+    blogger = await get_blogger(blogger_id)
+    
+    if not blogger:
+        await callback.answer("❌ Блогер не найден")
+        return
+    
+    await callback.answer()
+    await state.update_data(editing_blogger_id=blogger_id, editing_field="price_stories")
+    
+    current_price = blogger.price_stories or "не указано"
+    await callback.message.edit_text(
+        f"✏️ <b>Редактирование цены сторис</b>\n\n"
+        f"Текущая цена: <b>{current_price}</b>\n\n"
+        f"Отправьте новую цену за 4 истории (только число):",
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_new_value)
+
+
+@router.callback_query(F.data.startswith("edit_field_reels_reach_"))
+async def handle_edit_field_reels_reach(callback: CallbackQuery, state: FSMContext):
+    """Редактирование охвата рилс"""
+    blogger_id = int(callback.data.split("_")[3])
+    blogger = await get_blogger(blogger_id)
+    
+    if not blogger:
+        await callback.answer("❌ Блогер не найден")
+        return
+    
+    await callback.answer()
+    await state.update_data(editing_blogger_id=blogger_id, editing_field="reels_reach")
+    
+    current_min = blogger.reels_reach_min or "не указано"
+    current_max = blogger.reels_reach_max or "не указано"
+    
+    await callback.message.edit_text(
+        f"✏️ <b>Редактирование охвата рилс</b>\n\n"
+        f"Текущий охват: <b>{current_min} - {current_max}</b>\n\n"
+        f"Отправьте минимальный охват рилс (только число):",
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_reels_reach_min)
+
+
+@router.callback_query(F.data.startswith("edit_field_price_reels_"))
+async def handle_edit_field_price_reels(callback: CallbackQuery, state: FSMContext):
+    """Редактирование цены рилс"""
+    blogger_id = int(callback.data.split("_")[3])
+    blogger = await get_blogger(blogger_id)
+    
+    if not blogger:
+        await callback.answer("❌ Блогер не найден")
+        return
+    
+    await callback.answer()
+    await state.update_data(editing_blogger_id=blogger_id, editing_field="price_reels")
+    
+    current_price = blogger.price_reels or "не указано"
+    await callback.message.edit_text(
+        f"✏️ <b>Редактирование цены рилс</b>\n\n"
+        f"Текущая цена: <b>{current_price}</b>\n\n"
+        f"Отправьте новую цену за рилс (только число):",
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_new_value)
+
+
+@router.callback_query(F.data.startswith("edit_field_description_"))
+async def handle_edit_field_description(callback: CallbackQuery, state: FSMContext):
+    """Редактирование описания блогера"""
+    blogger_id = int(callback.data.split("_")[3])
+    blogger = await get_blogger(blogger_id)
+    
+    if not blogger:
+        await callback.answer("❌ Блогер не найден")
+        return
+    
+    await callback.answer()
+    await state.update_data(editing_blogger_id=blogger_id, editing_field="description")
+    
+    current_desc = blogger.description or "не указано"
+    await callback.message.edit_text(
+        f"✏️ <b>Редактирование описания</b>\n\n"
+        f"Текущее описание: <b>{current_desc}</b>\n\n"
+        f"Отправьте новое описание блогера:",
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_new_value)
+
+
+# === ОБРАБОТЧИК НОВЫХ ЗНАЧЕНИЙ ===
+
+@router.message(SellerStates.waiting_for_new_value)
+async def handle_new_value(message: Message, state: FSMContext):
+    """Обработка нового значения для редактируемого поля"""
+    data = await state.get_data()
+    blogger_id = data.get('editing_blogger_id')
+    editing_field = data.get('editing_field')
+    
+    if not blogger_id or not editing_field:
+        await message.answer("❌ Ошибка: не найдены данные для редактирования")
+        await state.clear()
+        return
+    
+    blogger = await get_blogger(blogger_id)
+    if not blogger:
+        await message.answer("❌ Блогер не найден")
+        await state.clear()
+        return
+    
+    # Обновляем соответствующее поле
+    update_data = {}
+    
+    if editing_field == "name":
+        update_data["name"] = message.text
+    elif editing_field == "url":
+        update_data["url"] = message.text
+    elif editing_field == "subscribers_count":
+        try:
+            subscribers = int(message.text.replace(',', '').replace(' ', ''))
+            update_data["subscribers_count"] = subscribers
+        except ValueError:
+            await message.answer("❌ Пожалуйста, введите корректное число")
+            return
+    elif editing_field == "price_stories":
+        try:
+            price = int(message.text.replace(',', '').replace(' ', ''))
+            update_data["price_stories"] = price
+        except ValueError:
+            await message.answer("❌ Пожалуйста, введите корректное число")
+            return
+    elif editing_field == "price_reels":
+        try:
+            price = int(message.text.replace(',', '').replace(' ', ''))
+            update_data["price_reels"] = price
+        except ValueError:
+            await message.answer("❌ Пожалуйста, введите корректное число")
+            return
+    elif editing_field == "description":
+        update_data["description"] = message.text
+    
+    # Обновляем блогера
+    from database.database import update_blogger
+    success = await update_blogger(blogger_id, **update_data)
+    
+    if success:
+        await message.answer(
+            f"✅ <b>Поле обновлено!</b>\n\n"
+            f"Поле '{editing_field}' успешно изменено.",
             parse_mode="HTML"
         )
+        
+        # Показываем обновленную информацию о блогере
+        updated_blogger = await get_blogger(blogger_id)
+        if updated_blogger:
+            info_text = f"✏️ <b>Редактирование полей блогера</b>\n\n"
+            info_text += format_full_blogger_info(updated_blogger)
+            info_text += f"\n\n<b>Выберите поле для редактирования:</b>"
+            
+            await send_blogger_info_with_photos(
+                message, 
+                updated_blogger, 
+                info_text, 
+                get_blogger_edit_field_keyboard(blogger_id)
+            )
+    else:
+        await message.answer("❌ Ошибка при обновлении поля")
+    
+    await state.clear()
+
+
+# === ОБРАБОТЧИКИ ДЛЯ РЕДАКТИРОВАНИЯ ОХВАТОВ ===
+
+async def handle_edit_stories_reach_min(message: Message, state: FSMContext):
+    """Обработка минимального охвата сторис при редактировании"""
+    data = await state.get_data()
+    blogger_id = data.get('editing_blogger_id')
+    
+    if not blogger_id:
+        await message.answer("❌ Ошибка: не найден ID блогера")
+        await state.clear()
+        return
+    
+    try:
+        min_reach = int(message.text.replace(',', '').replace(' ', ''))
+        await state.update_data(stories_reach_min=min_reach)
+        
+        await message.answer(
+            f"✅ Минимальный охват сторис: <b>{min_reach:,}</b>\n\n"
+            f"Теперь отправьте максимальный охват сторис (только число):",
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_stories_reach_max)
+        
+    except ValueError:
+        await message.answer("❌ Пожалуйста, введите корректное число")
+
+
+async def handle_edit_stories_reach_max(message: Message, state: FSMContext):
+    """Обработка максимального охвата сторис при редактировании"""
+    data = await state.get_data()
+    blogger_id = data.get('editing_blogger_id')
+    min_reach = data.get('stories_reach_min')
+    
+    if not blogger_id or min_reach is None:
+        await message.answer("❌ Ошибка: не найдены данные для редактирования")
+        await state.clear()
+        return
+    
+    try:
+        max_reach = int(message.text.replace(',', '').replace(' ', ''))
+        
+        if max_reach < min_reach:
+            await message.answer("❌ Максимальный охват не может быть меньше минимального")
+            return
+        
+        # Обновляем блогера
+        from database.database import update_blogger
+        success = await update_blogger(blogger_id, stories_reach_min=min_reach, stories_reach_max=max_reach)
+        
+        if success:
+            await message.answer(
+                f"✅ <b>Охват сторис обновлен!</b>\n\n"
+                f"Минимальный: <b>{min_reach:,}</b>\n"
+                f"Максимальный: <b>{max_reach:,}</b>",
+                parse_mode="HTML"
+            )
+            
+            # Показываем обновленную информацию о блогере
+            updated_blogger = await get_blogger(blogger_id)
+            if updated_blogger:
+                info_text = f"✏️ <b>Редактирование полей блогера</b>\n\n"
+                info_text += format_full_blogger_info(updated_blogger)
+                info_text += f"\n\n<b>Выберите поле для редактирования:</b>"
+                
+                await send_blogger_info_with_photos(
+                    message, 
+                    updated_blogger, 
+                    info_text, 
+                    get_blogger_edit_field_keyboard(blogger_id)
+                )
+        else:
+            await message.answer("❌ Ошибка при обновлении охвата сторис")
+        
+        await state.clear()
+        
+    except ValueError:
+        await message.answer("❌ Пожалуйста, введите корректное число")
+
+
+async def handle_edit_reels_reach_min(message: Message, state: FSMContext):
+    """Обработка минимального охвата рилс при редактировании"""
+    data = await state.get_data()
+    blogger_id = data.get('editing_blogger_id')
+    
+    if not blogger_id:
+        await message.answer("❌ Ошибка: не найден ID блогера")
+        await state.clear()
+        return
+    
+    try:
+        min_reach = int(message.text.replace(',', '').replace(' ', ''))
+        await state.update_data(reels_reach_min=min_reach)
+        
+        await message.answer(
+            f"✅ Минимальный охват рилс: <b>{min_reach:,}</b>\n\n"
+            f"Теперь отправьте максимальный охват рилс (только число):",
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_reels_reach_max)
+        
+    except ValueError:
+        await message.answer("❌ Пожалуйста, введите корректное число")
+
+
+async def handle_edit_reels_reach_max(message: Message, state: FSMContext):
+    """Обработка максимального охвата рилс при редактировании"""
+    data = await state.get_data()
+    blogger_id = data.get('editing_blogger_id')
+    min_reach = data.get('reels_reach_min')
+    
+    if not blogger_id or min_reach is None:
+        await message.answer("❌ Ошибка: не найдены данные для редактирования")
+        await state.clear()
+        return
+    
+    try:
+        max_reach = int(message.text.replace(',', '').replace(' ', ''))
+        
+        if max_reach < min_reach:
+            await message.answer("❌ Максимальный охват не может быть меньше минимального")
+            return
+        
+        # Обновляем блогера
+        from database.database import update_blogger
+        success = await update_blogger(blogger_id, reels_reach_min=min_reach, reels_reach_max=max_reach)
+        
+        if success:
+            await message.answer(
+                f"✅ <b>Охват рилс обновлен!</b>\n\n"
+                f"Минимальный: <b>{min_reach:,}</b>\n"
+                f"Максимальный: <b>{max_reach:,}</b>",
+                parse_mode="HTML"
+            )
+            
+            # Показываем обновленную информацию о блогере
+            updated_blogger = await get_blogger(blogger_id)
+            if updated_blogger:
+                info_text = f"✏️ <b>Редактирование полей блогера</b>\n\n"
+                info_text += format_full_blogger_info(updated_blogger)
+                info_text += f"\n\n<b>Выберите поле для редактирования:</b>"
+                
+                await send_blogger_info_with_photos(
+                    message, 
+                    updated_blogger, 
+                    info_text, 
+                    get_blogger_edit_field_keyboard(blogger_id)
+                )
+        else:
+            await message.answer("❌ Ошибка при обновлении охвата рилс")
+        
+        await state.clear()
+        
+    except ValueError:
+        await message.answer("❌ Пожалуйста, введите корректное число")
