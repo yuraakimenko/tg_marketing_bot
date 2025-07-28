@@ -665,6 +665,14 @@ async def get_blogger(blogger_id: int) -> Optional[Blogger]:
                 except (json.JSONDecodeError, ValueError):
                     pass
             
+            # Парсим stats_images из JSON
+            stats_images = []
+            if row['stats_images']:
+                try:
+                    stats_images = json.loads(row['stats_images'])
+                except (json.JSONDecodeError, ValueError):
+                    pass
+            
             return Blogger(
                 id=row['id'],
                 seller_id=row['seller_id'],
@@ -679,6 +687,7 @@ async def get_blogger(blogger_id: int) -> Optional[Blogger]:
                 stories_reach_max=row['stories_reach_max'] if 'stories_reach_max' in row.keys() else None,
                 reels_reach_min=row['reels_reach_min'] if 'reels_reach_min' in row.keys() else None,
                 reels_reach_max=row['reels_reach_max'] if 'reels_reach_max' in row.keys() else None,
+                stats_images=stats_images,
                 description=row['description'],
                 created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else datetime.now(),
                 updated_at=datetime.fromisoformat(row['updated_at']) if row['updated_at'] else datetime.now()
@@ -721,6 +730,14 @@ async def get_user_bloggers(seller_id: int) -> List[Blogger]:
                     except (KeyError, ValueError):
                         pass
 
+            # Парсим stats_images из JSON
+            stats_images = []
+            if row['stats_images']:
+                try:
+                    stats_images = json.loads(row['stats_images'])
+                except (json.JSONDecodeError, ValueError):
+                    pass
+
             bloggers.append(Blogger(
                 id=row['id'],
                 seller_id=row['seller_id'],
@@ -735,6 +752,7 @@ async def get_user_bloggers(seller_id: int) -> List[Blogger]:
                 stories_reach_max=row['stories_reach_max'] if 'stories_reach_max' in row.keys() else None,
                 reels_reach_min=row['reels_reach_min'] if 'reels_reach_min' in row.keys() else None,
                 reels_reach_max=row['reels_reach_max'] if 'reels_reach_max' in row.keys() else None,
+                stats_images=stats_images,
                 description=row['description'],
                 created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else datetime.now(),
                 updated_at=datetime.fromisoformat(row['updated_at']) if row['updated_at'] else datetime.now()
@@ -917,32 +935,38 @@ async def search_bloggers(platforms: List[str] = None, categories: List[str] = N
 
 async def update_blogger(blogger_id: int, seller_id: int, **kwargs) -> bool:
     """Обновление данных блогера"""
-    # Список полей, которые можно обновлять
-    allowed_fields = [
-        'name', 'url', 'platforms', 'categories',
-        'price_stories', 'price_post', 'price_video',
-        'has_reviews', 'description', 'stats_images'
-    ]
-    
-    # Фильтруем только разрешенные поля
-    updates = {k: v for k, v in kwargs.items() if k in allowed_fields}
+    try:
+        # Список полей, которые можно обновлять
+        allowed_fields = [
+            'name', 'url', 'platforms', 'categories',
+            'price_stories', 'price_post', 'price_video',
+            'has_reviews', 'description', 'stats_images'
+        ]
+        
+        # Фильтруем только разрешенные поля
+        updates = {k: v for k, v in kwargs.items() if k in allowed_fields}
 
-    if 'stats_images' in updates:
-        updates['stats_images'] = json.dumps(updates['stats_images'])
-    
-    if not updates:
+        if 'stats_images' in updates:
+            updates['stats_images'] = json.dumps(updates['stats_images'])
+        
+        if not updates:
+            return False
+        
+        # Строим SQL запрос
+        set_clause = ", ".join([f"{field} = ?" for field in updates.keys()])
+        query = f"UPDATE bloggers SET {set_clause}, updated_at = ? WHERE id = ? AND seller_id = ?"
+        
+        params = list(updates.values()) + [datetime.now().isoformat(), blogger_id, seller_id]
+        
+        async with aiosqlite.connect(DATABASE_PATH) as db:
+            cursor = await db.execute(query, params)
+            await db.commit()
+            result = cursor.rowcount > 0
+            print(f"Обновление блогера {blogger_id}: {result}, обновлено строк: {cursor.rowcount}")
+            return result
+    except Exception as e:
+        print(f"Ошибка при обновлении блогера {blogger_id}: {e}")
         return False
-    
-    # Строим SQL запрос
-    set_clause = ", ".join([f"{field} = ?" for field in updates.keys()])
-    query = f"UPDATE bloggers SET {set_clause}, updated_at = ? WHERE id = ? AND seller_id = ?"
-    
-    params = list(updates.values()) + [datetime.now().isoformat(), blogger_id, seller_id]
-    
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        cursor = await db.execute(query, params)
-        await db.commit()
-        return cursor.rowcount > 0
 
 
 async def delete_blogger(blogger_id: int, seller_id: int) -> bool:

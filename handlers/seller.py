@@ -556,36 +556,42 @@ async def handle_price_reels(message: Message, state: FSMContext):
 @router.message(SellerStates.waiting_for_stats_photos, F.photo)
 async def handle_stats_photo(message: Message, state: FSMContext):
     """Обработка загрузки фото статистики"""
-    data = await state.get_data()
-    stats_photos = data.get('stats_photos', [])
-    
-    # Получаем file_id самого большого размера фото
-    photo = message.photo[-1]
-    stats_photos.append(photo.file_id)
-    
-    await state.update_data(stats_photos=stats_photos)
-    
-    # Проверяем, редактируем ли мы существующего блогера
-    if 'editing_blogger_id' in data:
-        blogger_id = data['editing_blogger_id']
-        await message.answer(
-            f"✅ Фото добавлено (всего: {len(stats_photos)})\n\n"
-            "Отправьте еще фото или нажмите 'Готово':",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="✅ Готово", callback_data="edit_stats_photos_done")],
-                [InlineKeyboardButton(text="❌ Отмена", callback_data=f"edit_blogger_fields_{blogger_id}")]
-            ])
-        )
-    else:
-        # Это добавление нового блогера
-        await message.answer(
-            f"✅ Фото добавлено (всего: {len(stats_photos)})\n\n"
-            "Отправьте еще фото или нажмите 'Готово':",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="✅ Готово", callback_data="stats_photos_done")],
-                [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_price_reels")]
-            ])
-        )
+    try:
+        data = await state.get_data()
+        stats_photos = data.get('stats_photos', [])
+        
+        # Получаем file_id самого большого размера фото
+        photo = message.photo[-1]
+        stats_photos.append(photo.file_id)
+        
+        await state.update_data(stats_photos=stats_photos)
+        
+        logger.info(f"Добавлено фото статистики, всего: {len(stats_photos)}")
+        
+        # Проверяем, редактируем ли мы существующего блогера
+        if 'editing_blogger_id' in data:
+            blogger_id = data['editing_blogger_id']
+            await message.answer(
+                f"✅ Фото добавлено (всего: {len(stats_photos)})\n\n"
+                "Отправьте еще фото или нажмите 'Готово':",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="✅ Готово", callback_data="edit_stats_photos_done")],
+                    [InlineKeyboardButton(text="❌ Отмена", callback_data=f"edit_blogger_fields_{blogger_id}")]
+                ])
+            )
+        else:
+            # Это добавление нового блогера
+            await message.answer(
+                f"✅ Фото добавлено (всего: {len(stats_photos)})\n\n"
+                "Отправьте еще фото или нажмите 'Готово':",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="✅ Готово", callback_data="stats_photos_done")],
+                    [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_price_reels")]
+                ])
+            )
+    except Exception as e:
+        logger.error(f"Ошибка в handle_stats_photo: {e}", exc_info=True)
+        await message.answer("❌ Произошла ошибка при обработке фото. Попробуйте еще раз.")
 
 
 @router.message(SellerStates.waiting_for_stats_photos, F.text.lower() == "готово")
@@ -1335,88 +1341,124 @@ async def handle_view_stats_photos(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("edit_field_stats_photos_"))
 async def handle_edit_stats_photos(callback: CallbackQuery, state: FSMContext):
     """Редактирование фото статистики"""
-    blogger_id = int(callback.data.split("_")[4])
-    blogger = await get_blogger(blogger_id)
-    
-    if not blogger:
-        await callback.answer("❌ Блогер не найден")
-        return
-    
-    await callback.answer()
-    
-    # Сохраняем ID блогера для обновления
-    await state.update_data(editing_blogger_id=blogger_id, stats_photos=[])
-    
-    # Проверяем и преобразуем stats_images если нужно
-    stats_images = blogger.stats_images
-    if isinstance(stats_images, str):
-        try:
-            import json
-            stats_images = json.loads(stats_images)
-        except:
-            stats_images = []
-    
-    text = "📊 <b>Редактирование фото статистики</b>\n\n"
-    if stats_images and len(stats_images) > 0:
-        text += f"Текущие фото: {len(stats_images)} шт.\n\n"
-        text += "⚠️ Загрузка новых фото заменит все существующие!\n\n"
-    
-    text += "Загрузите новые скриншоты статистики.\n"
-    text += "Когда закончите, нажмите кнопку 'Готово':"
-    
-    await callback.message.edit_text(
-        text,
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="✅ Готово", callback_data="edit_stats_photos_done")],
-            [InlineKeyboardButton(text="❌ Отмена", callback_data=f"edit_blogger_fields_{blogger_id}")]
-        ]),
-        parse_mode="HTML"
-    )
-    await state.set_state(SellerStates.waiting_for_stats_photos)
+    try:
+        blogger_id = int(callback.data.split("_")[4])
+        blogger = await get_blogger(blogger_id)
+        
+        if not blogger:
+            await callback.answer("❌ Блогер не найден")
+            return
+        
+        await callback.answer()
+        
+        # Сохраняем ID блогера для обновления
+        await state.update_data(editing_blogger_id=blogger_id, stats_photos=[])
+        
+        # Проверяем и преобразуем stats_images если нужно
+        stats_images = blogger.stats_images
+        if isinstance(stats_images, str):
+            try:
+                import json
+                stats_images = json.loads(stats_images)
+            except:
+                stats_images = []
+        
+        logger.info(f"Начинаем редактирование фото для блогера {blogger_id}, текущих фото: {len(stats_images)}")
+        
+        text = "📊 <b>Редактирование фото статистики</b>\n\n"
+        if stats_images and len(stats_images) > 0:
+            text += f"Текущие фото: {len(stats_images)} шт.\n\n"
+            text += "⚠️ Загрузка новых фото заменит все существующие!\n\n"
+        
+        text += "Загрузите новые скриншоты статистики.\n"
+        text += "Когда закончите, нажмите кнопку 'Готово':"
+        
+        await callback.message.edit_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="✅ Готово", callback_data="edit_stats_photos_done")],
+                [InlineKeyboardButton(text="❌ Отмена", callback_data=f"edit_blogger_fields_{blogger_id}")]
+            ]),
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_stats_photos)
+    except Exception as e:
+        logger.error(f"Ошибка в handle_edit_stats_photos: {e}", exc_info=True)
+        await callback.answer("❌ Произошла ошибка")
+        await callback.message.edit_text(
+            "❌ <b>Произошла ошибка</b>\n\n"
+            "Попробуйте еще раз или обратитесь к администратору.",
+            parse_mode="HTML"
+        )
 
 
 @router.callback_query(F.data == "edit_stats_photos_done")
 async def finish_edit_stats_photos(callback: CallbackQuery, state: FSMContext):
     """Завершение редактирования фото статистики"""
-    await callback.answer()
-    
-    data = await state.get_data()
-    blogger_id = data.get('editing_blogger_id')
-    stats_photos = data.get('stats_photos', [])
-    
-    if not blogger_id:
-        await callback.message.edit_text("❌ Ошибка: не найден ID блогера")
-        return
-    
-    # Обновляем блогера
-    success = await update_blogger(blogger_id, stats_images=stats_photos)
-    
-    if success:
-        await callback.message.edit_text(
-            f"✅ <b>Фото статистики обновлены!</b>\n\n"
-            f"Загружено фото: {len(stats_photos)}",
-            parse_mode="HTML"
-        )
+    try:
+        await callback.answer()
         
-        # Очищаем состояние
-        await state.clear()
+        data = await state.get_data()
+        blogger_id = data.get('editing_blogger_id')
+        stats_photos = data.get('stats_photos', [])
         
-        # Показываем обновленную информацию о блогере
-        blogger = await get_blogger(blogger_id)
-        if blogger:
-            info_text = f"✏️ <b>Редактирование полей блогера</b>\n\n"
-            info_text += format_full_blogger_info(blogger)
-            info_text += f"\n\n<b>Выберите поле для редактирования:</b>"
-            
-            await callback.message.answer(
-                info_text,
-                reply_markup=get_blogger_edit_field_keyboard(blogger.id),
+        logger.info(f"Завершение редактирования фото для блогера {blogger_id}, фото: {len(stats_photos)}")
+        
+        if not blogger_id:
+            logger.error("Не найден ID блогера в состоянии")
+            await callback.message.edit_text("❌ Ошибка: не найден ID блогера")
+            return
+        
+        # Получаем пользователя для seller_id
+        user = await get_user(callback.from_user.id)
+        if not user:
+            logger.error(f"Пользователь {callback.from_user.id} не найден")
+            await callback.message.edit_text("❌ Ошибка: пользователь не найден")
+            return
+        
+        logger.info(f"Обновляем блогера {blogger_id} для пользователя {user.id}")
+        
+        # Обновляем блогера
+        success = await update_blogger(blogger_id, user.id, stats_images=stats_photos)
+        
+        if success:
+            logger.info(f"✅ Блогер {blogger_id} успешно обновлен")
+            await callback.message.edit_text(
+                f"✅ <b>Фото статистики обновлены!</b>\n\n"
+                f"Загружено фото: {len(stats_photos)}",
                 parse_mode="HTML"
             )
-    else:
+            
+            # Очищаем состояние
+            await state.clear()
+            
+            # Показываем обновленную информацию о блогере
+            blogger = await get_blogger(blogger_id)
+            if blogger:
+                info_text = f"✏️ <b>Редактирование полей блогера</b>\n\n"
+                info_text += format_full_blogger_info(blogger)
+                info_text += f"\n\n<b>Выберите поле для редактирования:</b>"
+                
+                await callback.message.answer(
+                    info_text,
+                    reply_markup=get_blogger_edit_field_keyboard(blogger.id),
+                    parse_mode="HTML"
+                )
+            else:
+                logger.error(f"Не удалось получить блогера {blogger_id} после обновления")
+                await callback.message.answer("❌ Ошибка: не удалось загрузить обновленные данные")
+        else:
+            logger.error(f"❌ Не удалось обновить блогера {blogger_id}")
+            await callback.message.edit_text(
+                "❌ <b>Ошибка обновления</b>\n\n"
+                "Не удалось обновить фото статистики.",
+                parse_mode="HTML"
+            )
+    except Exception as e:
+        logger.error(f"Ошибка в finish_edit_stats_photos: {e}", exc_info=True)
         await callback.message.edit_text(
-            "❌ <b>Ошибка обновления</b>\n\n"
-            "Не удалось обновить фото статистики.",
+            "❌ <b>Произошла ошибка</b>\n\n"
+            "Попробуйте еще раз или обратитесь к администратору.",
             parse_mode="HTML"
         )
 
