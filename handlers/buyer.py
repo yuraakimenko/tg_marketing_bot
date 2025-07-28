@@ -4,15 +4,15 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
 
-from database.database import get_user, search_bloggers, get_blogger, create_complaint
-from database.models import UserRole, SubscriptionStatus
-from bot.keyboards import (
-    get_category_keyboard, get_yes_no_keyboard, 
-    get_search_results_keyboard, get_blogger_selection_keyboard,
-    get_main_menu_buyer
+from database.database import (
+    get_user, get_blogger, search_bloggers,
+    create_complaint, get_user_subscription
 )
-from bot.states import BuyerStates, ComplaintStates
-from utils.google_sheets import log_complaint_to_sheets
+from database.models import UserRole, SubscriptionStatus
+# from utils.filters import is_buyer
+# from utils.google_sheets import log_complaint_to_sheets
+from bot.keyboards import get_main_menu_buyer, get_yes_no_keyboard
+from bot.states import ComplaintStates, BuyerStates
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -641,7 +641,7 @@ async def handle_complaint_reason(message: Message, state: FSMContext):
             )
             
             # Логируем в Google Sheets
-            await log_complaint_to_sheets(user, blogger_name, reason)
+            # await log_complaint_to_sheets(user, blogger_name, reason)
         else:
             await message.answer(
                 "❌ <b>Ошибка при подаче жалобы</b>\n\n"
