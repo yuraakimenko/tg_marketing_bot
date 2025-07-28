@@ -308,206 +308,218 @@ async def handle_blogger_name(message: Message, state: FSMContext):
     
     await state.update_data(blogger_name=name)
     
-    # Переходим к демографии
+    # Переходим к статистике
     await message.answer(
-        "📊 <b>Демография аудитории</b>\n\n"
-        "Укажите процент аудитории в возрасте 13-17 лет:\n\n"
-        "💡 <b>Важно:</b> Сумма всех возрастных категорий должна равняться 100%",
+        "📊 <b>Статистика блогера</b>\n\n"
+        "Укажите количество подписчиков:",
         parse_mode="HTML"
     )
-    await state.set_state(SellerStates.waiting_for_audience_13_17)
+    await state.set_state(SellerStates.waiting_for_subscribers_count)
 
 
-@router.message(SellerStates.waiting_for_audience_13_17)
-async def handle_audience_13_17(message: Message, state: FSMContext):
-    """Обработка ввода процента аудитории 13-17 лет"""
+@router.message(SellerStates.waiting_for_subscribers_count)
+async def handle_subscribers_count(message: Message, state: FSMContext):
+    """Обработка ввода количества подписчиков"""
     try:
-        percent = int(message.text.strip())
-        if percent < 0 or percent > 100:
-            raise ValueError("Invalid percentage")
+        count = int(message.text.strip().replace(',', '').replace(' ', ''))
+        if count < 0:
+            raise ValueError("Negative count")
     except ValueError:
         await message.answer(
             "❌ <b>Неверный формат</b>\n\n"
-            "Введите число от 0 до 100.\n"
+            "Введите число подписчиков (например: 15000).\n"
             "Попробуйте еще раз:",
             parse_mode="HTML"
         )
         return
     
-    await state.update_data(audience_13_17_percent=percent)
+    await state.update_data(subscribers_count=count)
     
     await message.answer(
-        f"📊 Укажите процент аудитории в возрасте 18-24 лет:\n\n"
-        f"Уже указано: 13-17 лет: {percent}%",
+        "📖 <b>Охват сторис</b>\n\n"
+        "Укажите МИНИМАЛЬНЫЙ охват сторис:\n\n"
+        "💡 <b>Важно:</b> Указывайте именно ОХВАТЫ, а не просмотры!",
         parse_mode="HTML"
     )
-    await state.set_state(SellerStates.waiting_for_audience_18_24)
+    await state.set_state(SellerStates.waiting_for_stories_reach_min)
 
 
-@router.message(SellerStates.waiting_for_audience_18_24)
-async def handle_audience_18_24(message: Message, state: FSMContext):
-    """Обработка ввода процента аудитории 18-24 лет"""
+@router.message(SellerStates.waiting_for_stories_reach_min)
+async def handle_stories_reach_min(message: Message, state: FSMContext):
+    """Обработка ввода минимального охвата сторис"""
     try:
-        percent = int(message.text.strip())
-        if percent < 0 or percent > 100:
-            raise ValueError("Invalid percentage")
+        reach = int(message.text.strip().replace(',', '').replace(' ', ''))
+        if reach < 0:
+            raise ValueError("Negative reach")
     except ValueError:
         await message.answer(
             "❌ <b>Неверный формат</b>\n\n"
-            "Введите число от 0 до 100.\n"
+            "Введите число минимального охвата сторис.\n"
             "Попробуйте еще раз:",
             parse_mode="HTML"
         )
         return
     
-    await state.update_data(audience_18_24_percent=percent)
-    
-    data = await state.get_data()
-    total = data.get('audience_13_17_percent', 0) + percent
+    await state.update_data(stories_reach_min=reach)
     
     await message.answer(
-        f"📊 Укажите процент аудитории в возрасте 25-35 лет:\n\n"
-        f"Уже указано: 13-17 лет: {data.get('audience_13_17_percent', 0)}%, "
-        f"18-24 лет: {percent}%\n"
-        f"Всего: {total}%",
+        f"📖 <b>Охват сторис</b>\n\n"
+        f"Укажите МАКСИМАЛЬНЫЙ охват сторис:\n\n"
+        f"Уже указано: Минимальный охват: {reach:,}",
         parse_mode="HTML"
     )
-    await state.set_state(SellerStates.waiting_for_audience_25_35)
+    await state.set_state(SellerStates.waiting_for_stories_reach_max)
 
 
-@router.message(SellerStates.waiting_for_audience_25_35)
-async def handle_audience_25_35(message: Message, state: FSMContext):
-    """Обработка ввода процента аудитории 25-35 лет"""
+@router.message(SellerStates.waiting_for_stories_reach_max)
+async def handle_stories_reach_max(message: Message, state: FSMContext):
+    """Обработка ввода максимального охвата сторис"""
     try:
-        percent = int(message.text.strip())
-        if percent < 0 or percent > 100:
-            raise ValueError("Invalid percentage")
+        reach = int(message.text.strip().replace(',', '').replace(' ', ''))
+        if reach < 0:
+            raise ValueError("Negative reach")
     except ValueError:
         await message.answer(
             "❌ <b>Неверный формат</b>\n\n"
-            "Введите число от 0 до 100.\n"
-            "Попробуйте еще раз:",
-            parse_mode="HTML"
-        )
-        return
-    
-    await state.update_data(audience_25_35_percent=percent)
-    
-    data = await state.get_data()
-    total = (data.get('audience_13_17_percent', 0) + 
-             data.get('audience_18_24_percent', 0) + percent)
-    
-    await message.answer(
-        f"📊 Укажите процент аудитории в возрасте 35+ лет:\n\n"
-        f"Уже указано: 13-17 лет: {data.get('audience_13_17_percent', 0)}%, "
-        f"18-24 лет: {data.get('audience_18_24_percent', 0)}%, "
-        f"25-35 лет: {percent}%\n"
-        f"Всего: {total}%\n\n"
-        f"Осталось указать: {100 - total}%",
-        parse_mode="HTML"
-    )
-    await state.set_state(SellerStates.waiting_for_audience_35_plus)
-
-
-@router.message(SellerStates.waiting_for_audience_35_plus)
-async def handle_audience_35_plus(message: Message, state: FSMContext):
-    """Обработка ввода процента аудитории 35+ лет"""
-    try:
-        percent = int(message.text.strip())
-        if percent < 0 or percent > 100:
-            raise ValueError("Invalid percentage")
-    except ValueError:
-        await message.answer(
-            "❌ <b>Неверный формат</b>\n\n"
-            "Введите число от 0 до 100.\n"
+            "Введите число максимального охвата сторис.\n"
             "Попробуйте еще раз:",
             parse_mode="HTML"
         )
         return
     
     data = await state.get_data()
-    total = (data.get('audience_13_17_percent', 0) + 
-             data.get('audience_18_24_percent', 0) + 
-             data.get('audience_25_35_percent', 0) + percent)
+    min_reach = data.get('stories_reach_min', 0)
     
-    if total != 100:
+    if reach < min_reach:
         await message.answer(
-            f"❌ <b>Неверная сумма процентов</b>\n\n"
-            f"Сумма всех возрастных категорий должна равняться 100%.\n"
-            f"Текущая сумма: {total}%\n\n"
+            f"❌ <b>Неверное значение</b>\n\n"
+            f"Максимальный охват не может быть меньше минимального.\n"
+            f"Минимальный охват: {min_reach:,}\n"
             f"Попробуйте еще раз:",
             parse_mode="HTML"
         )
         return
     
-    await state.update_data(audience_35_plus_percent=percent)
+    await state.update_data(stories_reach_max=reach)
     
     await message.answer(
-        "👥 <b>Пол аудитории</b>\n\n"
-        "Укажите процент женской аудитории:\n\n"
-        "💡 <b>Важно:</b> Сумма мужской и женской аудитории должна равняться 100%",
+        "💰 <b>Цена на 4 истории</b>\n\n"
+        "Укажите цену за 4 истории в рублях:",
         parse_mode="HTML"
     )
-    await state.set_state(SellerStates.waiting_for_female_percent)
+    await state.set_state(SellerStates.waiting_for_price_stories)
 
 
-@router.message(SellerStates.waiting_for_female_percent)
-async def handle_female_percent(message: Message, state: FSMContext):
-    """Обработка ввода процента женской аудитории"""
+@router.message(SellerStates.waiting_for_price_stories)
+async def handle_price_stories(message: Message, state: FSMContext):
+    """Обработка ввода цены за 4 истории"""
     try:
-        percent = int(message.text.strip())
-        if percent < 0 or percent > 100:
-            raise ValueError("Invalid percentage")
+        price = int(message.text.strip().replace(',', '').replace(' ', ''))
+        if price < 0:
+            raise ValueError("Negative price")
     except ValueError:
         await message.answer(
             "❌ <b>Неверный формат</b>\n\n"
-            "Введите число от 0 до 100.\n"
+            "Введите цену в рублях (например: 5000).\n"
             "Попробуйте еще раз:",
             parse_mode="HTML"
         )
         return
     
-    await state.update_data(female_percent=percent)
+    await state.update_data(price_stories=price)
     
     await message.answer(
-        f"👥 Укажите процент мужской аудитории:\n\n"
-        f"Уже указано: Женская аудитория: {percent}%\n"
-        f"Осталось указать: {100 - percent}%",
+        "🎬 <b>Охват рилс</b>\n\n"
+        "Укажите МИНИМАЛЬНЫЙ охват рилс:\n\n"
+        "💡 <b>Важно:</b> Указывайте именно ОХВАТЫ, а не просмотры!",
         parse_mode="HTML"
     )
-    await state.set_state(SellerStates.waiting_for_male_percent)
+    await state.set_state(SellerStates.waiting_for_reels_reach_min)
 
 
-@router.message(SellerStates.waiting_for_male_percent)
-async def handle_male_percent(message: Message, state: FSMContext):
-    """Обработка ввода процента мужской аудитории"""
+@router.message(SellerStates.waiting_for_reels_reach_min)
+async def handle_reels_reach_min(message: Message, state: FSMContext):
+    """Обработка ввода минимального охвата рилс"""
     try:
-        percent = int(message.text.strip())
-        if percent < 0 or percent > 100:
-            raise ValueError("Invalid percentage")
+        reach = int(message.text.strip().replace(',', '').replace(' ', ''))
+        if reach < 0:
+            raise ValueError("Negative reach")
     except ValueError:
         await message.answer(
             "❌ <b>Неверный формат</b>\n\n"
-            "Введите число от 0 до 100.\n"
+            "Введите число минимального охвата рилс.\n"
+            "Попробуйте еще раз:",
+            parse_mode="HTML"
+        )
+        return
+    
+    await state.update_data(reels_reach_min=reach)
+    
+    await message.answer(
+        f"🎬 <b>Охват рилс</b>\n\n"
+        f"Укажите МАКСИМАЛЬНЫЙ охват рилс:\n\n"
+        f"Уже указано: Минимальный охват: {reach:,}",
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_reels_reach_max)
+
+
+@router.message(SellerStates.waiting_for_reels_reach_max)
+async def handle_reels_reach_max(message: Message, state: FSMContext):
+    """Обработка ввода максимального охвата рилс"""
+    try:
+        reach = int(message.text.strip().replace(',', '').replace(' ', ''))
+        if reach < 0:
+            raise ValueError("Negative reach")
+    except ValueError:
+        await message.answer(
+            "❌ <b>Неверный формат</b>\n\n"
+            "Введите число максимального охвата рилс.\n"
             "Попробуйте еще раз:",
             parse_mode="HTML"
         )
         return
     
     data = await state.get_data()
-    total = data.get('female_percent', 0) + percent
+    min_reach = data.get('reels_reach_min', 0)
     
-    if total != 100:
+    if reach < min_reach:
         await message.answer(
-            f"❌ <b>Неверная сумма процентов</b>\n\n"
-            f"Сумма мужской и женской аудитории должна равняться 100%.\n"
-            f"Текущая сумма: {total}%\n\n"
+            f"❌ <b>Неверное значение</b>\n\n"
+            f"Максимальный охват не может быть меньше минимального.\n"
+            f"Минимальный охват: {min_reach:,}\n"
             f"Попробуйте еще раз:",
             parse_mode="HTML"
         )
         return
     
-    await state.update_data(male_percent=percent)
+    await state.update_data(reels_reach_max=reach)
+    
+    await message.answer(
+        "💸 <b>Цена рилс</b>\n\n"
+        "Укажите цену за рилс в рублях:",
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_price_reels)
+
+
+@router.message(SellerStates.waiting_for_price_reels)
+async def handle_price_reels(message: Message, state: FSMContext):
+    """Обработка ввода цены за рилс"""
+    try:
+        price = int(message.text.strip().replace(',', '').replace(' ', ''))
+        if price < 0:
+            raise ValueError("Negative price")
+    except ValueError:
+        await message.answer(
+            "❌ <b>Неверный формат</b>\n\n"
+            "Введите цену в рублях (например: 8000).\n"
+            "Попробуйте еще раз:",
+            parse_mode="HTML"
+        )
+        return
+    
+    await state.update_data(price_reels=price)
     
     await message.answer(
         "🏷️ <b>Категории блога</b>\n\n"
@@ -950,24 +962,15 @@ async def handle_blogger_description(message: Message, state: FSMContext):
             seller_id=user.id,
             name=data['blogger_name'],
             url=data['blogger_url'],
-            platforms=data['platforms'],  # Теперь используем множественные платформы
+            platforms=data['platforms'],
             categories=data['categories'],
-            audience_13_17_percent=data.get('audience_13_17_percent'),
-            audience_18_24_percent=data.get('audience_18_24_percent'),
-            audience_25_35_percent=data.get('audience_25_35_percent'),
-            audience_35_plus_percent=data.get('audience_35_plus_percent'),
-            female_percent=data.get('female_percent'),
-            male_percent=data.get('male_percent'),
             price_stories=data.get('price_stories'),
-            price_post=data.get('price_post'),
-            price_video=data.get('price_video'),
-            has_reviews=data.get('has_reviews', False),
-            is_registered_rkn=data.get('is_registered_rkn', False),
-            official_payment_possible=data.get('official_payment_possible', False),
+            price_reels=data.get('price_reels'),
             subscribers_count=data.get('subscribers_count'),
-            avg_views=data.get('avg_views'),
-            avg_likes=data.get('avg_likes'),
-            engagement_rate=data.get('engagement_rate'),
+            stories_reach_min=data.get('stories_reach_min'),
+            stories_reach_max=data.get('stories_reach_max'),
+            reels_reach_min=data.get('reels_reach_min'),
+            reels_reach_max=data.get('reels_reach_max'),
             description=description
         )
         
@@ -1300,88 +1303,51 @@ async def callback_main_menu(callback: CallbackQuery, state: FSMContext):
 
 
 def format_full_blogger_info(blogger) -> str:
-    """Формирование ПОЛНОЙ информации о блогере со всеми деталями"""
+    """Формирование информации о блогере согласно новому ТЗ"""
     info_text = f"👤 <b>Имя:</b> {blogger.name}\n"
-    info_text += f"🔗 <b>Ссылка:</b> {blogger.url}\n"
-    info_text += f"📱 <b>Платформы:</b> {blogger.get_platforms_summary()}\n"
+    info_text += f"🔗 <b>Чистая ссылка:</b> {blogger.url}\n"
     
-    # ===== СТАТИСТИКА =====
-    info_text += f"\n📊 <b>СТАТИСТИКА:</b>\n"
+    # ===== ПОДПИСЧИКИ =====
     if blogger.subscribers_count:
-        info_text += f"• 👥 Подписчиков: <b>{blogger.subscribers_count:,}</b>\n"
+        info_text += f"👥 <b>Подписчики:</b> {blogger.subscribers_count:,}\n"
     else:
-        info_text += f"• 👥 Подписчиков: <i>не указано</i>\n"
-        
-    if blogger.avg_views:
-        info_text += f"• 👁️ Средние просмотры: <b>{blogger.avg_views:,}</b>\n"
-    else:
-        info_text += f"• 👁️ Средние просмотры: <i>не указано</i>\n"
-        
-    if blogger.avg_likes:
-        info_text += f"• ❤️ Средние лайки: <b>{blogger.avg_likes:,}</b>\n"
-    else:
-        info_text += f"• ❤️ Средние лайки: <i>не указано</i>\n"
-        
-    if blogger.engagement_rate:
-        info_text += f"• 📈 Вовлеченность: <b>{blogger.engagement_rate:.1f}%</b>\n"
-    else:
-        info_text += f"• 📈 Вовлеченность: <i>не указано</i>\n"
+        info_text += f"👥 <b>Подписчики:</b> <i>не указано</i>\n"
     
-    # ===== ДЕМОГРАФИЯ =====
-    info_text += f"\n👥 <b>ДЕМОГРАФИЯ АУДИТОРИИ:</b>\n"
+    # ===== СТАТИСТИКА ПРОФИЛЯ =====
+    info_text += f"\n📊 <b>Статистика профиля:</b> <i>фотки должны быть</i>\n"
     
-    # Возрастные категории
-    age_summary = blogger.get_age_categories_summary()
-    if age_summary != "Не указано":
-        info_text += f"• 🎂 Возраст: <b>{age_summary}</b>\n"
+    # ===== ОХВАТ СТОРИС (ВИЛКА) =====
+    if blogger.stories_reach_min and blogger.stories_reach_max:
+        info_text += f"📖 <b>Средний охват сторис:</b> {blogger.stories_reach_min:,} - {blogger.stories_reach_max:,}\n"
+    elif blogger.stories_reach_min or blogger.stories_reach_max:
+        reach = blogger.stories_reach_min or blogger.stories_reach_max
+        info_text += f"📖 <b>Средний охват сторис:</b> ~{reach:,}\n"
     else:
-        info_text += f"• 🎂 Возраст: <i>не указано</i>\n"
+        info_text += f"📖 <b>Средний охват сторис:</b> <i>не указано</i>\n"
     
-    # Пол аудитории
-    if blogger.female_percent is not None and blogger.male_percent is not None:
-        info_text += f"• 👫 Пол: Женщины <b>{blogger.female_percent}%</b>, Мужчины <b>{blogger.male_percent}%</b>\n"
-    else:
-        info_text += f"• 👫 Пол аудитории: <i>не указано</i>\n"
-    
-    # ===== КАТЕГОРИИ =====
-    if blogger.categories:
-        categories_text = ', '.join([cat.get_russian_name() for cat in blogger.categories])
-        info_text += f"\n🏷️ <b>КАТЕГОРИИ:</b> {categories_text}\n"
-    else:
-        info_text += f"\n🏷️ <b>КАТЕГОРИИ:</b> <i>не указано</i>\n"
-    
-    # ===== ЦЕНЫ =====
-    info_text += f"\n💰 <b>ПРАЙС-ЛИСТ:</b>\n"
+    # ===== ЦЕНА НА 4 ИСТОРИИ =====
     if blogger.price_stories:
-        info_text += f"• 📸 Истории (4 шт): <b>{blogger.price_stories:,}₽</b>\n"
+        info_text += f"💰 <b>Цена на 4 истории:</b> {blogger.price_stories:,}₽\n"
     else:
-        info_text += f"• 📸 Истории (4 шт): <i>не указано</i>\n"
-        
-    if blogger.price_post:
-        info_text += f"• 📝 Пост: <b>{blogger.price_post:,}₽</b>\n"
-    else:
-        info_text += f"• 📝 Пост: <i>не указано</i>\n"
-        
-    if blogger.price_video:
-        info_text += f"• 🎥 Видео: <b>{blogger.price_video:,}₽</b>\n"
-    else:
-        info_text += f"• 🎥 Видео: <i>не указано</i>\n"
+        info_text += f"💰 <b>Цена на 4 истории:</b> <i>не указано</i>\n"
     
-    # ===== ДОПОЛНИТЕЛЬНАЯ ИНФОРМАЦИЯ =====
-    info_text += f"\n📋 <b>ДОПОЛНИТЕЛЬНО:</b>\n"
-    info_text += f"• 📝 Отзывы: {'✅ Есть' if blogger.has_reviews else '❌ Нет'}\n"
-    info_text += f"• 🏛️ Зарегистрирован в РКН: {'✅ Да' if blogger.is_registered_rkn else '❌ Нет'}\n"
-    info_text += f"• 💼 Официальная оплата: {'✅ Возможна' if blogger.official_payment_possible else '❌ Невозможна'}\n"
+    # ===== ОХВАТ РИЛС (ВИЛКА) =====
+    if blogger.reels_reach_min and blogger.reels_reach_max:
+        info_text += f"🎬 <b>Средний охват рилс:</b> {blogger.reels_reach_min:,} - {blogger.reels_reach_max:,}\n"
+    elif blogger.reels_reach_min or blogger.reels_reach_max:
+        reach = blogger.reels_reach_min or blogger.reels_reach_max
+        info_text += f"🎬 <b>Средний охват рилс:</b> ~{reach:,}\n"
+    else:
+        info_text += f"🎬 <b>Средний охват рилс:</b> <i>не указано</i>\n"
     
-    # ===== ОПИСАНИЕ =====
+    # ===== ЦЕНА РИЛС =====
+    if blogger.price_reels:
+        info_text += f"💸 <b>Цена рилс:</b> {blogger.price_reels:,}₽\n"
+    else:
+        info_text += f"💸 <b>Цена рилс:</b> <i>не указано</i>\n"
+    
+    # ===== ОПИСАНИЕ (если есть) =====
     if blogger.description and blogger.description.strip():
-        info_text += f"\n📄 <b>ОПИСАНИЕ:</b>\n<i>{blogger.description}</i>\n"
-    else:
-        info_text += f"\n📄 <b>ОПИСАНИЕ:</b> <i>не указано</i>\n"
-    
-    # ===== ДАТЫ =====
-    info_text += f"\n📅 <b>ДАТА СОЗДАНИЯ:</b> {blogger.created_at.strftime('%d.%m.%Y %H:%M')}\n"
-    if blogger.updated_at != blogger.created_at:
-        info_text += f"📅 <b>ПОСЛЕДНЕЕ ОБНОВЛЕНИЕ:</b> {blogger.updated_at.strftime('%d.%m.%Y %H:%M')}\n"
+        info_text += f"\n📄 <b>Описание:</b>\n<i>{blogger.description}</i>\n"
     
     return info_text 

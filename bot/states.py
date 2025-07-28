@@ -13,36 +13,26 @@ class SellerStates(StatesGroup):
     waiting_for_blogger_url = State()  # 2. Потом ссылка
     waiting_for_blogger_name = State()  # 3. Имя блогера
     
-    # Демография аудитории
-    waiting_for_audience_13_17 = State()  # % аудитории 13-17 лет
-    waiting_for_audience_18_24 = State()  # % аудитории 18-24 лет
-    waiting_for_audience_25_35 = State()  # % аудитории 25-35 лет
-    waiting_for_audience_35_plus = State()  # % аудитории 35+ лет
-    
-    # Пол аудитории
-    waiting_for_female_percent = State()  # % женской аудитории
-    waiting_for_male_percent = State()  # % мужской аудитории
-    
     # Категории (максимум 3)
     waiting_for_categories = State()  # Выбор категорий
     waiting_for_additional_category = State()  # Дополнительная категория
     
-    # Цены (кратные 1000)
-    waiting_for_price_stories = State()  # Цена за 4 истории
-    waiting_for_price_post = State()  # Цена за пост
-    waiting_for_price_video = State()  # Цена за видео
-    
-    # Дополнительная информация
-    waiting_for_has_reviews = State()  # Наличие отзывов
-    waiting_for_is_registered_rkn = State()  # Регистрация в РКН
-    waiting_for_official_payment = State()  # Возможна офиц. оплата
-    
-    # Статистика (загрузка)
-    waiting_for_statistics = State()  # Загрузка статистики
+    # Статистика
     waiting_for_subscribers_count = State()  # Количество подписчиков
-    waiting_for_avg_views = State()  # Средние просмотры
-    waiting_for_avg_likes = State()  # Средние лайки
-    waiting_for_engagement_rate = State()  # Процент вовлеченности
+    
+    # Охваты сторис (вилка)
+    waiting_for_stories_reach_min = State()  # Минимальный охват сторис
+    waiting_for_stories_reach_max = State()  # Максимальный охват сторис
+    
+    # Цена за 4 истории
+    waiting_for_price_stories = State()  # Цена за 4 истории
+    
+    # Охваты рилс (вилка)
+    waiting_for_reels_reach_min = State()  # Минимальный охват рилс
+    waiting_for_reels_reach_max = State()  # Максимальный охват рилс
+    
+    # Цена рилс
+    waiting_for_price_reels = State()  # Цена за рилс
     
     # Описание
     waiting_for_blogger_description = State()  # Описание блогера
