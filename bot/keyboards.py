@@ -318,4 +318,23 @@ def get_combined_main_menu(user, has_active_subscription: bool) -> ReplyKeyboard
         keyboard=keyboard_buttons,
         resize_keyboard=True,
         input_field_placeholder="Выберите действие"
-    ) 
+    )
+
+
+def get_blogger_success_keyboard(blogger_id: int) -> InlineKeyboardMarkup:
+    """Клавиатура после успешного добавления блогера"""
+    buttons = [
+        [
+            InlineKeyboardButton(text="✏️ Редактировать", callback_data=f"edit_blogger_{blogger_id}"),
+            InlineKeyboardButton(text="👀 Посмотреть", callback_data=f"view_blogger_{blogger_id}")
+        ],
+        [
+            InlineKeyboardButton(text="📝 Добавить еще", callback_data="add_blogger"),
+            InlineKeyboardButton(text="📋 Мои блогеры", callback_data="my_bloggers")
+        ],
+        [
+            InlineKeyboardButton(text="🏠 Главное меню", callback_data="main_menu")
+        ]
+    ]
+    
+    return InlineKeyboardMarkup(inline_keyboard=buttons) 

@@ -14,7 +14,7 @@ from bot.keyboards import (
     get_yes_no_keyboard, get_blogger_list_keyboard,
     get_blogger_details_keyboard, get_price_stories_keyboard,
     get_price_post_keyboard, get_price_video_keyboard,
-    get_platforms_multi_keyboard # добавлен импорт
+    get_platforms_multi_keyboard, get_blogger_success_keyboard
 )
 from bot.states import SellerStates
 
@@ -971,12 +971,14 @@ async def handle_blogger_description(message: Message, state: FSMContext):
             description=description
         )
         
+        # Формируем полную информацию о добавленном блогере
+        success_text = f"✅ <b>Блогер успешно добавлен!</b>\n\n"
+        success_text += format_full_blogger_info(blogger)
+        success_text += f"\n🎉 Теперь блогер доступен для поиска закупщиками."
+        
         await message.answer(
-            f"✅ <b>Блогер успешно добавлен!</b>\n\n"
-            f"📝 <b>Имя:</b> {blogger.name}\n"
-            f"🔗 <b>Ссылка:</b> {blogger.url}\n"
-            f"📊 <b>Подписчиков:</b> {blogger.subscribers_count:,}\n\n"
-            f"Теперь блогер доступен для поиска закупщиками.",
+            success_text,
+            reply_markup=get_blogger_success_keyboard(blogger.id),
             parse_mode="HTML"
         )
         
@@ -1104,4 +1106,282 @@ async def handle_delete_blogger(callback: CallbackQuery):
             "Не удалось удалить блогера.\n"
             "Попробуйте еще раз или обратитесь в поддержку.",
             parse_mode="HTML"
-        ) 
+        )
+
+
+# === ОБРАБОТЧИКИ CALLBACK КНОПОК ===
+
+@router.callback_query(F.data == "add_blogger")
+async def callback_add_blogger(callback: CallbackQuery, state: FSMContext):
+    """Кнопка добавить еще блогера"""
+    await callback.answer()
+    await state.clear()
+    
+    user = await get_user(callback.from_user.id)
+    if not user or not user.has_role(UserRole.SELLER):
+        await callback.message.answer("❌ Эта функция доступна только продажникам.")
+        return
+    
+    await callback.message.delete()
+    await callback.message.answer(
+        f"🎯 <b>Шаг 1:</b> Выберите платформы\n\n"
+        f"Выбранные платформы: <b>Не выбрано</b>\n\n"
+        f"Выберите платформы для блогера:",
+        reply_markup=get_platform_keyboard(),
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_platforms)
+
+
+@router.callback_query(F.data == "my_bloggers")
+async def callback_my_bloggers(callback: CallbackQuery, state: FSMContext):
+    """Кнопка мои блогеры"""
+    await callback.answer()
+    await state.clear()
+    
+    user = await get_user(callback.from_user.id)
+    if not user or not user.has_role(UserRole.SELLER):
+        await callback.message.answer("❌ Эта функция доступна только продажникам.")
+        return
+    
+    await callback.message.delete()
+    
+    # Получаем блогеров пользователя
+    bloggers = await get_user_bloggers(user.id)
+    
+    if not bloggers:
+        await callback.message.answer(
+            "📋 <b>Ваши блогеры</b>\n\n"
+            "У вас пока нет добавленных блогеров.\n\n"
+            "Добавьте первого блогера с помощью кнопки \"📝 Добавить блогера\".",
+            parse_mode="HTML"
+        )
+        return
+    
+    await callback.message.answer(
+        f"📋 <b>Ваши блогеры ({len(bloggers)})</b>\n\n"
+        "Выберите блогера для просмотра или редактирования:",
+        reply_markup=get_blogger_list_keyboard(bloggers, action="edit"),
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data.startswith("edit_blogger_"))
+async def handle_blogger_edit(callback: CallbackQuery, state: FSMContext):
+    """Обработка кнопки редактирования блогера - показ полной информации с вариантами редактирования"""
+    blogger_id = int(callback.data.split("_")[2])
+    
+    blogger = await get_blogger(blogger_id)
+    if not blogger:
+        await callback.answer("❌ Блогер не найден")
+        return
+    
+    user = await get_user(callback.from_user.id)
+    if not user or not user.has_role(UserRole.SELLER):
+        await callback.answer("❌ Доступ запрещен")
+        return
+    
+    # Проверяем, что блогер принадлежит пользователю
+    if blogger.seller_id != user.id:
+        await callback.answer("❌ Это не ваш блогер")
+        return
+    
+    await callback.answer()
+    
+    # Формируем полную информацию о блогере
+    info_text = "✏️ <b>РЕДАКТИРОВАНИЕ БЛОГЕРА</b>\n\n"
+    info_text += format_full_blogger_info(blogger)
+    info_text += "\n🔽 <b>Выберите что хотите изменить:</b>"
+    
+    # Создаем клавиатуру для выбора что редактировать
+    edit_keyboard = [
+        [
+            InlineKeyboardButton(text="📝 Имя", callback_data=f"edit_field_name_{blogger_id}"),
+            InlineKeyboardButton(text="🔗 Ссылка", callback_data=f"edit_field_url_{blogger_id}")
+        ],
+        [
+            InlineKeyboardButton(text="📱 Платформы", callback_data=f"edit_field_platforms_{blogger_id}"),
+            InlineKeyboardButton(text="🏷️ Категории", callback_data=f"edit_field_categories_{blogger_id}")
+        ],
+        [
+            InlineKeyboardButton(text="👥 Подписчики", callback_data=f"edit_field_subscribers_{blogger_id}"),
+            InlineKeyboardButton(text="👁️ Просмотры", callback_data=f"edit_field_views_{blogger_id}")
+        ],
+        [
+            InlineKeyboardButton(text="👫 Демография", callback_data=f"edit_field_demo_{blogger_id}"),
+            InlineKeyboardButton(text="💰 Цены", callback_data=f"edit_field_prices_{blogger_id}")
+        ],
+        [
+            InlineKeyboardButton(text="📋 Доп.инфо", callback_data=f"edit_field_additional_{blogger_id}"),
+            InlineKeyboardButton(text="📄 Описание", callback_data=f"edit_field_description_{blogger_id}")
+        ],
+        [
+            InlineKeyboardButton(text="🗑️ Удалить блогера", callback_data=f"delete_blogger_{blogger_id}")
+        ],
+        [
+            InlineKeyboardButton(text="↩️ Назад к блогеру", callback_data=f"view_blogger_{blogger_id}"),
+            InlineKeyboardButton(text="🏠 Главное меню", callback_data="main_menu")
+        ]
+    ]
+    
+    from aiogram.types import InlineKeyboardMarkup
+    keyboard = InlineKeyboardMarkup(inline_keyboard=edit_keyboard)
+    
+    await callback.message.edit_text(
+        info_text,
+        reply_markup=keyboard,
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data.startswith("view_blogger_"))
+async def handle_view_blogger(callback: CallbackQuery, state: FSMContext):
+    """Просмотр блогера (кнопка 👀 Посмотреть)"""
+    blogger_id = int(callback.data.split("_")[2])
+    
+    blogger = await get_blogger(blogger_id)
+    if not blogger:
+        await callback.answer("❌ Блогер не найден")
+        return
+    
+    user = await get_user(callback.from_user.id)
+    if not user or not user.has_role(UserRole.SELLER):
+        await callback.answer("❌ Доступ запрещен")
+        return
+    
+    # Проверяем, что блогер принадлежит пользователю
+    if blogger.seller_id != user.id:
+        await callback.answer("❌ Это не ваш блогер")
+        return
+    
+    await callback.answer()
+    
+    # Показываем полную информацию
+    info_text = "👀 <b>ПРОСМОТР БЛОГЕРА</b>\n\n"
+    info_text += format_full_blogger_info(blogger)
+    
+    # Создаем клавиатуру для действий
+    view_keyboard = [
+        [
+            InlineKeyboardButton(text="✏️ Редактировать", callback_data=f"edit_blogger_{blogger_id}"),
+            InlineKeyboardButton(text="🗑️ Удалить", callback_data=f"delete_blogger_{blogger_id}")
+        ],
+        [
+            InlineKeyboardButton(text="📋 Мои блогеры", callback_data="my_bloggers"),
+            InlineKeyboardButton(text="🏠 Главное меню", callback_data="main_menu")
+        ]
+    ]
+    
+    from aiogram.types import InlineKeyboardMarkup
+    keyboard = InlineKeyboardMarkup(inline_keyboard=view_keyboard)
+    
+    await callback.message.edit_text(
+        info_text,
+        reply_markup=keyboard,
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data == "main_menu")
+async def callback_main_menu(callback: CallbackQuery, state: FSMContext):
+    """Кнопка главное меню"""
+    await callback.answer()
+    await state.clear()
+    
+    user = await get_user(callback.from_user.id)
+    if not user:
+        await callback.message.answer("❌ Пользователь не найден. Используйте /start")
+        return
+    
+    await callback.message.delete()
+    
+    from handlers.common import show_main_menu
+    await show_main_menu(callback.message, user)
+
+
+def format_full_blogger_info(blogger) -> str:
+    """Формирование ПОЛНОЙ информации о блогере со всеми деталями"""
+    info_text = f"👤 <b>Имя:</b> {blogger.name}\n"
+    info_text += f"🔗 <b>Ссылка:</b> {blogger.url}\n"
+    info_text += f"📱 <b>Платформы:</b> {blogger.get_platforms_summary()}\n"
+    
+    # ===== СТАТИСТИКА =====
+    info_text += f"\n📊 <b>СТАТИСТИКА:</b>\n"
+    if blogger.subscribers_count:
+        info_text += f"• 👥 Подписчиков: <b>{blogger.subscribers_count:,}</b>\n"
+    else:
+        info_text += f"• 👥 Подписчиков: <i>не указано</i>\n"
+        
+    if blogger.avg_views:
+        info_text += f"• 👁️ Средние просмотры: <b>{blogger.avg_views:,}</b>\n"
+    else:
+        info_text += f"• 👁️ Средние просмотры: <i>не указано</i>\n"
+        
+    if blogger.avg_likes:
+        info_text += f"• ❤️ Средние лайки: <b>{blogger.avg_likes:,}</b>\n"
+    else:
+        info_text += f"• ❤️ Средние лайки: <i>не указано</i>\n"
+        
+    if blogger.engagement_rate:
+        info_text += f"• 📈 Вовлеченность: <b>{blogger.engagement_rate:.1f}%</b>\n"
+    else:
+        info_text += f"• 📈 Вовлеченность: <i>не указано</i>\n"
+    
+    # ===== ДЕМОГРАФИЯ =====
+    info_text += f"\n👥 <b>ДЕМОГРАФИЯ АУДИТОРИИ:</b>\n"
+    
+    # Возрастные категории
+    age_summary = blogger.get_age_categories_summary()
+    if age_summary != "Не указано":
+        info_text += f"• 🎂 Возраст: <b>{age_summary}</b>\n"
+    else:
+        info_text += f"• 🎂 Возраст: <i>не указано</i>\n"
+    
+    # Пол аудитории
+    if blogger.female_percent is not None and blogger.male_percent is not None:
+        info_text += f"• 👫 Пол: Женщины <b>{blogger.female_percent}%</b>, Мужчины <b>{blogger.male_percent}%</b>\n"
+    else:
+        info_text += f"• 👫 Пол аудитории: <i>не указано</i>\n"
+    
+    # ===== КАТЕГОРИИ =====
+    if blogger.categories:
+        categories_text = ', '.join([cat.get_russian_name() for cat in blogger.categories])
+        info_text += f"\n🏷️ <b>КАТЕГОРИИ:</b> {categories_text}\n"
+    else:
+        info_text += f"\n🏷️ <b>КАТЕГОРИИ:</b> <i>не указано</i>\n"
+    
+    # ===== ЦЕНЫ =====
+    info_text += f"\n💰 <b>ПРАЙС-ЛИСТ:</b>\n"
+    if blogger.price_stories:
+        info_text += f"• 📸 Истории (4 шт): <b>{blogger.price_stories:,}₽</b>\n"
+    else:
+        info_text += f"• 📸 Истории (4 шт): <i>не указано</i>\n"
+        
+    if blogger.price_post:
+        info_text += f"• 📝 Пост: <b>{blogger.price_post:,}₽</b>\n"
+    else:
+        info_text += f"• 📝 Пост: <i>не указано</i>\n"
+        
+    if blogger.price_video:
+        info_text += f"• 🎥 Видео: <b>{blogger.price_video:,}₽</b>\n"
+    else:
+        info_text += f"• 🎥 Видео: <i>не указано</i>\n"
+    
+    # ===== ДОПОЛНИТЕЛЬНАЯ ИНФОРМАЦИЯ =====
+    info_text += f"\n📋 <b>ДОПОЛНИТЕЛЬНО:</b>\n"
+    info_text += f"• 📝 Отзывы: {'✅ Есть' if blogger.has_reviews else '❌ Нет'}\n"
+    info_text += f"• 🏛️ Зарегистрирован в РКН: {'✅ Да' if blogger.is_registered_rkn else '❌ Нет'}\n"
+    info_text += f"• 💼 Официальная оплата: {'✅ Возможна' if blogger.official_payment_possible else '❌ Невозможна'}\n"
+    
+    # ===== ОПИСАНИЕ =====
+    if blogger.description and blogger.description.strip():
+        info_text += f"\n📄 <b>ОПИСАНИЕ:</b>\n<i>{blogger.description}</i>\n"
+    else:
+        info_text += f"\n📄 <b>ОПИСАНИЕ:</b> <i>не указано</i>\n"
+    
+    # ===== ДАТЫ =====
+    info_text += f"\n📅 <b>ДАТА СОЗДАНИЯ:</b> {blogger.created_at.strftime('%d.%m.%Y %H:%M')}\n"
+    if blogger.updated_at != blogger.created_at:
+        info_text += f"📅 <b>ПОСЛЕДНЕЕ ОБНОВЛЕНИЕ:</b> {blogger.updated_at.strftime('%d.%m.%Y %H:%M')}\n"
+    
+    return info_text 
