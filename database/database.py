@@ -74,6 +74,13 @@ async def init_db():
                 price_stories INTEGER,
                 price_post INTEGER,
                 price_video INTEGER,
+                price_reels INTEGER,
+                
+                -- Охват
+                stories_reach_min INTEGER,
+                stories_reach_max INTEGER,
+                reels_reach_min INTEGER,
+                reels_reach_max INTEGER,
                 
                 -- Дополнительная информация
                 has_reviews BOOLEAN DEFAULT FALSE,
@@ -334,6 +341,27 @@ async def init_db():
             if 'updated_at' not in columns:
                 await db.execute("ALTER TABLE bloggers ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
                 logger.info("Added updated_at column to bloggers table")
+            
+            # Добавляем поля для reels и reach
+            if 'price_reels' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN price_reels INTEGER")
+                logger.info("Added price_reels column to bloggers table")
+            
+            if 'stories_reach_min' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN stories_reach_min INTEGER")
+                logger.info("Added stories_reach_min column to bloggers table")
+            
+            if 'stories_reach_max' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN stories_reach_max INTEGER")
+                logger.info("Added stories_reach_max column to bloggers table")
+            
+            if 'reels_reach_min' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN reels_reach_min INTEGER")
+                logger.info("Added reels_reach_min column to bloggers table")
+            
+            if 'reels_reach_max' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN reels_reach_max INTEGER")
+                logger.info("Added reels_reach_max column to bloggers table")
                 
         except Exception as e:
             logger.error(f"Error during migration: {e}")
