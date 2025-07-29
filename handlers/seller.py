@@ -584,14 +584,29 @@ async def handle_price_reels(message: Message, state: FSMContext):
 @router.message(SellerStates.waiting_for_stats_photos, F.photo)
 async def handle_stats_photo(message: Message, state: FSMContext):
     """Обработка загрузки фото статистики"""
-    data = await state.get_data()
-    stats_photos = data.get('stats_photos', [])
-    
-    # Получаем file_id самого большого размера фото
-    photo = message.photo[-1]
-    stats_photos.append(photo.file_id)
-    
-    await state.update_data(stats_photos=stats_photos)
+    try:
+        logger.info(f"Получено фото от пользователя {message.from_user.id}")
+        
+        data = await state.get_data()
+        stats_photos = data.get('stats_photos', [])
+        
+        # Получаем file_id самого большого размера фото
+        photo = message.photo[-1]
+        logger.info(f"Добавляем фото: file_id={photo.file_id}, размер={photo.file_size}")
+        
+        stats_photos.append(photo.file_id)
+        await state.update_data(stats_photos=stats_photos)
+        
+        logger.info(f"Фото добавлено. Всего фото: {len(stats_photos)}")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при обработке фото: {e}", exc_info=True)
+        await message.answer(
+            "❌ <b>Ошибка при обработке фото</b>\n\n"
+            "Попробуйте отправить фото еще раз или используйте /reset для сброса состояния.",
+            parse_mode="HTML"
+        )
+        return
     
     # Проверяем, редактируем ли мы существующего блогера
     if 'editing_blogger_id' in data:
@@ -673,6 +688,45 @@ async def continue_without_stats(callback: CallbackQuery, state: FSMContext):
         parse_mode="HTML"
     )
     await state.set_state(SellerStates.waiting_for_categories)
+
+
+@router.message(SellerStates.waiting_for_stats_photos)
+async def handle_wrong_message_in_stats_photos(message: Message, state: FSMContext):
+    """Обработка неправильных сообщений в состоянии ожидания фото статистики"""
+    data = await state.get_data()
+    stats_photos = data.get('stats_photos', [])
+    
+    await message.answer(
+        f"📊 <b>Загрузка фото статистики</b>\n\n"
+        f"📷 Загружено фото: {len(stats_photos)}\n\n"
+        "❌ <b>Это не фото!</b>\n\n"
+        "Отправьте фото статистики профиля или нажмите 'Готово':",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Готово", callback_data="stats_photos_done")],
+            [InlineKeyboardButton(text="🔄 Сбросить", callback_data="reset_stats_photos")],
+            [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_price_reels")]
+        ]),
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data == "reset_stats_photos", SellerStates.waiting_for_stats_photos)
+async def reset_stats_photos(callback: CallbackQuery, state: FSMContext):
+    """Сбросить загруженные фото статистики"""
+    await callback.answer()
+    
+    await state.update_data(stats_photos=[])
+    
+    await callback.message.edit_text(
+        "🔄 <b>Фото статистики сброшены</b>\n\n"
+        "📷 Загружено фото: 0\n\n"
+        "Отправьте фото статистики профиля:",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Готово", callback_data="stats_photos_done")],
+            [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_price_reels")]
+        ]),
+        parse_mode="HTML"
+    )
 
 
 @router.callback_query(F.data == "back_to_stats_upload", SellerStates.waiting_for_stats_photos)

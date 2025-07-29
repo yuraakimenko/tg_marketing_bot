@@ -54,6 +54,7 @@ def get_settings_keyboard() -> InlineKeyboardMarkup:
     """Клавиатура настроек"""
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🔄 Сменить роли", callback_data="change_role")],
+        [InlineKeyboardButton(text="🔁 Перезапустить бота", callback_data="restart_bot")],
         [InlineKeyboardButton(text="📊 Статистика", callback_data="statistics")],
         [InlineKeyboardButton(text="❓ Помощь", callback_data="help")]
     ])

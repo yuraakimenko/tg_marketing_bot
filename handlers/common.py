@@ -3,6 +3,7 @@ from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State
 
 from database.database import get_user, create_user, add_user_role, update_user_roles
 from database.models import UserRole, SubscriptionStatus, User
@@ -267,6 +268,44 @@ async def back_to_settings(callback: CallbackQuery):
     await callback.answer()
 
 
+@router.callback_query(F.data == "restart_bot")
+async def restart_bot(callback: CallbackQuery, state: FSMContext):
+    """Перезапуск бота - сброс состояния и возврат в главное меню"""
+    await callback.answer()
+    
+    # Получаем текущее состояние для диагностики
+    current_state = await state.get_state()
+    data = await state.get_data()
+    
+    logger.info(f"Перезапуск бота для пользователя {callback.from_user.id}")
+    logger.info(f"Текущее состояние: {current_state}")
+    logger.info(f"Данные состояния: {data}")
+    
+    # Очищаем состояние
+    await state.clear()
+    
+    # Получаем пользователя
+    user = await get_user(callback.from_user.id)
+    
+    if user:
+        await callback.message.edit_text(
+            "🔄 <b>Бот перезапущен!</b>\n\n"
+            f"✅ Состояние сброшено\n"
+            f"📊 Было в состоянии: {current_state or 'Нет'}\n"
+            f"🗂️ Очищено полей: {len(data)}\n\n"
+            "Теперь вы можете начать заново:",
+            parse_mode="HTML"
+        )
+        await show_main_menu(callback.message, user)
+    else:
+        await callback.message.edit_text(
+            "🔄 <b>Бот перезапущен!</b>\n\n"
+            "❌ Пользователь не найден в базе данных.\n"
+            "Отправьте /start для регистрации.",
+            parse_mode="HTML"
+        )
+
+
 async def show_main_menu(message: Message, user: User):
     """Показать главное меню в зависимости от ролей пользователя"""
     has_active_subscription = user.subscription_status in [
@@ -372,4 +411,156 @@ def get_combined_main_menu(user, has_active_subscription: bool) -> InlineKeyboar
         keyboard=keyboard_buttons,
         resize_keyboard=True,
         input_field_placeholder="Выберите действие"
-    ) 
+    )
+
+
+@router.message(Command("reset"))
+async def reset_command(message: Message, state: FSMContext):
+    """Команда для сброса состояния пользователя"""
+    current_state = await state.get_state()
+    data = await state.get_data()
+    
+    logger.info(f"Сброс состояния для пользователя {message.from_user.id}")
+    logger.info(f"Текущее состояние: {current_state}")
+    logger.info(f"Данные состояния: {data}")
+    
+    # Очищаем состояние
+    await state.clear()
+    
+    # Получаем пользователя для показа главного меню
+    user = await get_user(message.from_user.id)
+    
+    if user:
+        await message.answer(
+            "🔄 <b>Состояние сброшено!</b>\n\n"
+            f"✅ Очищены все данные формы\n"
+            f"📊 Текущее состояние: {current_state}\n"
+            f"🗂️ Данные: {len(data)} полей\n\n"
+            "Теперь вы можете начать заново:",
+            parse_mode="HTML"
+        )
+        await show_main_menu(message, user)
+    else:
+        await message.answer(
+            "🔄 <b>Состояние сброшено!</b>\n\n"
+            "❌ Пользователь не найден в базе данных.\n"
+            "Отправьте /start для регистрации.",
+            parse_mode="HTML"
+        )
+
+
+@router.message(Command("debug"))
+async def debug_command(message: Message, state: FSMContext):
+    """Команда для диагностики состояния пользователя"""
+    current_state = await state.get_state()
+    data = await state.get_data()
+    user = await get_user(message.from_user.id)
+    
+    debug_info = f"""
+🔍 <b>ДИАГНОСТИКА БОТА</b>
+
+👤 <b>Пользователь:</b>
+• ID: {message.from_user.id}
+• Имя: {message.from_user.first_name}
+• Username: @{message.from_user.username}
+• В базе: {'✅' if user else '❌'}
+
+🎯 <b>Состояние FSM:</b>
+• Текущее: {current_state or 'Нет'}
+• Данные: {len(data)} полей
+
+📊 <b>Данные состояния:</b>
+"""
+    
+    if data:
+        for key, value in data.items():
+            if isinstance(value, list):
+                debug_info += f"• {key}: список из {len(value)} элементов\n"
+            elif isinstance(value, dict):
+                debug_info += f"• {key}: словарь с {len(value)} ключами\n"
+            else:
+                debug_info += f"• {key}: {str(value)[:50]}{'...' if len(str(value)) > 50 else ''}\n"
+    else:
+        debug_info += "• Нет данных\n"
+    
+    if user:
+        debug_info += f"""
+👥 <b>Роли пользователя:</b>
+• Роли: {[role.value for role in user.roles]}
+• Подписка: {user.subscription_status.value}
+"""
+    
+    debug_info += f"""
+🛠️ <b>Доступные команды:</b>
+• /reset - сбросить состояние
+• /debug - эта диагностика
+• /start - перезапустить бота
+"""
+    
+    await message.answer(debug_info, parse_mode="HTML"        )
+
+
+@router.callback_query(F.data == "help")
+async def help_callback(callback: CallbackQuery):
+    """Обработка кнопки помощи в настройках"""
+    await callback.answer()
+    
+    help_text = """
+🤖 <b>ПОМОЩЬ ПО БОТУ</b>
+
+<b>Основные команды:</b>
+• /start - запуск бота
+• /reset - сбросить текущее состояние
+• /debug - диагностика состояния
+• /help - эта справка
+
+<b>Если бот "завис":</b>
+1️⃣ Отправьте /reset для сброса состояния
+2️⃣ Или /debug для диагностики
+3️⃣ Затем /start для перезапуска
+
+<b>При проблемах с фото:</b>
+• Убедитесь, что отправляете именно фото (не файл)
+• Попробуйте отправить фото заново
+• Используйте /reset если бот не реагирует
+
+<b>Поддержка:</b>
+Если проблемы продолжаются, обратитесь к администратору.
+"""
+    
+    await callback.message.edit_text(
+        help_text,
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="⚙️ Вернуться в настройки", callback_data="back_to_settings")]
+        ])
+    )
+
+
+@router.message(Command("help"))
+async def help_command(message: Message):
+    """Команда помощи"""
+    help_text = """
+🤖 <b>ПОМОЩЬ ПО БОТУ</b>
+
+<b>Основные команды:</b>
+• /start - запуск бота
+• /reset - сбросить текущее состояние
+• /debug - диагностика состояния
+• /help - эта справка
+
+<b>Если бот "завис":</b>
+1️⃣ Отправьте /reset для сброса состояния
+2️⃣ Или /debug для диагностики
+3️⃣ Затем /start для перезапуска
+
+<b>При проблемах с фото:</b>
+• Убедитесь, что отправляете именно фото (не файл)
+• Попробуйте отправить фото заново
+• Используйте /reset если бот не реагирует
+
+<b>Поддержка:</b>
+Если проблемы продолжаются, обратитесь к администратору.
+"""
+    
+    await message.answer(help_text, parse_mode="HTML") 
