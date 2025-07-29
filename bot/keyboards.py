@@ -452,6 +452,45 @@ def get_edit_blogger_keyboard(blogger_id: int) -> InlineKeyboardMarkup:
     ])
 
 
+def get_blogger_management_keyboard(blogger_id: int) -> InlineKeyboardMarkup:
+    """Клавиатура управления блогером в списке"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✏️ Редактировать", callback_data=f"edit_blogger_{blogger_id}")
+        ],
+        [
+            InlineKeyboardButton(text="📊 Посмотреть фото статистики", callback_data=f"view_stats_photos_{blogger_id}")
+        ],
+        [
+            InlineKeyboardButton(text="🗑 Удалить", callback_data=f"delete_blogger_{blogger_id}")
+        ]
+    ])
+
+
+def get_blogger_management_keyboard_with_stats(blogger_id: int, has_stats_photos: bool) -> InlineKeyboardMarkup:
+    """Клавиатура управления блогером в списке с учетом наличия фото статистики"""
+    keyboard = [
+        [
+            InlineKeyboardButton(text="✏️ Редактировать", callback_data=f"edit_blogger_{blogger_id}")
+        ]
+    ]
+    
+    if has_stats_photos:
+        keyboard.append([
+            InlineKeyboardButton(text="📊 Посмотреть фото статистики", callback_data=f"view_stats_photos_{blogger_id}")
+        ])
+    else:
+        keyboard.append([
+            InlineKeyboardButton(text="📊 Посмотреть скриншоты статистики", callback_data=f"view_stats_photos_{blogger_id}")
+        ])
+    
+    keyboard.append([
+        InlineKeyboardButton(text="🗑 Удалить", callback_data=f"delete_blogger_{blogger_id}")
+    ])
+    
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
 def get_confirmation_keyboard() -> InlineKeyboardMarkup:
     """Клавиатура подтверждения действия"""
     return InlineKeyboardMarkup(inline_keyboard=[

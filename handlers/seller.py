@@ -22,7 +22,9 @@ from bot.keyboards import (
     get_blogger_edit_field_keyboard,
     get_blogger_success_keyboard_enhanced,
     get_delete_confirmation_keyboard,
-    get_edit_blogger_keyboard
+    get_edit_blogger_keyboard,
+    get_blogger_management_keyboard,
+    get_blogger_management_keyboard_with_stats
 )
 from bot.states import SellerStates
 from typing import Union
@@ -949,9 +951,22 @@ async def show_my_bloggers(message: Message, state: FSMContext):
         info_text = f"📝 <b>Блогер #{blogger.id}</b>\n\n"
         info_text += format_full_blogger_info(blogger)
         
+        # Проверяем наличие фото статистики
+        has_stats_photos = False
+        if blogger.stats_images:
+            if isinstance(blogger.stats_images, str):
+                try:
+                    import json
+                    stats_images_list = json.loads(blogger.stats_images)
+                    has_stats_photos = stats_images_list and len(stats_images_list) > 0
+                except:
+                    has_stats_photos = False
+            else:
+                has_stats_photos = len(blogger.stats_images) > 0
+        
         await message.answer(
             info_text,
-            reply_markup=get_blogger_management_keyboard(blogger.id),
+            reply_markup=get_blogger_management_keyboard_with_stats(blogger.id, has_stats_photos),
             parse_mode="HTML"
         )
 
@@ -1444,7 +1459,8 @@ async def handle_view_stats_photos(callback: CallbackQuery):
     if not stats_images or len(stats_images) == 0:
         await callback.message.answer(
             "📊 <b>Статистика профиля</b>\n\n"
-            "У этого блогера нет загруженных фото статистики.",
+            "У этого блогера нет загруженных фото статистики.\n\n"
+            "💡 <i>Для добавления фото статистики используйте кнопку '✏️ Редактировать' → '📊 Фото статистики'</i>",
             parse_mode="HTML"
         )
         return
