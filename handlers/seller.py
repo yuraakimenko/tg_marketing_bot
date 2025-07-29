@@ -1111,20 +1111,9 @@ def format_full_blogger_info(blogger) -> str:
         info_text += f"👥 <b>Подписчики:</b> <i>не указано</i>\n"
     
     # ===== СТАТИСТИКА ПРОФИЛЯ =====
-    if blogger.stats_images and len(blogger.stats_images) > 0:
-        # Добавляем проверку типа данных
-        if isinstance(blogger.stats_images, str):
-            try:
-                import json
-                stats_images_list = json.loads(blogger.stats_images)
-                if stats_images_list and len(stats_images_list) > 0:
-                    info_text += f"\n📊 <b>Статистика профиля:</b> <i>фото загружены ({len(stats_images_list)} шт.)</i>\n"
-                else:
-                    info_text += f"\n📊 <b>Статистика профиля:</b> <i>фото не загружены</i>\n"
-            except:
-                info_text += f"\n📊 <b>Статистика профиля:</b> <i>фото не загружены</i>\n"
-        else:
-            info_text += f"\n📊 <b>Статистика профиля:</b> <i>фото загружены ({len(blogger.stats_images)} шт.)</i>\n"
+    stats_images = get_blogger_stats_images(blogger)
+    if stats_images and len(stats_images) > 0:
+        info_text += f"\n📊 <b>Статистика профиля:</b> <i>фото загружены ({len(stats_images)} шт.)</i>\n"
     else:
         info_text += f"\n📊 <b>Статистика профиля:</b> <i>фото не загружены</i>\n"
     
@@ -1542,7 +1531,7 @@ async def finish_edit_stats_photos(callback: CallbackQuery, state: FSMContext):
     
     if not stats_photos:
         # Если нет фото, сразу обновляем блогера
-        success = await update_blogger(blogger_id, stats_images=[])
+        success = await update_blogger(blogger_id, callback.from_user.id, stats_images=[])
         
         if success:
             await callback.message.edit_text(
@@ -1974,7 +1963,7 @@ async def handle_new_value(message: Message, state: FSMContext):
     
     # Обновляем блогера
     from database.database import update_blogger
-    success = await update_blogger(blogger_id, **update_data)
+    success = await update_blogger(blogger_id, message.from_user.id, **update_data)
     
     if success:
         await message.answer(
@@ -2049,7 +2038,7 @@ async def handle_edit_stories_reach_max(message: Message, state: FSMContext):
         
         # Обновляем блогера
         from database.database import update_blogger
-        success = await update_blogger(blogger_id, stories_reach_min=min_reach, stories_reach_max=max_reach)
+        success = await update_blogger(blogger_id, message.from_user.id, stories_reach_min=min_reach, stories_reach_max=max_reach)
         
         if success:
             await message.answer(
@@ -2126,7 +2115,7 @@ async def handle_edit_reels_reach_max(message: Message, state: FSMContext):
         
         # Обновляем блогера
         from database.database import update_blogger
-        success = await update_blogger(blogger_id, reels_reach_min=min_reach, reels_reach_max=max_reach)
+        success = await update_blogger(blogger_id, message.from_user.id, reels_reach_min=min_reach, reels_reach_max=max_reach)
         
         if success:
             await message.answer(
@@ -2217,7 +2206,7 @@ async def confirm_edit_stats_photos(callback: CallbackQuery, state: FSMContext):
         return
     
     # Обновляем блогера
-    success = await update_blogger(blogger_id, stats_images=stats_photos)
+    success = await update_blogger(blogger_id, callback.from_user.id, stats_images=stats_photos)
     
     if success:
         await callback.message.edit_text(
