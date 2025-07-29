@@ -36,6 +36,7 @@ class SellerStates(StatesGroup):
     
     # Статистика - фото пруфы
     waiting_for_stats_photos = State()  # Загрузка фото статистики
+    waiting_for_stats_photos_confirmation = State()  # Подтверждение загруженных фото
     
     # Описание
     waiting_for_blogger_description = State()  # Описание блогера
