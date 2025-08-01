@@ -1542,7 +1542,13 @@ async def finish_edit_stats_photos(callback: CallbackQuery, state: FSMContext):
     
     if not stats_photos:
         # Если нет фото, сразу обновляем блогера
-        success = await update_blogger(blogger_id, stats_images=[])
+        # Получаем пользователя для seller_id
+        user = await get_user(callback.from_user.id)
+        if not user:
+            await callback.message.edit_text("❌ Ошибка: пользователь не найден")
+            return
+        
+        success = await update_blogger(blogger_id, user.id, stats_images=[])
         
         if success:
             await callback.message.edit_text(
@@ -1974,7 +1980,14 @@ async def handle_new_value(message: Message, state: FSMContext):
     
     # Обновляем блогера
     from database.database import update_blogger
-    success = await update_blogger(blogger_id, **update_data)
+    # Получаем пользователя для seller_id
+    user = await get_user(message.from_user.id)
+    if not user:
+        await message.answer("❌ Ошибка: пользователь не найден")
+        await state.clear()
+        return
+    
+    success = await update_blogger(blogger_id, user.id, **update_data)
     
     if success:
         await message.answer(
@@ -2049,7 +2062,14 @@ async def handle_edit_stories_reach_max(message: Message, state: FSMContext):
         
         # Обновляем блогера
         from database.database import update_blogger
-        success = await update_blogger(blogger_id, stories_reach_min=min_reach, stories_reach_max=max_reach)
+        # Получаем пользователя для seller_id
+        user = await get_user(message.from_user.id)
+        if not user:
+            await message.answer("❌ Ошибка: пользователь не найден")
+            await state.clear()
+            return
+        
+        success = await update_blogger(blogger_id, user.id, stories_reach_min=min_reach, stories_reach_max=max_reach)
         
         if success:
             await message.answer(
@@ -2126,7 +2146,14 @@ async def handle_edit_reels_reach_max(message: Message, state: FSMContext):
         
         # Обновляем блогера
         from database.database import update_blogger
-        success = await update_blogger(blogger_id, reels_reach_min=min_reach, reels_reach_max=max_reach)
+        # Получаем пользователя для seller_id
+        user = await get_user(message.from_user.id)
+        if not user:
+            await message.answer("❌ Ошибка: пользователь не найден")
+            await state.clear()
+            return
+        
+        success = await update_blogger(blogger_id, user.id, reels_reach_min=min_reach, reels_reach_max=max_reach)
         
         if success:
             await message.answer(
@@ -2216,8 +2243,14 @@ async def confirm_edit_stats_photos(callback: CallbackQuery, state: FSMContext):
         await callback.message.edit_text("❌ Ошибка: не найден ID блогера")
         return
     
+    # Получаем пользователя для seller_id
+    user = await get_user(callback.from_user.id)
+    if not user:
+        await callback.message.edit_text("❌ Ошибка: пользователь не найден")
+        return
+    
     # Обновляем блогера
-    success = await update_blogger(blogger_id, stats_images=stats_photos)
+    success = await update_blogger(blogger_id, user.id, stats_images=stats_photos)
     
     if success:
         await callback.message.edit_text(
