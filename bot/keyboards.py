@@ -444,6 +444,9 @@ def get_edit_blogger_keyboard(blogger_id: int) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="📊 Посмотреть фото статистики", callback_data=f"view_stats_photos_{blogger_id}")
         ],
         [
+            InlineKeyboardButton(text="📱 Добавить статистику по платформе", callback_data=f"add_platform_stats_{blogger_id}")
+        ],
+        [
             InlineKeyboardButton(text="🗑 Удалить", callback_data=f"delete_blogger_{blogger_id}")
         ],
         [

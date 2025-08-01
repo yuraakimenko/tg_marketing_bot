@@ -2,11 +2,11 @@ import aiosqlite
 import os
 import json
 import logging
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict
 from datetime import datetime
 
 from .models import User, Blogger, Review, Subscription, Contact, SearchFilter
-from .models import UserRole, SubscriptionStatus, Platform, BlogCategory
+from .models import UserRole, SubscriptionStatus, Platform, BlogCategory, PlatformStats
 
 DATABASE_PATH = "bot_database.db"
 logger = logging.getLogger(__name__)
@@ -100,6 +100,50 @@ async def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (seller_id) REFERENCES users (id)
+            )
+        """)
+        
+        # Создание таблицы статистики по платформам
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS platform_stats (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                blogger_id INTEGER NOT NULL,
+                platform TEXT NOT NULL,  -- instagram, youtube, telegram, tiktok, vk
+                
+                -- Основная статистика
+                subscribers_count INTEGER,
+                engagement_rate REAL,
+                avg_views INTEGER,
+                avg_likes INTEGER,
+                
+                -- Демография аудитории
+                audience_13_17_percent INTEGER,
+                audience_18_24_percent INTEGER,
+                audience_25_35_percent INTEGER,
+                audience_35_plus_percent INTEGER,
+                
+                -- Пол аудитории
+                female_percent INTEGER,
+                male_percent INTEGER,
+                
+                -- Цены
+                price_stories INTEGER,
+                price_reels INTEGER,
+                price_post INTEGER,
+                
+                -- Охваты
+                stories_reach_min INTEGER,
+                stories_reach_max INTEGER,
+                reels_reach_min INTEGER,
+                reels_reach_max INTEGER,
+                
+                -- Ссылки на изображения со статистикой
+                stats_images TEXT,  -- JSON массив
+                
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (blogger_id) REFERENCES bloggers (id) ON DELETE CASCADE,
+                UNIQUE(blogger_id, platform)
             )
         """)
         
@@ -665,20 +709,34 @@ async def get_blogger(blogger_id: int) -> Optional[Blogger]:
                 except (json.JSONDecodeError, ValueError):
                     pass
             
+            # Загружаем статистику по платформам
+            platform_stats = await get_all_platform_stats(blogger_id)
+            
             return Blogger(
                 id=row['id'],
                 seller_id=row['seller_id'],
                 name=row['name'],
                 url=row['url'],
                 platforms=platforms,
+                platform_stats=platform_stats,
+                audience_13_17_percent=row['audience_13_17_percent'],
+                audience_18_24_percent=row['audience_18_24_percent'],
+                audience_25_35_percent=row['audience_25_35_percent'],
+                audience_35_plus_percent=row['audience_35_plus_percent'],
+                female_percent=row['female_percent'],
+                male_percent=row['male_percent'],
                 categories=categories,
                 price_stories=row['price_stories'],
                 price_reels=row['price_reels'] if 'price_reels' in row.keys() else None,
                 subscribers_count=row['subscribers_count'],
+                engagement_rate=row['engagement_rate'],
+                avg_views=row['avg_views'],
+                avg_likes=row['avg_likes'],
                 stories_reach_min=row['stories_reach_min'] if 'stories_reach_min' in row.keys() else None,
                 stories_reach_max=row['stories_reach_max'] if 'stories_reach_max' in row.keys() else None,
                 reels_reach_min=row['reels_reach_min'] if 'reels_reach_min' in row.keys() else None,
                 reels_reach_max=row['reels_reach_max'] if 'reels_reach_max' in row.keys() else None,
+                stats_images=json.loads(row['stats_images']) if row['stats_images'] else [],
                 description=row['description'],
                 created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else datetime.now(),
                 updated_at=datetime.fromisoformat(row['updated_at']) if row['updated_at'] else datetime.now()
@@ -721,20 +779,34 @@ async def get_user_bloggers(seller_id: int) -> List[Blogger]:
                     except (KeyError, ValueError):
                         pass
 
+            # Загружаем статистику по платформам
+            platform_stats = await get_all_platform_stats(row['id'])
+
             bloggers.append(Blogger(
                 id=row['id'],
                 seller_id=row['seller_id'],
                 name=row['name'],
                 url=row['url'],
                 platforms=platforms,
+                platform_stats=platform_stats,
+                audience_13_17_percent=row['audience_13_17_percent'],
+                audience_18_24_percent=row['audience_18_24_percent'],
+                audience_25_35_percent=row['audience_25_35_percent'],
+                audience_35_plus_percent=row['audience_35_plus_percent'],
+                female_percent=row['female_percent'],
+                male_percent=row['male_percent'],
                 categories=categories,
                 price_stories=row['price_stories'],
                 price_reels=row['price_reels'] if 'price_reels' in row.keys() else None,
                 subscribers_count=row['subscribers_count'],
+                engagement_rate=row['engagement_rate'],
+                avg_views=row['avg_views'],
+                avg_likes=row['avg_likes'],
                 stories_reach_min=row['stories_reach_min'] if 'stories_reach_min' in row.keys() else None,
                 stories_reach_max=row['stories_reach_max'] if 'stories_reach_max' in row.keys() else None,
                 reels_reach_min=row['reels_reach_min'] if 'reels_reach_min' in row.keys() else None,
                 reels_reach_max=row['reels_reach_max'] if 'reels_reach_max' in row.keys() else None,
+                stats_images=json.loads(row['stats_images']) if row['stats_images'] else [],
                 description=row['description'],
                 created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else datetime.now(),
                 updated_at=datetime.fromisoformat(row['updated_at']) if row['updated_at'] else datetime.now()
@@ -1262,4 +1334,292 @@ async def update_user_rating(user_id: int, new_rating: float) -> bool:
             return True
         except Exception as e:
             logger.error(f"Error updating user rating: {e}")
-            return False 
+            return False
+
+
+# === ФУНКЦИИ ДЛЯ РАБОТЫ СО СТАТИСТИКОЙ ПО ПЛАТФОРМАМ ===
+
+async def create_platform_stats(
+    blogger_id: int,
+    platform: Platform,
+    **kwargs
+) -> bool:
+    """Создать статистику для платформы"""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        try:
+            await db.execute("""
+                INSERT OR REPLACE INTO platform_stats (
+                    blogger_id, platform,
+                    subscribers_count, engagement_rate, avg_views, avg_likes,
+                    audience_13_17_percent, audience_18_24_percent, 
+                    audience_25_35_percent, audience_35_plus_percent,
+                    female_percent, male_percent,
+                    price_stories, price_reels, price_post,
+                    stories_reach_min, stories_reach_max,
+                    reels_reach_min, reels_reach_max,
+                    stats_images,
+                    updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, (
+                blogger_id, platform.value,
+                kwargs.get('subscribers_count'),
+                kwargs.get('engagement_rate'),
+                kwargs.get('avg_views'),
+                kwargs.get('avg_likes'),
+                kwargs.get('audience_13_17_percent'),
+                kwargs.get('audience_18_24_percent'),
+                kwargs.get('audience_25_35_percent'),
+                kwargs.get('audience_35_plus_percent'),
+                kwargs.get('female_percent'),
+                kwargs.get('male_percent'),
+                kwargs.get('price_stories'),
+                kwargs.get('price_reels'),
+                kwargs.get('price_post'),
+                kwargs.get('stories_reach_min'),
+                kwargs.get('stories_reach_max'),
+                kwargs.get('reels_reach_min'),
+                kwargs.get('reels_reach_max'),
+                json.dumps(kwargs.get('stats_images', []))
+            ))
+            
+            await db.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error creating platform stats: {e}")
+            return False
+
+
+async def get_platform_stats(blogger_id: int, platform: Platform) -> Optional[PlatformStats]:
+    """Получить статистику для конкретной платформы"""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("""
+            SELECT * FROM platform_stats 
+            WHERE blogger_id = ? AND platform = ?
+        """, (blogger_id, platform.value))
+        
+        row = await cursor.fetchone()
+        if not row:
+            return None
+        
+        return PlatformStats(
+            platform=platform,
+            subscribers_count=row['subscribers_count'],
+            engagement_rate=row['engagement_rate'],
+            avg_views=row['avg_views'],
+            avg_likes=row['avg_likes'],
+            audience_13_17_percent=row['audience_13_17_percent'],
+            audience_18_24_percent=row['audience_18_24_percent'],
+            audience_25_35_percent=row['audience_25_35_percent'],
+            audience_35_plus_percent=row['audience_35_plus_percent'],
+            female_percent=row['female_percent'],
+            male_percent=row['male_percent'],
+            price_stories=row['price_stories'],
+            price_reels=row['price_reels'],
+            price_post=row['price_post'],
+            stories_reach_min=row['stories_reach_min'],
+            stories_reach_max=row['stories_reach_max'],
+            reels_reach_min=row['reels_reach_min'],
+            reels_reach_max=row['reels_reach_max'],
+            stats_images=json.loads(row['stats_images']) if row['stats_images'] else []
+        )
+
+
+async def get_all_platform_stats(blogger_id: int) -> Dict[Platform, PlatformStats]:
+    """Получить статистику для всех платформ блогера"""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("""
+            SELECT * FROM platform_stats 
+            WHERE blogger_id = ?
+        """, (blogger_id,))
+        
+        rows = await cursor.fetchall()
+        stats = {}
+        
+        for row in rows:
+            platform = Platform(row['platform'])
+            stats[platform] = PlatformStats(
+                platform=platform,
+                subscribers_count=row['subscribers_count'],
+                engagement_rate=row['engagement_rate'],
+                avg_views=row['avg_views'],
+                avg_likes=row['avg_likes'],
+                audience_13_17_percent=row['audience_13_17_percent'],
+                audience_18_24_percent=row['audience_18_24_percent'],
+                audience_25_35_percent=row['audience_25_35_percent'],
+                audience_35_plus_percent=row['audience_35_plus_percent'],
+                female_percent=row['female_percent'],
+                male_percent=row['male_percent'],
+                price_stories=row['price_stories'],
+                price_reels=row['price_reels'],
+                price_post=row['price_post'],
+                stories_reach_min=row['stories_reach_min'],
+                stories_reach_max=row['stories_reach_max'],
+                reels_reach_min=row['reels_reach_min'],
+                reels_reach_max=row['reels_reach_max'],
+                stats_images=json.loads(row['stats_images']) if row['stats_images'] else []
+            )
+        
+        return stats
+
+
+async def update_platform_stats(
+    blogger_id: int,
+    platform: Platform,
+    **kwargs
+) -> bool:
+    """Обновить статистику для платформы"""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        try:
+            # Формируем SET часть запроса динамически
+            set_parts = []
+            params = []
+            
+            fields = [
+                'subscribers_count', 'engagement_rate', 'avg_views', 'avg_likes',
+                'audience_13_17_percent', 'audience_18_24_percent', 
+                'audience_25_35_percent', 'audience_35_plus_percent',
+                'female_percent', 'male_percent',
+                'price_stories', 'price_reels', 'price_post',
+                'stories_reach_min', 'stories_reach_max',
+                'reels_reach_min', 'reels_reach_max'
+            ]
+            
+            for field in fields:
+                if field in kwargs:
+                    set_parts.append(f"{field} = ?")
+                    params.append(kwargs[field])
+            
+            if 'stats_images' in kwargs:
+                set_parts.append("stats_images = ?")
+                params.append(json.dumps(kwargs['stats_images']))
+            
+            set_parts.append("updated_at = CURRENT_TIMESTAMP")
+            
+            params.extend([blogger_id, platform.value])
+            
+            query = f"""
+                UPDATE platform_stats 
+                SET {', '.join(set_parts)}
+                WHERE blogger_id = ? AND platform = ?
+            """
+            
+            await db.execute(query, params)
+            await db.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error updating platform stats: {e}")
+            return False
+
+
+async def delete_platform_stats(blogger_id: int, platform: Platform) -> bool:
+    """Удалить статистику для платформы"""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        try:
+            await db.execute("""
+                DELETE FROM platform_stats 
+                WHERE blogger_id = ? AND platform = ?
+            """, (blogger_id, platform.value))
+            
+            await db.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error deleting platform stats: {e}")
+            return False
+
+
+async def get_bloggers_with_platform_stats(platform: Platform, limit: int = 10) -> List[Tuple[Blogger, User]]:
+    """Получить блогеров со статистикой для конкретной платформы"""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("""
+            SELECT b.*, u.*, ps.*
+            FROM bloggers b
+            JOIN users u ON b.seller_id = u.id
+            JOIN platform_stats ps ON b.id = ps.blogger_id
+            WHERE ps.platform = ?
+            ORDER BY ps.subscribers_count DESC
+            LIMIT ?
+        """, (platform.value, limit))
+        
+        rows = await cursor.fetchall()
+        results = []
+        
+        for row in rows:
+            # Создаем пользователя
+            user = User(
+                id=row['seller_id'],
+                telegram_id=row['telegram_id'],
+                username=row['username'],
+                first_name=row['first_name'],
+                last_name=row['last_name'],
+                roles={UserRole.SELLER},  # Упрощенно для примера
+                subscription_status=SubscriptionStatus(row['subscription_status']) if row['subscription_status'] else SubscriptionStatus.INACTIVE,
+                subscription_end_date=datetime.fromisoformat(row['subscription_end_date']) if row['subscription_end_date'] else None,
+                rating=row['rating'],
+                reviews_count=row['reviews_count'],
+                is_vip=bool(row['is_vip']) if 'is_vip' in row.keys() else False,
+                penalty_amount=row['penalty_amount'] if 'penalty_amount' in row.keys() else 0,
+                is_blocked=bool(row['is_blocked']) if 'is_blocked' in row.keys() else False,
+                created_at=datetime.fromisoformat(row['created_at']),
+                updated_at=datetime.fromisoformat(row['updated_at'])
+            )
+            
+            # Создаем статистику платформы
+            platform_stats = PlatformStats(
+                platform=platform,
+                subscribers_count=row['subscribers_count'],
+                engagement_rate=row['engagement_rate'],
+                avg_views=row['avg_views'],
+                avg_likes=row['avg_likes'],
+                audience_13_17_percent=row['audience_13_17_percent'],
+                audience_18_24_percent=row['audience_18_24_percent'],
+                audience_25_35_percent=row['audience_25_35_percent'],
+                audience_35_plus_percent=row['audience_35_plus_percent'],
+                female_percent=row['female_percent'],
+                male_percent=row['male_percent'],
+                price_stories=row['price_stories'],
+                price_reels=row['price_reels'],
+                price_post=row['price_post'],
+                stories_reach_min=row['stories_reach_min'],
+                stories_reach_max=row['stories_reach_max'],
+                reels_reach_min=row['reels_reach_min'],
+                reels_reach_max=row['reels_reach_max'],
+                stats_images=json.loads(row['stats_images']) if row['stats_images'] else []
+            )
+            
+            # Создаем блогера
+            blogger = Blogger(
+                id=row['id'],
+                seller_id=row['seller_id'],
+                name=row['name'],
+                url=row['url'],
+                platforms=json.loads(row['platforms']) if row['platforms'] else [],
+                platform_stats={platform: platform_stats},
+                audience_13_17_percent=row['audience_13_17_percent'],
+                audience_18_24_percent=row['audience_18_24_percent'],
+                audience_25_35_percent=row['audience_25_35_percent'],
+                audience_35_plus_percent=row['audience_35_plus_percent'],
+                female_percent=row['female_percent'],
+                male_percent=row['male_percent'],
+                categories=json.loads(row['categories']) if row['categories'] else [],
+                price_stories=row['price_stories'],
+                price_reels=row['price_reels'],
+                subscribers_count=row['subscribers_count'],
+                engagement_rate=row['engagement_rate'],
+                avg_views=row['avg_views'],
+                avg_likes=row['avg_likes'],
+                stories_reach_min=row['stories_reach_min'],
+                stories_reach_max=row['stories_reach_max'],
+                reels_reach_min=row['reels_reach_min'],
+                reels_reach_max=row['reels_reach_max'],
+                stats_images=json.loads(row['stats_images']) if row['stats_images'] else [],
+                description=row['description'],
+                created_at=datetime.fromisoformat(row['created_at']),
+                updated_at=datetime.fromisoformat(row['updated_at'])
+            )
+            
+            results.append((blogger, user))
+        
+        return results 
