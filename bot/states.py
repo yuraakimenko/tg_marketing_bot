@@ -45,6 +45,37 @@ class SellerStates(StatesGroup):
     editing_blogger = State()
     waiting_for_edit_field = State()
     waiting_for_new_value = State()
+    
+    # Новые состояния для статистики по платформам
+    waiting_for_platform_stats = State()  # Выбор платформы для добавления статистики
+    waiting_for_platform_subscribers = State()  # Подписчики для платформы
+    waiting_for_platform_engagement = State()  # Вовлеченность для платформы
+    waiting_for_platform_avg_views = State()  # Средние просмотры для платформы
+    waiting_for_platform_avg_likes = State()  # Средние лайки для платформы
+    
+    # Демография для платформы
+    waiting_for_platform_age_13_17 = State()  # % аудитории 13-17 лет
+    waiting_for_platform_age_18_24 = State()  # % аудитории 18-24 лет
+    waiting_for_platform_age_25_35 = State()  # % аудитории 25-35 лет
+    waiting_for_platform_age_35_plus = State()  # % аудитории 35+ лет
+    
+    # Пол аудитории для платформы
+    waiting_for_platform_female_percent = State()  # % женской аудитории
+    
+    # Цены для платформы
+    waiting_for_platform_price_stories = State()  # Цена за истории
+    waiting_for_platform_price_reels = State()  # Цена за рилс
+    waiting_for_platform_price_post = State()  # Цена за пост
+    
+    # Охваты для платформы
+    waiting_for_platform_stories_reach_min = State()  # Минимальный охват сторис
+    waiting_for_platform_stories_reach_max = State()  # Максимальный охват сторис
+    waiting_for_platform_reels_reach_min = State()  # Минимальный охват рилс
+    waiting_for_platform_reels_reach_max = State()  # Максимальный охват рилс
+    
+    # Фото статистики для платформы
+    waiting_for_platform_stats_photos = State()  # Загрузка фото статистики для платформы
+    waiting_for_platform_stats_photos_confirmation = State()  # Подтверждение фото для платформы
 
 
 class BuyerStates(StatesGroup):

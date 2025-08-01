@@ -603,7 +603,7 @@ async def handle_stats_photo(message: Message, state: FSMContext):
         await message.answer(
             f"📊 <b>Статистика профиля</b>\n\n"
             f"✅ Фото добавлено (всего: {len(stats_photos)})\n\n"
-            f"Отправьте еще фото или нажмите 'Готово':",
+            f"Отправьте еще фото или видео, или нажмите 'Готово':",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="✅ Готово", callback_data="edit_stats_photos_done")],
                 [InlineKeyboardButton(text="❌ Отмена", callback_data=f"edit_blogger_fields_{blogger_id}")]
@@ -615,7 +615,48 @@ async def handle_stats_photo(message: Message, state: FSMContext):
         await message.answer(
             f"📊 <b>Статистика профиля</b>\n\n"
             f"✅ Фото добавлено (всего: {len(stats_photos)})\n\n"
-            f"Отправьте еще фото или нажмите 'Готово':",
+            f"Отправьте еще фото или видео, или нажмите 'Готово':",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="✅ Готово", callback_data="stats_photos_done")],
+                [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_price_reels")]
+            ]),
+            parse_mode="HTML"
+        )
+
+
+@router.message(SellerStates.waiting_for_stats_photos, F.video)
+async def handle_stats_video(message: Message, state: FSMContext):
+    """Обработка загрузки видео статистики"""
+    data = await state.get_data()
+    stats_photos = data.get('stats_photos', [])
+    
+    # Получаем file_id видео
+    video = message.video
+    stats_photos.append(video.file_id)
+    
+    await state.update_data(stats_photos=stats_photos)
+    
+    # Проверяем, редактируем ли мы существующего блогера
+    if 'editing_blogger_id' in data:
+        blogger_id = data['editing_blogger_id']
+        
+        # Отправляем одно сообщение с обновленной информацией
+        await message.answer(
+            f"📊 <b>Статистика профиля</b>\n\n"
+            f"✅ Видео добавлено (всего: {len(stats_photos)})\n\n"
+            f"Отправьте еще фото или видео, или нажмите 'Готово':",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="✅ Готово", callback_data="edit_stats_photos_done")],
+                [InlineKeyboardButton(text="❌ Отмена", callback_data=f"edit_blogger_fields_{blogger_id}")]
+            ]),
+            parse_mode="HTML"
+        )
+    else:
+        # Это добавление нового блогера
+        await message.answer(
+            f"📊 <b>Статистика профиля</b>\n\n"
+            f"✅ Видео добавлено (всего: {len(stats_photos)})\n\n"
+            f"Отправьте еще фото или видео, или нажмите 'Готово':",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="✅ Готово", callback_data="stats_photos_done")],
                 [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_price_reels")]
@@ -2252,29 +2293,599 @@ async def confirm_edit_stats_photos(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data == "retry_edit_stats_photos", SellerStates.waiting_for_stats_photos_confirmation)
 async def retry_edit_stats_photos(callback: CallbackQuery, state: FSMContext):
-    """Повторная загрузка фотографий при редактировании"""
-    await callback.answer()
-    
+    """Повторная загрузка фото статистики при редактировании"""
     data = await state.get_data()
     blogger_id = data.get('editing_blogger_id')
     
-    if not blogger_id:
-        await callback.message.edit_text("❌ Ошибка: не найден ID блогера")
-        return
-    
-    # Очищаем загруженные фотографии
     await state.update_data(stats_photos=[])
-    
     await callback.message.edit_text(
-        "📊 <b>Редактирование фото статистики</b>\n\n"
-        "Загрузите новые скриншоты статистики.\n"
-        "Когда закончите, нажмите кнопку 'Готово':",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="✅ Готово", callback_data="edit_stats_photos_done")],
-            [InlineKeyboardButton(text="❌ Отмена", callback_data=f"edit_blogger_fields_{blogger_id}")]
-        ]),
+        "📸 <b>Загрузка фото статистики</b>\n\n"
+        "Отправьте фото со статистикой профиля.\n"
+        "Можно отправить несколько фото.\n\n"
+        "Когда закончите, нажмите кнопку «Готово» или напишите «готово».",
+        reply_markup=get_blogger_addition_navigation_with_back("stats_photos_done"),
         parse_mode="HTML"
     )
-    
-    # Возвращаемся к состоянию загрузки фотографий
     await state.set_state(SellerStates.waiting_for_stats_photos)
+
+
+# === НОВЫЕ ОБРАБОТЧИКИ ДЛЯ СТАТИСТИКИ ПО ПЛАТФОРМАМ ===
+
+@router.callback_query(F.data.startswith("add_platform_stats_"))
+async def handle_add_platform_stats(callback: CallbackQuery, state: FSMContext):
+    """Начало добавления статистики для платформы"""
+    blogger_id = int(callback.data.split("_")[3])
+    
+    await state.update_data(editing_blogger_id=blogger_id)
+    
+    # Создаем клавиатуру для выбора платформы
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📱 Instagram", callback_data=f"platform_stats_instagram_{blogger_id}")],
+        [InlineKeyboardButton(text="📺 YouTube", callback_data=f"platform_stats_youtube_{blogger_id}")],
+        [InlineKeyboardButton(text="📢 Telegram", callback_data=f"platform_stats_telegram_{blogger_id}")],
+        [InlineKeyboardButton(text="🎵 TikTok", callback_data=f"platform_stats_tiktok_{blogger_id}")],
+        [InlineKeyboardButton(text="💙 VK", callback_data=f"platform_stats_vk_{blogger_id}")],
+        [InlineKeyboardButton(text="🔙 Назад", callback_data=f"edit_blogger_{blogger_id}")]
+    ])
+    
+    await callback.message.edit_text(
+        "📊 <b>Добавление статистики по платформе</b>\n\n"
+        "Выберите платформу, для которой хотите добавить статистику:",
+        reply_markup=keyboard,
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_platform_stats)
+
+
+@router.callback_query(F.data.startswith("platform_stats_"))
+async def handle_platform_stats_selection(callback: CallbackQuery, state: FSMContext):
+    """Выбор платформы для добавления статистики"""
+    parts = callback.data.split("_")
+    platform_name = parts[2]
+    blogger_id = int(parts[3])
+    
+    platform = Platform(platform_name)
+    
+    await state.update_data(
+        current_platform=platform.value,
+        platform_stats_data={}
+    )
+    
+    await callback.message.edit_text(
+        f"📊 <b>Статистика для {platform.get_russian_name()}</b>\n\n"
+        f"Введите количество подписчиков:",
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_platform_subscribers)
+
+
+@router.message(SellerStates.waiting_for_platform_subscribers)
+async def handle_platform_subscribers(message: Message, state: FSMContext):
+    """Обработка количества подписчиков для платформы"""
+    try:
+        subscribers = int(message.text.replace(" ", "").replace(",", ""))
+        if subscribers <= 0:
+            await message.answer("❌ Количество подписчиков должно быть положительным числом.")
+            return
+        
+        data = await state.get_data()
+        platform_stats_data = data.get('platform_stats_data', {})
+        platform_stats_data['subscribers_count'] = subscribers
+        await state.update_data(platform_stats_data=platform_stats_data)
+        
+        await message.answer(
+            "📈 <b>Вовлеченность</b>\n\n"
+            "Введите процент вовлеченности (например: 3.5):",
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_platform_engagement)
+        
+    except ValueError:
+        await message.answer("❌ Пожалуйста, введите корректное число.")
+
+
+@router.message(SellerStates.waiting_for_platform_engagement)
+async def handle_platform_engagement(message: Message, state: FSMContext):
+    """Обработка вовлеченности для платформы"""
+    try:
+        engagement = float(message.text.replace(",", "."))
+        if engagement < 0 or engagement > 100:
+            await message.answer("❌ Процент вовлеченности должен быть от 0 до 100.")
+            return
+        
+        data = await state.get_data()
+        platform_stats_data = data.get('platform_stats_data', {})
+        platform_stats_data['engagement_rate'] = engagement
+        await state.update_data(platform_stats_data=platform_stats_data)
+        
+        await message.answer(
+            "👁️ <b>Средние просмотры</b>\n\n"
+            "Введите среднее количество просмотров:",
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_platform_avg_views)
+        
+    except ValueError:
+        await message.answer("❌ Пожалуйста, введите корректное число.")
+
+
+@router.message(SellerStates.waiting_for_platform_avg_views)
+async def handle_platform_avg_views(message: Message, state: FSMContext):
+    """Обработка средних просмотров для платформы"""
+    try:
+        avg_views = int(message.text.replace(" ", "").replace(",", ""))
+        if avg_views < 0:
+            await message.answer("❌ Количество просмотров должно быть положительным числом.")
+            return
+        
+        data = await state.get_data()
+        platform_stats_data = data.get('platform_stats_data', {})
+        platform_stats_data['avg_views'] = avg_views
+        await state.update_data(platform_stats_data=platform_stats_data)
+        
+        await message.answer(
+            "❤️ <b>Средние лайки</b>\n\n"
+            "Введите среднее количество лайков:",
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_platform_avg_likes)
+        
+    except ValueError:
+        await message.answer("❌ Пожалуйста, введите корректное число.")
+
+
+@router.message(SellerStates.waiting_for_platform_avg_likes)
+async def handle_platform_avg_likes(message: Message, state: FSMContext):
+    """Обработка средних лайков для платформы"""
+    try:
+        avg_likes = int(message.text.replace(" ", "").replace(",", ""))
+        if avg_likes < 0:
+            await message.answer("❌ Количество лайков должно быть положительным числом.")
+            return
+        
+        data = await state.get_data()
+        platform_stats_data = data.get('platform_stats_data', {})
+        platform_stats_data['avg_likes'] = avg_likes
+        await state.update_data(platform_stats_data=platform_stats_data)
+        
+        await message.answer(
+            "👥 <b>Демография аудитории</b>\n\n"
+            "Введите процент аудитории 13-17 лет:",
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_platform_age_13_17)
+        
+    except ValueError:
+        await message.answer("❌ Пожалуйста, введите корректное число.")
+
+
+@router.message(SellerStates.waiting_for_platform_age_13_17)
+async def handle_platform_age_13_17(message: Message, state: FSMContext):
+    """Обработка % аудитории 13-17 лет"""
+    try:
+        percent = int(message.text.replace("%", "").strip())
+        if percent < 0 or percent > 100:
+            await message.answer("❌ Процент должен быть от 0 до 100.")
+            return
+        
+        data = await state.get_data()
+        platform_stats_data = data.get('platform_stats_data', {})
+        platform_stats_data['audience_13_17_percent'] = percent
+        await state.update_data(platform_stats_data=platform_stats_data)
+        
+        await message.answer(
+            "👥 <b>Демография аудитории</b>\n\n"
+            "Введите процент аудитории 18-24 лет:",
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_platform_age_18_24)
+        
+    except ValueError:
+        await message.answer("❌ Пожалуйста, введите корректное число.")
+
+
+@router.message(SellerStates.waiting_for_platform_age_18_24)
+async def handle_platform_age_18_24(message: Message, state: FSMContext):
+    """Обработка % аудитории 18-24 лет"""
+    try:
+        percent = int(message.text.replace("%", "").strip())
+        if percent < 0 or percent > 100:
+            await message.answer("❌ Процент должен быть от 0 до 100.")
+            return
+        
+        data = await state.get_data()
+        platform_stats_data = data.get('platform_stats_data', {})
+        platform_stats_data['audience_18_24_percent'] = percent
+        await state.update_data(platform_stats_data=platform_stats_data)
+        
+        await message.answer(
+            "👥 <b>Демография аудитории</b>\n\n"
+            "Введите процент аудитории 25-35 лет:",
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_platform_age_25_35)
+        
+    except ValueError:
+        await message.answer("❌ Пожалуйста, введите корректное число.")
+
+
+@router.message(SellerStates.waiting_for_platform_age_25_35)
+async def handle_platform_age_25_35(message: Message, state: FSMContext):
+    """Обработка % аудитории 25-35 лет"""
+    try:
+        percent = int(message.text.replace("%", "").strip())
+        if percent < 0 or percent > 100:
+            await message.answer("❌ Процент должен быть от 0 до 100.")
+            return
+        
+        data = await state.get_data()
+        platform_stats_data = data.get('platform_stats_data', {})
+        platform_stats_data['audience_25_35_percent'] = percent
+        await state.update_data(platform_stats_data=platform_stats_data)
+        
+        # Автоматически вычисляем остаток для 35+
+        total_so_far = (
+            platform_stats_data.get('audience_13_17_percent', 0) +
+            platform_stats_data.get('audience_18_24_percent', 0) +
+            percent
+        )
+        remaining = max(0, 100 - total_so_far)
+        platform_stats_data['audience_35_plus_percent'] = remaining
+        await state.update_data(platform_stats_data=platform_stats_data)
+        
+        await message.answer(
+            f"👥 <b>Демография аудитории</b>\n\n"
+            f"Процент аудитории 35+ лет: <b>{remaining}%</b>\n\n"
+            f"Теперь введите процент женской аудитории:",
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_platform_female_percent)
+        
+    except ValueError:
+        await message.answer("❌ Пожалуйста, введите корректное число.")
+
+
+@router.message(SellerStates.waiting_for_platform_female_percent)
+async def handle_platform_female_percent(message: Message, state: FSMContext):
+    """Обработка % женской аудитории"""
+    try:
+        percent = int(message.text.replace("%", "").strip())
+        if percent < 0 or percent > 100:
+            await message.answer("❌ Процент должен быть от 0 до 100.")
+            return
+        
+        data = await state.get_data()
+        platform_stats_data = data.get('platform_stats_data', {})
+        platform_stats_data['female_percent'] = percent
+        platform_stats_data['male_percent'] = 100 - percent
+        await state.update_data(platform_stats_data=platform_stats_data)
+        
+        await message.answer(
+            f"👥 <b>Пол аудитории</b>\n\n"
+            f"Женщины: <b>{percent}%</b>\n"
+            f"Мужчины: <b>{100 - percent}%</b>\n\n"
+            f"Теперь введите цену за истории:",
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_platform_price_stories)
+        
+    except ValueError:
+        await message.answer("❌ Пожалуйста, введите корректное число.")
+
+
+@router.message(SellerStates.waiting_for_platform_price_stories)
+async def handle_platform_price_stories(message: Message, state: FSMContext):
+    """Обработка цены за истории для платформы"""
+    try:
+        price = int(message.text.replace(" ", "").replace(",", "").replace("₽", ""))
+        if price < 0:
+            await message.answer("❌ Цена должна быть положительным числом.")
+            return
+        
+        data = await state.get_data()
+        platform_stats_data = data.get('platform_stats_data', {})
+        platform_stats_data['price_stories'] = price
+        await state.update_data(platform_stats_data=platform_stats_data)
+        
+        await message.answer(
+            "💰 <b>Цена за рилс/видео</b>\n\n"
+            "Введите цену за рилс или видео:",
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_platform_price_reels)
+        
+    except ValueError:
+        await message.answer("❌ Пожалуйста, введите корректное число.")
+
+
+@router.message(SellerStates.waiting_for_platform_price_reels)
+async def handle_platform_price_reels(message: Message, state: FSMContext):
+    """Обработка цены за рилс для платформы"""
+    try:
+        price = int(message.text.replace(" ", "").replace(",", "").replace("₽", ""))
+        if price < 0:
+            await message.answer("❌ Цена должна быть положительным числом.")
+            return
+        
+        data = await state.get_data()
+        platform_stats_data = data.get('platform_stats_data', {})
+        platform_stats_data['price_reels'] = price
+        await state.update_data(platform_stats_data=platform_stats_data)
+        
+        await message.answer(
+            "💰 <b>Цена за пост</b>\n\n"
+            "Введите цену за пост:",
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_platform_price_post)
+        
+    except ValueError:
+        await message.answer("❌ Пожалуйста, введите корректное число.")
+
+
+@router.message(SellerStates.waiting_for_platform_price_post)
+async def handle_platform_price_post(message: Message, state: FSMContext):
+    """Обработка цены за пост для платформы"""
+    try:
+        price = int(message.text.replace(" ", "").replace(",", "").replace("₽", ""))
+        if price < 0:
+            await message.answer("❌ Цена должна быть положительным числом.")
+            return
+        
+        data = await state.get_data()
+        platform_stats_data = data.get('platform_stats_data', {})
+        platform_stats_data['price_post'] = price
+        await state.update_data(platform_stats_data=platform_stats_data)
+        
+        await message.answer(
+            "📊 <b>Охват сторис</b>\n\n"
+            "Введите минимальный охват сторис:",
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_platform_stories_reach_min)
+        
+    except ValueError:
+        await message.answer("❌ Пожалуйста, введите корректное число.")
+
+
+@router.message(SellerStates.waiting_for_platform_stories_reach_min)
+async def handle_platform_stories_reach_min(message: Message, state: FSMContext):
+    """Обработка минимального охвата сторис для платформы"""
+    try:
+        reach = int(message.text.replace(" ", "").replace(",", ""))
+        if reach < 0:
+            await message.answer("❌ Охват должен быть положительным числом.")
+            return
+        
+        data = await state.get_data()
+        platform_stats_data = data.get('platform_stats_data', {})
+        platform_stats_data['stories_reach_min'] = reach
+        await state.update_data(platform_stats_data=platform_stats_data)
+        
+        await message.answer(
+            "📊 <b>Охват сторис</b>\n\n"
+            "Введите максимальный охват сторис:",
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_platform_stories_reach_max)
+        
+    except ValueError:
+        await message.answer("❌ Пожалуйста, введите корректное число.")
+
+
+@router.message(SellerStates.waiting_for_platform_stories_reach_max)
+async def handle_platform_stories_reach_max(message: Message, state: FSMContext):
+    """Обработка максимального охвата сторис для платформы"""
+    try:
+        reach = int(message.text.replace(" ", "").replace(",", ""))
+        if reach < 0:
+            await message.answer("❌ Охват должен быть положительным числом.")
+            return
+        
+        data = await state.get_data()
+        platform_stats_data = data.get('platform_stats_data', {})
+        platform_stats_data['stories_reach_max'] = reach
+        await state.update_data(platform_stats_data=platform_stats_data)
+        
+        await message.answer(
+            "📊 <b>Охват рилс</b>\n\n"
+            "Введите минимальный охват рилс:",
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_platform_reels_reach_min)
+        
+    except ValueError:
+        await message.answer("❌ Пожалуйста, введите корректное число.")
+
+
+@router.message(SellerStates.waiting_for_platform_reels_reach_min)
+async def handle_platform_reels_reach_min(message: Message, state: FSMContext):
+    """Обработка минимального охвата рилс для платформы"""
+    try:
+        reach = int(message.text.replace(" ", "").replace(",", ""))
+        if reach < 0:
+            await message.answer("❌ Охват должен быть положительным числом.")
+            return
+        
+        data = await state.get_data()
+        platform_stats_data = data.get('platform_stats_data', {})
+        platform_stats_data['reels_reach_min'] = reach
+        await state.update_data(platform_stats_data=platform_stats_data)
+        
+        await message.answer(
+            "📊 <b>Охват рилс</b>\n\n"
+            "Введите максимальный охват рилс:",
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_platform_reels_reach_max)
+        
+    except ValueError:
+        await message.answer("❌ Пожалуйста, введите корректное число.")
+
+
+@router.message(SellerStates.waiting_for_platform_reels_reach_max)
+async def handle_platform_reels_reach_max(message: Message, state: FSMContext):
+    """Обработка максимального охвата рилс для платформы"""
+    try:
+        reach = int(message.text.replace(" ", "").replace(",", ""))
+        if reach < 0:
+            await message.answer("❌ Охват должен быть положительным числом.")
+            return
+        
+        data = await state.get_data()
+        platform_stats_data = data.get('platform_stats_data', {})
+        platform_stats_data['reels_reach_max'] = reach
+        await state.update_data(platform_stats_data=platform_stats_data)
+        
+        await message.answer(
+            "📸 <b>Фото/видео статистики</b>\n\n"
+            "Отправьте фото или видео со статистикой профиля.\n"
+            "Можно отправить несколько файлов.\n\n"
+            "Когда закончите, нажмите кнопку «Готово» или напишите «готово».",
+            reply_markup=get_blogger_addition_navigation_with_back("platform_stats_photos_done"),
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_platform_stats_photos)
+        
+    except ValueError:
+        await message.answer("❌ Пожалуйста, введите корректное число.")
+
+
+@router.message(SellerStates.waiting_for_platform_stats_photos, F.photo)
+async def handle_platform_stats_photo(message: Message, state: FSMContext):
+    """Обработка загрузки фото статистики для платформы"""
+    data = await state.get_data()
+    stats_photos = data.get('platform_stats_photos', [])
+    
+    # Получаем file_id фото
+    photo = message.photo[-1]
+    stats_photos.append(photo.file_id)
+    
+    await state.update_data(platform_stats_photos=stats_photos)
+    
+    await message.answer(
+        f"✅ Фото {len(stats_photos)} загружено!\n\n"
+        f"Отправьте еще фото или видео, или нажмите «Готово».",
+        reply_markup=get_blogger_addition_navigation_with_back("platform_stats_photos_done")
+    )
+
+
+@router.message(SellerStates.waiting_for_platform_stats_photos, F.video)
+async def handle_platform_stats_video(message: Message, state: FSMContext):
+    """Обработка загрузки видео статистики для платформы"""
+    data = await state.get_data()
+    stats_photos = data.get('platform_stats_photos', [])
+    
+    # Получаем file_id видео
+    video = message.video
+    stats_photos.append(video.file_id)
+    
+    await state.update_data(platform_stats_photos=stats_photos)
+    
+    await message.answer(
+        f"✅ Видео {len(stats_photos)} загружено!\n\n"
+        f"Отправьте еще фото или видео, или нажмите «Готово».",
+        reply_markup=get_blogger_addition_navigation_with_back("platform_stats_photos_done")
+    )
+
+
+@router.message(SellerStates.waiting_for_platform_stats_photos, F.text.lower() == "готово")
+@router.callback_query(F.data == "platform_stats_photos_done", SellerStates.waiting_for_platform_stats_photos)
+async def finish_platform_stats_photos(update: Union[Message, CallbackQuery], state: FSMContext):
+    """Завершение загрузки фото статистики для платформы"""
+    data = await state.get_data()
+    stats_photos = data.get('platform_stats_photos', [])
+    
+    if not stats_photos:
+        await update.answer("❌ Нужно загрузить хотя бы одно фото.")
+        return
+    
+    # Показываем загруженные фото для подтверждения
+    await send_platform_stats_photos_for_confirmation(update, stats_photos, state)
+
+
+async def send_platform_stats_photos_for_confirmation(update, stats_photos, state):
+    """Отправка фото статистики для подтверждения"""
+    data = await state.get_data()
+    platform_name = data.get('current_platform')
+    platform = Platform(platform_name)
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Подтвердить", callback_data="confirm_platform_stats_photos")],
+        [InlineKeyboardButton(text="🔄 Загрузить заново", callback_data="retry_platform_stats_photos")],
+        [InlineKeyboardButton(text="🔙 Назад", callback_data=f"edit_blogger_{data.get('editing_blogger_id')}")]
+    ])
+    
+    if isinstance(update, CallbackQuery):
+        await update.message.edit_text(
+            f"📸 <b>Подтверждение фото статистики для {platform.get_russian_name()}</b>\n\n"
+            f"Загружено фото: {len(stats_photos)} шт.\n\n"
+            f"Подтвердите загрузку или загрузите заново.",
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
+    else:
+        await update.answer(
+            f"📸 <b>Подтверждение фото статистики для {platform.get_russian_name()}</b>\n\n"
+            f"Загружено фото: {len(stats_photos)} шт.\n\n"
+            f"Подтвердите загрузку или загрузите заново.",
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
+    
+    await state.set_state(SellerStates.waiting_for_platform_stats_photos_confirmation)
+
+
+@router.callback_query(F.data == "confirm_platform_stats_photos", SellerStates.waiting_for_platform_stats_photos_confirmation)
+async def confirm_platform_stats_photos(callback: CallbackQuery, state: FSMContext):
+    """Подтверждение фото статистики для платформы"""
+    data = await state.get_data()
+    blogger_id = data.get('editing_blogger_id')
+    platform_name = data.get('current_platform')
+    platform = Platform(platform_name)
+    platform_stats_data = data.get('platform_stats_data', {})
+    stats_photos = data.get('platform_stats_photos', [])
+    
+    # Добавляем фото к данным статистики
+    platform_stats_data['stats_images'] = stats_photos
+    
+    # Сохраняем статистику в базу данных
+    from database.database import create_platform_stats
+    success = await create_platform_stats(blogger_id, platform, **platform_stats_data)
+    
+    if success:
+        await callback.message.edit_text(
+            f"✅ <b>Статистика для {platform.get_russian_name()} успешно добавлена!</b>\n\n"
+            f"📊 Подписчики: {platform_stats_data.get('subscribers_count', 0):,}\n"
+            f"📈 Вовлеченность: {platform_stats_data.get('engagement_rate', 0):.1f}%\n"
+            f"📸 Фото: {len(stats_photos)} шт.\n\n"
+            f"Хотите добавить статистику для другой платформы?",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="➕ Добавить еще", callback_data=f"add_platform_stats_{blogger_id}")],
+                [InlineKeyboardButton(text="👥 Мои блогеры", callback_data="show_my_bloggers")]
+            ]),
+            parse_mode="HTML"
+        )
+    else:
+        await callback.message.edit_text(
+            "❌ <b>Ошибка при сохранении статистики</b>\n\n"
+            "Попробуйте еще раз или обратитесь в поддержку.",
+            parse_mode="HTML"
+        )
+    
+    await state.clear()
+
+
+@router.callback_query(F.data == "retry_platform_stats_photos", SellerStates.waiting_for_platform_stats_photos_confirmation)
+async def retry_platform_stats_photos(callback: CallbackQuery, state: FSMContext):
+    """Повторная загрузка фото статистики для платформы"""
+    await state.update_data(platform_stats_photos=[])
+    await callback.message.edit_text(
+        "📸 <b>Загрузка фото статистики</b>\n\n"
+        "Отправьте фото со статистикой профиля.\n"
+        "Можно отправить несколько фото.\n\n"
+        "Когда закончите, нажмите кнопку «Готово» или напишите «готово».",
+        reply_markup=get_blogger_addition_navigation_with_back("platform_stats_photos_done"),
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_platform_stats_photos)

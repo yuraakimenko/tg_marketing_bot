@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional, List, Set
+from typing import Optional, List, Set, Dict
 from datetime import datetime
 from enum import Enum
 
@@ -24,6 +24,17 @@ class Platform(Enum):
     TELEGRAM = "telegram"
     TIKTOK = "tiktok"
     VK = "vk"
+    
+    def get_russian_name(self) -> str:
+        """Получить русское название платформы"""
+        names = {
+            "instagram": "Instagram",
+            "youtube": "YouTube",
+            "telegram": "Telegram",
+            "tiktok": "TikTok",
+            "vk": "VK"
+        }
+        return names.get(self.value, self.value)
 
 
 class BlogCategory(Enum):
@@ -64,6 +75,88 @@ class BlogCategory(Enum):
             "not_important": "Неважно"
         }
         return names.get(self.value, self.value)
+
+
+@dataclass
+class PlatformStats:
+    """Статистика для конкретной платформы"""
+    platform: Platform
+    subscribers_count: Optional[int] = None
+    engagement_rate: Optional[float] = None  # Процент вовлеченности
+    avg_views: Optional[int] = None
+    avg_likes: Optional[int] = None
+    
+    # Демография аудитории
+    audience_13_17_percent: Optional[int] = None  # % аудитории 13-17 лет
+    audience_18_24_percent: Optional[int] = None  # % аудитории 18-24 лет
+    audience_25_35_percent: Optional[int] = None  # % аудитории 25-35 лет
+    audience_35_plus_percent: Optional[int] = None  # % аудитории 35+ лет
+    
+    # Пол аудитории
+    female_percent: Optional[int] = None  # % женской аудитории
+    male_percent: Optional[int] = None  # % мужской аудитории
+    
+    # Цены (могут отличаться для разных платформ)
+    price_stories: Optional[int] = None  # Цена за истории/сторис
+    price_reels: Optional[int] = None  # Цена за рилс/видео
+    price_post: Optional[int] = None  # Цена за пост
+    
+    # Охваты (вилка)
+    stories_reach_min: Optional[int] = None  # Минимальный охват сторис
+    stories_reach_max: Optional[int] = None  # Максимальный охват сторис
+    reels_reach_min: Optional[int] = None  # Минимальный охват рилс
+    reels_reach_max: Optional[int] = None  # Максимальный охват рилс
+    
+    # Ссылки на изображения со статистикой
+    stats_images: List[str] = field(default_factory=list)
+    
+    def validate_reach_ranges(self) -> bool:
+        """Проверка корректности диапазонов охватов"""
+        # Проверка диапазона сторис
+        if self.stories_reach_min is not None and self.stories_reach_max is not None:
+            if self.stories_reach_min > self.stories_reach_max:
+                return False
+        
+        # Проверка диапазона рилс
+        if self.reels_reach_min is not None and self.reels_reach_max is not None:
+            if self.reels_reach_min > self.reels_reach_max:
+                return False
+        
+        return True
+    
+    def get_stories_reach_summary(self) -> str:
+        """Получить сводку по охвату сторис"""
+        if self.stories_reach_min and self.stories_reach_max:
+            return f"{self.stories_reach_min:,} - {self.stories_reach_max:,}"
+        elif self.stories_reach_min or self.stories_reach_max:
+            reach = self.stories_reach_min or self.stories_reach_max
+            return f"~{reach:,}"
+        else:
+            return "Не указано"
+    
+    def get_reels_reach_summary(self) -> str:
+        """Получить сводку по охвату рилс"""
+        if self.reels_reach_min and self.reels_reach_max:
+            return f"{self.reels_reach_min:,} - {self.reels_reach_max:,}"
+        elif self.reels_reach_min or self.reels_reach_max:
+            reach = self.reels_reach_min or self.reels_reach_max
+            return f"~{reach:,}"
+        else:
+            return "Не указано"
+    
+    def get_age_categories_summary(self) -> str:
+        """Получить сводку по возрастным категориям"""
+        age_parts = []
+        if self.audience_13_17_percent:
+            age_parts.append(f"13-17: {self.audience_13_17_percent}%")
+        if self.audience_18_24_percent:
+            age_parts.append(f"18-24: {self.audience_18_24_percent}%")
+        if self.audience_25_35_percent:
+            age_parts.append(f"25-35: {self.audience_25_35_percent}%")
+        if self.audience_35_plus_percent:
+            age_parts.append(f"35+: {self.audience_35_plus_percent}%")
+        
+        return ", ".join(age_parts) if age_parts else "Не указано"
 
 
 @dataclass
@@ -117,47 +210,69 @@ class User:
 
 @dataclass
 class Blogger:
-    """Модель блогера"""
+    """Модель блогера с поддержкой статистики по нескольким платформам"""
     id: int
     seller_id: int
     name: str
     url: str
     platforms: List[Platform] = field(default_factory=list)  # Множественный выбор платформ
     
-    # Демография аудитории
+    # Статистика по платформам (новое поле)
+    platform_stats: Dict[Platform, PlatformStats] = field(default_factory=dict)
+    
+    # Общая демография аудитории (для обратной совместимости)
     audience_13_17_percent: Optional[int] = None  # % аудитории 13-17 лет
     audience_18_24_percent: Optional[int] = None  # % аудитории 18-24 лет
     audience_25_35_percent: Optional[int] = None  # % аудитории 25-35 лет
     audience_35_plus_percent: Optional[int] = None  # % аудитории 35+ лет
     
-    # Пол аудитории
+    # Общий пол аудитории (для обратной совместимости)
     female_percent: Optional[int] = None  # % женской аудитории
     male_percent: Optional[int] = None  # % мужской аудитории
     
     # Категории (максимум 3)
     categories: List[BlogCategory] = field(default_factory=list)  # Список категорий
     
-    # Цены
+    # Общие цены (для обратной совместимости)
     price_stories: Optional[int] = None  # Цена за 4 истории
     price_reels: Optional[int] = None  # Цена за рилс
     
-    # Статистика (будет разной для разных платформ)
+    # Общая статистика (для обратной совместимости)
     subscribers_count: Optional[int] = None
+    engagement_rate: Optional[float] = None
+    avg_views: Optional[int] = None
+    avg_likes: Optional[int] = None
     
-    # Охваты сторис (вилка)
+    # Общие охваты сторис (вилка) (для обратной совместимости)
     stories_reach_min: Optional[int] = None  # Минимальный охват сторис
     stories_reach_max: Optional[int] = None  # Максимальный охват сторис
     
-    # Охваты рилс (вилка)
+    # Общие охваты рилс (вилка) (для обратной совместимости)
     reels_reach_min: Optional[int] = None  # Минимальный охват рилс
     reels_reach_max: Optional[int] = None  # Максимальный охват рилс
 
-    # Ссылки на изображения со статистикой
+    # Ссылки на изображения со статистикой (для обратной совместимости)
     stats_images: List[str] = field(default_factory=list)
     
     description: Optional[str] = None
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
+    
+    def get_platform_stats(self, platform: Platform) -> Optional[PlatformStats]:
+        """Получить статистику для конкретной платформы"""
+        return self.platform_stats.get(platform)
+    
+    def set_platform_stats(self, platform: Platform, stats: PlatformStats) -> None:
+        """Установить статистику для конкретной платформы"""
+        self.platform_stats[platform] = stats
+    
+    def has_platform_stats(self, platform: Platform) -> bool:
+        """Проверить, есть ли статистика для платформы"""
+        return platform in self.platform_stats
+    
+    def get_platforms_with_stats(self) -> List[Platform]:
+        """Получить список платформ, для которых есть статистика"""
+        return list(self.platform_stats.keys())
     
     def validate_reach_ranges(self) -> bool:
         """Проверка корректности диапазонов охватов"""
@@ -195,7 +310,21 @@ class Blogger:
     
     def get_platforms_summary(self) -> str:
         """Получить сводку по платформам"""
-        return ", ".join([platform.value for platform in self.platforms]) if self.platforms else "Не указано"
+        return ", ".join([platform.get_russian_name() for platform in self.platforms]) if self.platforms else "Не указано"
+    
+    def get_age_categories_summary(self) -> str:
+        """Получить сводку по возрастным категориям"""
+        age_parts = []
+        if self.audience_13_17_percent:
+            age_parts.append(f"13-17: {self.audience_13_17_percent}%")
+        if self.audience_18_24_percent:
+            age_parts.append(f"18-24: {self.audience_18_24_percent}%")
+        if self.audience_25_35_percent:
+            age_parts.append(f"25-35: {self.audience_25_35_percent}%")
+        if self.audience_35_plus_percent:
+            age_parts.append(f"35+: {self.audience_35_plus_percent}%")
+        
+        return ", ".join(age_parts) if age_parts else "Не указано"
 
 
 @dataclass

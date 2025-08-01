@@ -510,28 +510,63 @@ async def handle_blogger_selection(callback: CallbackQuery, state: FSMContext):
     info_text += f"🔗 <b>Ссылка:</b> {blogger.url}\n"
     info_text += f"📱 <b>Платформы:</b> {blogger.get_platforms_summary()}\n\n"
     
-    if blogger.subscribers_count:
-        info_text += f"📊 <b>Подписчиков:</b> {blogger.subscribers_count:,}\n"
-    if blogger.avg_views:
-        info_text += f"👁️ <b>Средние просмотры:</b> {blogger.avg_views:,}\n"
-    if blogger.avg_likes:
-        info_text += f"❤️ <b>Средние лайки:</b> {blogger.avg_likes:,}\n"
-    if blogger.engagement_rate:
-        info_text += f"📈 <b>Вовлеченность:</b> {blogger.engagement_rate:.1f}%\n"
-    
-    info_text += f"\n👥 <b>Демография:</b>\n"
-    info_text += f"• Возраст: {blogger.get_age_categories_summary()}\n"
-    info_text += f"• Пол: Женщины {blogger.female_percent}%, Мужчины {blogger.male_percent}%\n"
+    # Показываем статистику по платформам
+    if blogger.platform_stats:
+        info_text += f"📊 <b>Статистика по платформам:</b>\n"
+        for platform, stats in blogger.platform_stats.items():
+            info_text += f"\n📱 <b>{platform.get_russian_name()}:</b>\n"
+            if stats.subscribers_count:
+                info_text += f"• Подписчиков: {stats.subscribers_count:,}\n"
+            if stats.engagement_rate:
+                info_text += f"• Вовлеченность: {stats.engagement_rate:.1f}%\n"
+            if stats.avg_views:
+                info_text += f"• Средние просмотры: {stats.avg_views:,}\n"
+            if stats.avg_likes:
+                info_text += f"• Средние лайки: {stats.avg_likes:,}\n"
+            
+            # Демография
+            if any([stats.audience_13_17_percent, stats.audience_18_24_percent, 
+                   stats.audience_25_35_percent, stats.audience_35_plus_percent]):
+                info_text += f"• Возраст: {stats.get_age_categories_summary()}\n"
+            if stats.female_percent:
+                info_text += f"• Пол: Женщины {stats.female_percent}%, Мужчины {stats.male_percent}%\n"
+            
+            # Цены
+            if stats.price_stories:
+                info_text += f"• Истории: {stats.price_stories:,}₽\n"
+            if stats.price_reels:
+                info_text += f"• Рилс/видео: {stats.price_reels:,}₽\n"
+            if stats.price_post:
+                info_text += f"• Пост: {stats.price_post:,}₽\n"
+            
+            # Охваты
+            if stats.stories_reach_min or stats.stories_reach_max:
+                info_text += f"• Охват сторис: {stats.get_stories_reach_summary()}\n"
+            if stats.reels_reach_min or stats.reels_reach_max:
+                info_text += f"• Охват рилс: {stats.get_reels_reach_summary()}\n"
+    else:
+        # Показываем общую статистику для обратной совместимости
+        if blogger.subscribers_count:
+            info_text += f"📊 <b>Подписчиков:</b> {blogger.subscribers_count:,}\n"
+        if blogger.avg_views:
+            info_text += f"👁️ <b>Средние просмотры:</b> {blogger.avg_views:,}\n"
+        if blogger.avg_likes:
+            info_text += f"❤️ <b>Средние лайки:</b> {blogger.avg_likes:,}\n"
+        if blogger.engagement_rate:
+            info_text += f"📈 <b>Вовлеченность:</b> {blogger.engagement_rate:.1f}%\n"
+        
+        info_text += f"\n👥 <b>Демография:</b>\n"
+        info_text += f"• Возраст: {blogger.get_age_categories_summary()}\n"
+        if blogger.female_percent:
+            info_text += f"• Пол: Женщины {blogger.female_percent}%, Мужчины {blogger.male_percent}%\n"
+        
+        info_text += f"\n💰 <b>Цены:</b>\n"
+        if blogger.price_stories:
+            info_text += f"• Истории: {blogger.price_stories:,}₽\n"
+        if blogger.price_reels:
+            info_text += f"• Рилс: {blogger.price_reels:,}₽\n"
     
     info_text += f"\n🏷️ <b>Категории:</b> {', '.join([cat.get_russian_name() for cat in blogger.categories])}\n"
-    
-    info_text += f"\n💰 <b>Цены:</b>\n"
-    if blogger.price_stories:
-        info_text += f"• Истории: {blogger.price_stories:,}₽\n"
-    if blogger.price_post:
-        info_text += f"• Пост: {blogger.price_post:,}₽\n"
-    if blogger.price_video:
-        info_text += f"• Видео: {blogger.price_video:,}₽\n"
     
     info_text += f"\n📋 <b>Дополнительно:</b>\n"
     info_text += f"• Отзывы: {'✅' if blogger.has_reviews else '❌'}\n"
@@ -541,10 +576,22 @@ async def handle_blogger_selection(callback: CallbackQuery, state: FSMContext):
     if blogger.description:
         info_text += f"\n📝 <b>Описание:</b>\n{blogger.description}"
     
+    # Создаем клавиатуру с кнопкой для просмотра других соцсетей
+    keyboard = get_blogger_selection_keyboard(blogger)
+    
+    # Добавляем кнопку для просмотра других соцсетей, если есть статистика по нескольким платформам
+    if len(blogger.platform_stats) > 1:
+        keyboard.inline_keyboard.append([
+            InlineKeyboardButton(
+                text="📱 Показать другие соцсети блогера", 
+                callback_data=f"show_other_platforms_{blogger_id}"
+            )
+        ])
+    
     await callback.answer()
     await callback.message.edit_text(
         info_text,
-        reply_markup=get_blogger_selection_keyboard(blogger),
+        reply_markup=keyboard,
         parse_mode="HTML"
     )
 
@@ -733,3 +780,130 @@ async def get_user_by_id(user_id: int):
                 updated_at=datetime.fromisoformat(row['updated_at']) if row['updated_at'] else datetime.now()
             )
         return None 
+
+
+@router.callback_query(F.data.startswith("show_other_platforms_"))
+async def handle_show_other_platforms(callback: CallbackQuery, state: FSMContext):
+    """Показать статистику по другим платформам блогера"""
+    blogger_id = int(callback.data.split("_")[3])
+    
+    blogger = await get_blogger(blogger_id)
+    if not blogger:
+        await callback.answer("❌ Блогер не найден")
+        return
+    
+    if not blogger.platform_stats or len(blogger.platform_stats) <= 1:
+        await callback.answer("❌ У блогера нет других соцсетей")
+        return
+    
+    # Создаем клавиатуру для выбора платформы
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[])
+    
+    for platform in blogger.platform_stats.keys():
+        keyboard.inline_keyboard.append([
+            InlineKeyboardButton(
+                text=f"📱 {platform.get_russian_name()}", 
+                callback_data=f"show_platform_stats_{blogger_id}_{platform.value}"
+            )
+        ])
+    
+    keyboard.inline_keyboard.append([
+        InlineKeyboardButton(text="🔙 Назад", callback_data=f"blogger_{blogger_id}")
+    ])
+    
+    await callback.message.edit_text(
+        f"📱 <b>Выберите соцсеть для просмотра статистики</b>\n\n"
+        f"У блогера <b>{blogger.name}</b> есть статистика по следующим платформам:",
+        reply_markup=keyboard,
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data.startswith("show_platform_stats_"))
+async def handle_show_platform_stats(callback: CallbackQuery, state: FSMContext):
+    """Показать статистику для конкретной платформы"""
+    parts = callback.data.split("_")
+    blogger_id = int(parts[3])
+    platform_name = parts[4]
+    
+    blogger = await get_blogger(blogger_id)
+    if not blogger:
+        await callback.answer("❌ Блогер не найден")
+        return
+    
+    platform = Platform(platform_name)
+    stats = blogger.get_platform_stats(platform)
+    
+    if not stats:
+        await callback.answer("❌ Статистика для этой платформы не найдена")
+        return
+    
+    # Формируем информацию о статистике платформы
+    info_text = f"📊 <b>Статистика {platform.get_russian_name()}</b>\n\n"
+    info_text += f"👤 <b>Блогер:</b> {blogger.name}\n"
+    info_text += f"🔗 <b>Ссылка:</b> {blogger.url}\n\n"
+    
+    # Основная статистика
+    if stats.subscribers_count:
+        info_text += f"📊 <b>Подписчиков:</b> {stats.subscribers_count:,}\n"
+    if stats.engagement_rate:
+        info_text += f"📈 <b>Вовлеченность:</b> {stats.engagement_rate:.1f}%\n"
+    if stats.avg_views:
+        info_text += f"👁️ <b>Средние просмотры:</b> {stats.avg_views:,}\n"
+    if stats.avg_likes:
+        info_text += f"❤️ <b>Средние лайки:</b> {stats.avg_likes:,}\n"
+    
+    # Демография
+    if any([stats.audience_13_17_percent, stats.audience_18_24_percent, 
+           stats.audience_25_35_percent, stats.audience_35_plus_percent]):
+        info_text += f"\n👥 <b>Демография:</b>\n"
+        info_text += f"• Возраст: {stats.get_age_categories_summary()}\n"
+    if stats.female_percent:
+        info_text += f"• Пол: Женщины {stats.female_percent}%, Мужчины {stats.male_percent}%\n"
+    
+    # Цены
+    if any([stats.price_stories, stats.price_reels, stats.price_post]):
+        info_text += f"\n💰 <b>Цены:</b>\n"
+        if stats.price_stories:
+            info_text += f"• Истории: {stats.price_stories:,}₽\n"
+        if stats.price_reels:
+            info_text += f"• Рилс/видео: {stats.price_reels:,}₽\n"
+        if stats.price_post:
+            info_text += f"• Пост: {stats.price_post:,}₽\n"
+    
+    # Охваты
+    if stats.stories_reach_min or stats.stories_reach_max:
+        info_text += f"\n📊 <b>Охват сторис:</b> {stats.get_stories_reach_summary()}\n"
+    if stats.reels_reach_min or stats.reels_reach_max:
+        info_text += f"📊 <b>Охват рилс:</b> {stats.get_reels_reach_summary()}\n"
+    
+    # Категории
+    info_text += f"\n🏷️ <b>Категории:</b> {', '.join([cat.get_russian_name() for cat in blogger.categories])}\n"
+    
+    # Кнопки действий
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📞 Получить контакты", callback_data=f"contact_{blogger_id}")],
+        [InlineKeyboardButton(text="⚠️ Подать жалобу", callback_data=f"complain_{blogger_id}")],
+        [InlineKeyboardButton(text="🔙 К списку соцсетей", callback_data=f"show_other_platforms_{blogger_id}")],
+        [InlineKeyboardButton(text="🔙 К результатам поиска", callback_data="back_to_search_results")]
+    ])
+    
+    await callback.message.edit_text(
+        info_text,
+        reply_markup=keyboard,
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data == "back_to_search_results")
+async def handle_back_to_search_results(callback: CallbackQuery, state: FSMContext):
+    """Вернуться к результатам поиска"""
+    data = await state.get_data()
+    
+    # Здесь нужно восстановить результаты поиска из состояния
+    # Пока что просто показываем сообщение
+    await callback.message.edit_text(
+        "🔍 <b>Результаты поиска</b>\n\n"
+        "Используйте кнопку «🔍 Поиск блогеров» для нового поиска.",
+        parse_mode="HTML"
+    ) 
