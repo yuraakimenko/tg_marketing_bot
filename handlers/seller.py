@@ -27,7 +27,7 @@ from bot.keyboards import (
     get_blogger_management_keyboard_with_stats
 )
 from bot.states import SellerStates
-from typing import Union
+from typing import Union, Optional
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -350,13 +350,12 @@ async def handle_subscribers_count(message: Message, state: FSMContext):
     await state.update_data(subscribers_count=count)
     
     await message.answer(
-        "📖 <b>Охват сторис</b>\n\n"
-        "Укажите МИНИМАЛЬНЫЙ охват сторис:\n\n"
-        "💡 <b>Важно:</b> Указывайте именно ОХВАТЫ, а не просмотры!",
+        "👥 <b>Демография</b>\n\n"
+        "Укажите процент аудитории 13-17 лет (0-100):",
         reply_markup=get_blogger_addition_navigation_with_back(),
         parse_mode="HTML"
     )
-    await state.set_state(SellerStates.waiting_for_stories_reach_min)
+    await state.set_state(SellerStates.waiting_for_audience_13_17)
 
 
 @router.message(SellerStates.waiting_for_stories_reach_min, F.text)
@@ -569,18 +568,8 @@ async def handle_price_reels(message: Message, state: FSMContext):
     
     await state.update_data(price_reels=price)
     
-    await message.answer(
-        "📊 <b>Статистика профиля</b>\n\n"
-        "Загрузите скриншоты статистики вашего блога (охваты, аудитория и т.д.).\n"
-        "Вы можете отправить несколько фото.\n\n"
-        "Когда закончите, нажмите кнопку 'Готово' или напишите 'готово':",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="✅ Готово", callback_data="stats_photos_done")],
-            [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_price_reels")]
-        ]),
-        parse_mode="HTML"
-    )
-    await state.set_state(SellerStates.waiting_for_stats_photos)
+    # Переходим к платформенно-специфичным вопросам (Telegram/YouTube) или дальше
+    await route_after_platforms(message, state)
 
 
 @router.message(SellerStates.waiting_for_stats_photos, F.photo)
@@ -787,12 +776,11 @@ async def confirm_categories(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
     
     await callback.message.edit_text(
-        "📄 <b>Описание блогера</b>\n\n"
-        "Напишите краткое описание блогера (или напишите 'пропустить'):",
+        "🛡️ <b>РКН</b>\n\nЗарегистрирован ли блогер в РКН? (да/нет)",
         reply_markup=get_blogger_addition_navigation_with_back(),
         parse_mode="HTML"
     )
-    await state.set_state(SellerStates.waiting_for_blogger_description)
+    await state.set_state(SellerStates.waiting_for_is_registered_rkn)
 
 
 @router.message(SellerStates.waiting_for_blogger_description)
@@ -869,6 +857,37 @@ async def handle_blogger_description(message: Message, state: FSMContext):
             stories_reach_max=data.get('stories_reach_max'),
             reels_reach_min=data.get('reels_reach_min'),
             reels_reach_max=data.get('reels_reach_max'),
+
+            audience_13_17_percent=data.get('audience_13_17_percent'),
+            audience_18_24_percent=data.get('audience_18_24_percent'),
+            audience_25_35_percent=data.get('audience_25_35_percent'),
+            audience_35_plus_percent=data.get('audience_35_plus_percent'),
+            russia_audience_percent=data.get('russia_audience_percent'),
+            female_percent=data.get('female_percent'),
+            male_percent=data.get('male_percent'),
+
+            has_reviews=data.get('has_reviews'),
+            is_registered_rkn=data.get('is_registered_rkn'),
+            official_payment_possible=data.get('official_payment_possible'),
+
+            tg_avg_post_reach_day=data.get('tg_avg_post_reach_day'),
+            tg_avg_post_reach_week=data.get('tg_avg_post_reach_week'),
+            tg_avg_post_reach_month=data.get('tg_avg_post_reach_month'),
+            tg_price_photo_day=data.get('tg_price_photo_day'),
+            tg_price_photo_week=data.get('tg_price_photo_week'),
+            tg_price_photo_month=data.get('tg_price_photo_month'),
+            tg_price_video_day=data.get('tg_price_video_day'),
+            tg_price_video_week=data.get('tg_price_video_week'),
+            tg_price_video_month=data.get('tg_price_video_month'),
+
+            yt_shorts_enabled=data.get('yt_shorts_enabled'),
+            yt_shorts_avg_reach=data.get('yt_shorts_avg_reach'),
+            yt_price_shorts=data.get('yt_price_shorts'),
+            yt_horizontal_enabled=data.get('yt_horizontal_enabled'),
+            yt_horizontal_avg_reach=data.get('yt_horizontal_avg_reach'),
+            yt_price_preroll=data.get('yt_price_preroll'),
+            yt_price_integration_first_half=data.get('yt_price_integration_first_half'),
+
             stats_images=data.get('stats_photos', []),
             description=description
         )
@@ -895,14 +914,18 @@ async def handle_blogger_description(message: Message, state: FSMContext):
             blogger_data = {
                 'name': blogger.name,
                 'url': blogger.url,
-                'platforms': blogger.platforms,
-                'categories': blogger.categories,
+                'platforms': [p.value for p in blogger.platforms] if blogger.platforms else [],
+                'categories': [c.value for c in blogger.categories] if blogger.categories else [],
                 'subscribers_count': blogger.subscribers_count,
                 'price_stories': blogger.price_stories,
                 'price_reels': blogger.price_reels,
                 'audience_13_17_percent': blogger.audience_13_17_percent,
                 'audience_18_24_percent': blogger.audience_18_24_percent,
-                'audience_25_35_percent': blogger.audience_25_35_percent
+                'audience_25_35_percent': blogger.audience_25_35_percent,
+                'audience_35_plus_percent': blogger.audience_35_plus_percent,
+                'russia_audience_percent': blogger.russia_audience_percent,
+                'female_percent': blogger.female_percent,
+                'male_percent': blogger.male_percent
             }
             
             await log_blogger_action_to_sheets(user_data, blogger_data, "add")
@@ -1065,14 +1088,18 @@ async def handle_confirm_delete(callback: CallbackQuery):
             blogger_data = {
                 'name': blogger.name,
                 'url': blogger.url,
-                'platforms': blogger.platforms,
-                'categories': blogger.categories,
+                'platforms': [p.value for p in blogger.platforms] if blogger.platforms else [],
+                'categories': [c.value for c in blogger.categories] if blogger.categories else [],
                 'subscribers_count': blogger.subscribers_count,
                 'price_stories': blogger.price_stories,
                 'price_reels': blogger.price_reels,
                 'audience_13_17_percent': blogger.audience_13_17_percent,
                 'audience_18_24_percent': blogger.audience_18_24_percent,
-                'audience_25_35_percent': blogger.audience_25_35_percent
+                'audience_25_35_percent': blogger.audience_25_35_percent,
+                'audience_35_plus_percent': blogger.audience_35_plus_percent,
+                'russia_audience_percent': blogger.russia_audience_percent,
+                'female_percent': blogger.female_percent,
+                'male_percent': blogger.male_percent
             }
             
             await log_blogger_action_to_sheets(user_data, blogger_data, "delete")
@@ -1103,12 +1130,49 @@ def format_full_blogger_info(blogger) -> str:
     urls = blogger.url.split(',') if ',' in blogger.url else [blogger.url]
     link_text = "Ссылки на соцсети" if len(urls) > 1 else "Ссылка на соцсети"
     info_text += f"🔗 <b>{link_text}:</b> {blogger.url}\n"
+
+    # Платформы и категории
+    try:
+        platforms_text = ", ".join([p.value for p in blogger.platforms]) if blogger.platforms else "Не указано"
+    except Exception:
+        platforms_text = str(blogger.platforms)
+    info_text += f"📱 <b>Платформы:</b> {platforms_text}\n"
+    try:
+        categories_text = ", ".join([c.get_russian_name() for c in blogger.categories]) if blogger.categories else "Не указано"
+    except Exception:
+        categories_text = str(blogger.categories)
+    info_text += f"🏷️ <b>Категории:</b> {categories_text}\n"
     
     # ===== ПОДПИСЧИКИ =====
     if blogger.subscribers_count:
         info_text += f"👥 <b>Подписчики:</b> {blogger.subscribers_count:,}\n"
     else:
         info_text += f"👥 <b>Подписчики:</b> <i>не указано</i>\n"
+    
+    # Демография и РФ
+    demo_parts = []
+    if getattr(blogger, 'audience_13_17_percent', None) is not None:
+        demo_parts.append(f"13–17: {blogger.audience_13_17_percent}%")
+    if getattr(blogger, 'audience_18_24_percent', None) is not None:
+        demo_parts.append(f"18–24: {blogger.audience_18_24_percent}%")
+    if getattr(blogger, 'audience_25_35_percent', None) is not None:
+        demo_parts.append(f"25–35: {blogger.audience_25_35_percent}%")
+    if getattr(blogger, 'audience_35_plus_percent', None) is not None:
+        demo_parts.append(f"35+: {blogger.audience_35_plus_percent}%")
+    if demo_parts:
+        info_text += f"🎯 <b>Возраст ЦА:</b> {', '.join(demo_parts)}\n"
+    if getattr(blogger, 'female_percent', None) is not None or getattr(blogger, 'male_percent', None) is not None:
+        info_text += f"⚖️ <b>Пол:</b> ж {blogger.female_percent or 0}% / м {blogger.male_percent or 0}%\n"
+    if getattr(blogger, 'russia_audience_percent', None) is not None:
+        info_text += f"🇷🇺 <b>Аудитория из РФ:</b> {blogger.russia_audience_percent}%\n"
+
+    # Флаги соответствия
+    if getattr(blogger, 'is_registered_rkn', None) is not None:
+        info_text += f"🛡️ <b>РКН:</b> {'да' if blogger.is_registered_rkn else 'нет'}\n"
+    if getattr(blogger, 'official_payment_possible', None) is not None:
+        info_text += f"💼 <b>Официальная оплата:</b> {'да' if blogger.official_payment_possible else 'нет'}\n"
+    if getattr(blogger, 'has_reviews', None) is not None:
+        info_text += f"⭐ <b>Отзывы:</b> {'есть' if blogger.has_reviews else 'нет'}\n"
     
     # ===== СТАТИСТИКА ПРОФИЛЯ =====
     if blogger.stats_images and len(blogger.stats_images) > 0:
@@ -1157,6 +1221,32 @@ def format_full_blogger_info(blogger) -> str:
         info_text += f"💸 <b>Цена рилс:</b> {blogger.price_reels:,}₽\n"
     else:
         info_text += f"💸 <b>Цена рилс:</b> <i>не указано</i>\n"
+
+    # Telegram детали
+    if getattr(blogger, 'tg_avg_post_reach_day', None) is not None or getattr(blogger, 'tg_avg_post_reach_week', None) is not None or getattr(blogger, 'tg_avg_post_reach_month', None) is not None:
+        info_text += "\n📣 <b>Telegram</b>\n"
+        info_text += f"Охват/сутки: {blogger.tg_avg_post_reach_day or '—'}\n"
+        info_text += f"Охват/неделя: {blogger.tg_avg_post_reach_week or '—'}\n"
+        info_text += f"Охват/месяц: {blogger.tg_avg_post_reach_month or '—'}\n"
+    if getattr(blogger, 'tg_price_photo_day', None) is not None or getattr(blogger, 'tg_price_video_day', None) is not None:
+        info_text += f"Цена фотопоста: сутки {blogger.tg_price_photo_day or '—'}₽ / неделя {blogger.tg_price_photo_week or '—'}₽ / месяц {blogger.tg_price_photo_month or '—'}₽\n"
+        info_text += f"Цена видеопоста: сутки {blogger.tg_price_video_day or '—'}₽ / неделя {blogger.tg_price_video_week or '—'}₽ / месяц {blogger.tg_price_video_month or '—'}₽\n"
+
+    # YouTube детали
+    if getattr(blogger, 'yt_shorts_enabled', None) is not None or getattr(blogger, 'yt_horizontal_enabled', None) is not None:
+        info_text += "\n📺 <b>YouTube</b>\n"
+        if blogger.yt_shorts_enabled is not None:
+            info_text += f"Шортс: {'да' if blogger.yt_shorts_enabled else 'нет'}"
+            if blogger.yt_shorts_enabled:
+                info_text += f", охват: {blogger.yt_shorts_avg_reach or '—'}, цена: {blogger.yt_price_shorts or '—'}₽\n"
+            else:
+                info_text += "\n"
+        if blogger.yt_horizontal_enabled is not None:
+            info_text += f"Горизонтальные видео: {'да' if blogger.yt_horizontal_enabled else 'нет'}"
+            if blogger.yt_horizontal_enabled:
+                info_text += f", охват: {blogger.yt_horizontal_avg_reach or '—'}, преролл: {blogger.yt_price_preroll or '—'}₽, интеграция (1-я половина): {blogger.yt_price_integration_first_half or '—'}₽\n"
+            else:
+                info_text += "\n"
     
     # ===== ОПИСАНИЕ (если есть) =====
     if blogger.description and blogger.description.strip():
@@ -2278,3 +2368,482 @@ async def retry_edit_stats_photos(callback: CallbackQuery, state: FSMContext):
     
     # Возвращаемся к состоянию загрузки фотографий
     await state.set_state(SellerStates.waiting_for_stats_photos)
+
+
+@router.message(SellerStates.waiting_for_audience_13_17)
+async def handle_audience_13_17(message: Message, state: FSMContext):
+    try:
+        val = int(message.text.strip())
+        if not (0 <= val <= 100):
+            raise ValueError
+    except Exception:
+        await message.answer(
+            "❌ Неверный формат\n\nВведите число от 0 до 100:",
+            parse_mode="HTML"
+        )
+        return
+    await state.update_data(audience_13_17_percent=val)
+    await message.answer(
+        "Укажите процент аудитории 18-24 лет (0-100):",
+        reply_markup=get_blogger_addition_navigation_with_back(),
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_audience_18_24)
+
+
+@router.message(SellerStates.waiting_for_audience_18_24)
+async def handle_audience_18_24(message: Message, state: FSMContext):
+    try:
+        val = int(message.text.strip())
+        if not (0 <= val <= 100):
+            raise ValueError
+    except Exception:
+        await message.answer("❌ Введите число 0-100:")
+        return
+    await state.update_data(audience_18_24_percent=val)
+    await message.answer(
+        "Укажите процент аудитории 25-35 лет (0-100):",
+        reply_markup=get_blogger_addition_navigation_with_back(),
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_audience_25_35)
+
+
+@router.message(SellerStates.waiting_for_audience_25_35)
+async def handle_audience_25_35(message: Message, state: FSMContext):
+    try:
+        val = int(message.text.strip())
+        if not (0 <= val <= 100):
+            raise ValueError
+    except Exception:
+        await message.answer("❌ Введите число 0-100:")
+        return
+    await state.update_data(audience_25_35_percent=val)
+    await message.answer(
+        "Укажите процент аудитории 35+ лет (0-100):",
+        reply_markup=get_blogger_addition_navigation_with_back(),
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_audience_35_plus)
+
+
+@router.message(SellerStates.waiting_for_audience_35_plus)
+async def handle_audience_35_plus(message: Message, state: FSMContext):
+    try:
+        val = int(message.text.strip())
+        if not (0 <= val <= 100):
+            raise ValueError
+    except Exception:
+        await message.answer("❌ Введите число 0-100:")
+        return
+    await state.update_data(audience_35_plus_percent=val)
+    await message.answer(
+        "Укажите процент ЖЕНСКОЙ аудитории (0-100):",
+        reply_markup=get_blogger_addition_navigation_with_back(),
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_female_percent)
+
+
+@router.message(SellerStates.waiting_for_female_percent)
+async def handle_female_percent(message: Message, state: FSMContext):
+    try:
+        val = int(message.text.strip())
+        if not (0 <= val <= 100):
+            raise ValueError
+    except Exception:
+        await message.answer("❌ Введите число 0-100:")
+        return
+    await state.update_data(female_percent=val)
+    await message.answer(
+        "Укажите процент МУЖСКОЙ аудитории (0-100):",
+        reply_markup=get_blogger_addition_navigation_with_back(),
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_male_percent)
+
+
+@router.message(SellerStates.waiting_for_male_percent)
+async def handle_male_percent(message: Message, state: FSMContext):
+    try:
+        val = int(message.text.strip())
+        if not (0 <= val <= 100):
+            raise ValueError
+    except Exception:
+        await message.answer("❌ Введите число 0-100:")
+        return
+    await state.update_data(male_percent=val)
+    await message.answer(
+        "Укажите процент аудитории из России (0-100):",
+        reply_markup=get_blogger_addition_navigation_with_back(),
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_russia_percent)
+
+
+@router.message(SellerStates.waiting_for_russia_percent)
+async def handle_russia_percent(message: Message, state: FSMContext):
+    try:
+        val = int(message.text.strip())
+        if not (0 <= val <= 100):
+            raise ValueError
+    except Exception:
+        await message.answer("❌ Введите число 0-100:")
+        return
+    await state.update_data(russia_audience_percent=val)
+
+    # Переход к охватам сторис
+    await message.answer(
+        "📖 <b>Охват сторис</b>\n\n"
+        "Укажите МИНИМАЛЬНЫЙ охват сторис:\n\n"
+        "💡 <b>Важно:</b> Указывайте именно ОХВАТЫ, а не просмотры!",
+        reply_markup=get_blogger_addition_navigation_with_back(),
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_stories_reach_min)
+
+
+async def route_after_platforms(message: Message, state: FSMContext):
+    """Ветки вопросов в зависимости от выбранных платформ (Telegram/YouTube), затем фото статистики"""
+    data = await state.get_data()
+    platforms = data.get('platforms', [])
+    platform_values = [p.value if hasattr(p, 'value') else (p if isinstance(p, str) else str(p)) for p in platforms]
+
+    # Если выбран Telegram — спросим охват/цены
+    if 'telegram' in platform_values:
+        await message.answer(
+            "📣 <b>Telegram</b>\n\nУкажите средний охват постов за сутки (число):",
+            reply_markup=get_blogger_addition_navigation_with_back(),
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_tg_avg_reach_day)
+        return
+
+    # Если выбран YouTube — спросим про шортс
+    if 'youtube' in platform_values:
+        await message.answer(
+            "📺 <b>YouTube</b>\n\nСнимает ли блогер шортс? (да/нет)",
+            reply_markup=get_blogger_addition_navigation_with_back(),
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_yt_shorts_enabled)
+        return
+
+    # Иначе — сразу к загрузке статистики
+    await message.answer(
+        "📊 <b>Статистика профиля</b>\n\n"
+        "Загрузите скриншоты статистики вашего блога (аудитория и охваты).\n"
+        "Можно несколько фото. Когда закончите, нажмите 'Готово' или напишите 'готово':",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Готово", callback_data="stats_photos_done")],
+            [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_price_reels")]
+        ]),
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_stats_photos)
+
+
+@router.message(SellerStates.waiting_for_tg_avg_reach_day)
+async def handle_tg_avg_reach_day(message: Message, state: FSMContext):
+    try:
+        val = int(message.text.strip().replace(',', '').replace(' ', ''))
+        if val < 0:
+            raise ValueError
+    except Exception:
+        await message.answer("❌ Введите корректное число")
+        return
+    await state.update_data(tg_avg_post_reach_day=val)
+    await message.answer(
+        "Укажите средний охват постов за неделю (число):",
+        reply_markup=get_blogger_addition_navigation_with_back(),
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_tg_avg_reach_week)
+
+
+@router.message(SellerStates.waiting_for_tg_avg_reach_week)
+async def handle_tg_avg_reach_week(message: Message, state: FSMContext):
+    try:
+        val = int(message.text.strip().replace(',', '').replace(' ', ''))
+        if val < 0:
+            raise ValueError
+    except Exception:
+        await message.answer("❌ Введите корректное число")
+        return
+    await state.update_data(tg_avg_post_reach_week=val)
+    await message.answer(
+        "Укажите средний охват постов за месяц (число):",
+        reply_markup=get_blogger_addition_navigation_with_back(),
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_tg_avg_reach_month)
+
+
+@router.message(SellerStates.waiting_for_tg_avg_reach_month)
+async def handle_tg_avg_reach_month(message: Message, state: FSMContext):
+    try:
+        val = int(message.text.strip().replace(',', '').replace(' ', ''))
+        if val < 0:
+            raise ValueError
+    except Exception:
+        await message.answer("❌ Введите корректное число")
+        return
+    await state.update_data(tg_avg_post_reach_month=val)
+    await message.answer(
+        "Укажите цену ФОТОПОСТА на сутки (руб):",
+        reply_markup=get_blogger_addition_navigation_with_back(),
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_tg_price_photo_day)
+
+
+def _parse_int(text: str) -> Optional[int]:
+    try:
+        v = int(text.strip().replace(',', '').replace(' ', ''))
+        if v < 0:
+            return None
+        return v
+    except Exception:
+        return None
+
+
+@router.message(SellerStates.waiting_for_tg_price_photo_day)
+async def handle_tg_price_photo_day(message: Message, state: FSMContext):
+    val = _parse_int(message.text)
+    if val is None:
+        await message.answer("❌ Введите корректное число")
+        return
+    await state.update_data(tg_price_photo_day=val)
+    await message.answer("Укажите цену ФОТОПОСТА на неделю (руб):")
+    await state.set_state(SellerStates.waiting_for_tg_price_photo_week)
+
+
+@router.message(SellerStates.waiting_for_tg_price_photo_week)
+async def handle_tg_price_photo_week(message: Message, state: FSMContext):
+    val = _parse_int(message.text)
+    if val is None:
+        await message.answer("❌ Введите корректное число")
+        return
+    await state.update_data(tg_price_photo_week=val)
+    await message.answer("Укажите цену ФОТОПОСТА на месяц (руб):")
+    await state.set_state(SellerStates.waiting_for_tg_price_photo_month)
+
+
+@router.message(SellerStates.waiting_for_tg_price_photo_month)
+async def handle_tg_price_photo_month(message: Message, state: FSMContext):
+    val = _parse_int(message.text)
+    if val is None:
+        await message.answer("❌ Введите корректное число")
+        return
+    await state.update_data(tg_price_photo_month=val)
+    await message.answer("Укажите цену ВИДЕОПОСТА на сутки (руб):")
+    await state.set_state(SellerStates.waiting_for_tg_price_video_day)
+
+
+@router.message(SellerStates.waiting_for_tg_price_video_day)
+async def handle_tg_price_video_day(message: Message, state: FSMContext):
+    val = _parse_int(message.text)
+    if val is None:
+        await message.answer("❌ Введите корректное число")
+        return
+    await state.update_data(tg_price_video_day=val)
+    await message.answer("Укажите цену ВИДЕОПОСТА на неделю (руб):")
+    await state.set_state(SellerStates.waiting_for_tg_price_video_week)
+
+
+@router.message(SellerStates.waiting_for_tg_price_video_week)
+async def handle_tg_price_video_week(message: Message, state: FSMContext):
+    val = _parse_int(message.text)
+    if val is None:
+        await message.answer("❌ Введите корректное число")
+        return
+    await state.update_data(tg_price_video_week=val)
+    await message.answer("Укажите цену ВИДЕОПОСТА на месяц (руб):")
+    await state.set_state(SellerStates.waiting_for_tg_price_video_month)
+
+
+@router.message(SellerStates.waiting_for_tg_price_video_month)
+async def handle_tg_price_video_month(message: Message, state: FSMContext):
+    val = _parse_int(message.text)
+    if val is None:
+        await message.answer("❌ Введите корректное число")
+        return
+    await state.update_data(tg_price_video_month=val)
+
+    # После телеграм-ветки — к статистике
+    await message.answer(
+        "📊 <b>Статистика профиля</b>\n\n"
+        "Загрузите скриншоты статистики (возраст/пол и охваты).\n"
+        "Можно несколько фото. Когда закончите, нажмите 'Готово':",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Готово", callback_data="stats_photos_done")],
+            [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_price_reels")]
+        ]),
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_stats_photos)
+
+
+@router.message(SellerStates.waiting_for_yt_shorts_enabled)
+async def handle_yt_shorts_enabled(message: Message, state: FSMContext):
+    text = message.text.strip().lower()
+    if text not in ["да", "нет", "yes", "no"]:
+        await message.answer("❌ Введите 'да' или 'нет'")
+        return
+    enabled = text in ["да", "yes"]
+    await state.update_data(yt_shorts_enabled=enabled)
+    if enabled:
+        await message.answer("Укажите средний охват шортс (число):")
+        await state.set_state(SellerStates.waiting_for_yt_shorts_avg_reach)
+    else:
+        # Перейдем к горизонтальным видео
+        await message.answer("Снимает ли блогер горизонтальные видео? (да/нет)")
+        await state.set_state(SellerStates.waiting_for_yt_horizontal_enabled)
+
+
+@router.message(SellerStates.waiting_for_yt_shorts_avg_reach)
+async def handle_yt_shorts_avg_reach(message: Message, state: FSMContext):
+    val = _parse_int(message.text)
+    if val is None:
+        await message.answer("❌ Введите корректное число")
+        return
+    await state.update_data(yt_shorts_avg_reach=val)
+    await message.answer("Укажите цену за шортс (руб):")
+    await state.set_state(SellerStates.waiting_for_yt_price_shorts)
+
+
+@router.message(SellerStates.waiting_for_yt_price_shorts)
+async def handle_yt_price_shorts(message: Message, state: FSMContext):
+    val = _parse_int(message.text)
+    if val is None:
+        await message.answer("❌ Введите корректное число")
+        return
+    await state.update_data(yt_price_shorts=val)
+    await message.answer("Снимает ли блогер горизонтальные видео? (да/нет)")
+    await state.set_state(SellerStates.waiting_for_yt_horizontal_enabled)
+
+
+@router.message(SellerStates.waiting_for_yt_horizontal_enabled)
+async def handle_yt_horizontal_enabled(message: Message, state: FSMContext):
+    text = message.text.strip().lower()
+    if text not in ["да", "нет", "yes", "no"]:
+        await message.answer("❌ Введите 'да' или 'нет'")
+        return
+    enabled = text in ["да", "yes"]
+    await state.update_data(yt_horizontal_enabled=enabled)
+    if enabled:
+        await message.answer("Укажите средний охват горизонтальных видео (число):")
+        await state.set_state(SellerStates.waiting_for_yt_horizontal_avg_reach)
+    else:
+        # Пропускаем до статистики
+        await message.answer(
+            "📊 <b>Статистика профиля</b>\n\nЗагрузите скриншоты статистики (возраст/пол и охваты).",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="✅ Готово", callback_data="stats_photos_done")],
+                [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_price_reels")]
+            ]),
+            parse_mode="HTML"
+        )
+        await state.set_state(SellerStates.waiting_for_stats_photos)
+
+
+@router.message(SellerStates.waiting_for_yt_horizontal_avg_reach)
+async def handle_yt_horizontal_avg_reach(message: Message, state: FSMContext):
+    val = _parse_int(message.text)
+    if val is None:
+        await message.answer("❌ Введите корректное число")
+        return
+    await state.update_data(yt_horizontal_avg_reach=val)
+    await message.answer("Укажите цену за преролл (руб):")
+    await state.set_state(SellerStates.waiting_for_yt_price_preroll)
+
+
+@router.message(SellerStates.waiting_for_yt_price_preroll)
+async def handle_yt_price_preroll(message: Message, state: FSMContext):
+    val = _parse_int(message.text)
+    if val is None:
+        await message.answer("❌ Введите корректное число")
+        return
+    await state.update_data(yt_price_preroll=val)
+    await message.answer("Укажите цену за интеграцию в первой половине видео (руб):")
+    await state.set_state(SellerStates.waiting_for_yt_price_integration_first_half)
+
+
+@router.message(SellerStates.waiting_for_yt_price_integration_first_half)
+async def handle_yt_price_integration_first_half(message: Message, state: FSMContext):
+    val = _parse_int(message.text)
+    if val is None:
+        await message.answer("❌ Введите корректное число")
+        return
+    await state.update_data(yt_price_integration_first_half=val)
+
+    # После YouTube — к статистике
+    await message.answer(
+        "📊 <b>Статистика профиля</b>\n\n"
+        "Загрузите скриншоты статистики (возраст/пол, проценты по РФ и охваты).",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Готово", callback_data="stats_photos_done")],
+            [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_price_reels")]
+        ]),
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_stats_photos)
+
+
+@router.callback_query(F.data.startswith("edit_field_demography_"))
+async def handle_edit_field_demography(callback: CallbackQuery):
+    await callback.answer()
+    await callback.message.answer(
+        "Редактирование демографии будет добавлено позже. Пока изменяйте через повторное добавление статистики.")
+
+
+@router.callback_query(F.data.startswith("edit_field_telegram_"))
+async def handle_edit_field_telegram(callback: CallbackQuery):
+    await callback.answer()
+    await callback.message.answer(
+        "Редактирование Telegram-полей будет добавлено позже.")
+
+
+@router.callback_query(F.data.startswith("edit_field_youtube_"))
+async def handle_edit_field_youtube(callback: CallbackQuery):
+    await callback.answer()
+    await callback.message.answer(
+        "Редактирование YouTube-полей будет добавлено позже.")
+
+
+@router.message(SellerStates.waiting_for_is_registered_rkn)
+async def handle_is_registered_rkn(message: Message, state: FSMContext):
+    text = message.text.strip().lower()
+    if text not in ["да", "нет", "yes", "no"]:
+        await message.answer("❌ Введите 'да' или 'нет'")
+        return
+    await state.update_data(is_registered_rkn=text in ["да", "yes"])
+    await message.answer("💼 Доступна ли официальная оплата? (да/нет)")
+    await state.set_state(SellerStates.waiting_for_official_payment_possible)
+
+
+@router.message(SellerStates.waiting_for_official_payment_possible)
+async def handle_official_payment_possible(message: Message, state: FSMContext):
+    text = message.text.strip().lower()
+    if text not in ["да", "нет", "yes", "no"]:
+        await message.answer("❌ Введите 'да' или 'нет'")
+        return
+    await state.update_data(official_payment_possible=text in ["да", "yes"])
+    await message.answer("⭐ Есть ли отзывы? (да/нет)")
+    await state.set_state(SellerStates.waiting_for_has_reviews)
+
+
+@router.message(SellerStates.waiting_for_has_reviews)
+async def handle_has_reviews(message: Message, state: FSMContext):
+    text = message.text.strip().lower()
+    if text not in ["да", "нет", "yes", "no"]:
+        await message.answer("❌ Введите 'да' или 'нет'")
+        return
+    await state.update_data(has_reviews=text in ["да", "yes"])
+    await message.answer(
+        "📄 <b>Описание блогера</b>\n\n"
+        "Напишите краткое описание блогера (или напишите 'пропустить'):",
+        reply_markup=get_blogger_addition_navigation_with_back(),
+        parse_mode="HTML"
+    )
+    await state.set_state(SellerStates.waiting_for_blogger_description)

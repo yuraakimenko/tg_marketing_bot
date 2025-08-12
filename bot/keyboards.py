@@ -410,6 +410,15 @@ def get_blogger_edit_field_keyboard(blogger_id: int) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="📄 Описание", callback_data=f"edit_field_description_{blogger_id}")
         ],
         [
+            InlineKeyboardButton(text="🎯 Демография/пол/РФ", callback_data=f"edit_field_demography_{blogger_id}")
+        ],
+        [
+            InlineKeyboardButton(text="📣 Telegram поля", callback_data=f"edit_field_telegram_{blogger_id}")
+        ],
+        [
+            InlineKeyboardButton(text="📺 YouTube поля", callback_data=f"edit_field_youtube_{blogger_id}")
+        ],
+        [
             InlineKeyboardButton(text="📊 Фото статистики", callback_data=f"edit_field_stats_photos_{blogger_id}")
         ],
         [
