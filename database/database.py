@@ -62,6 +62,7 @@ async def init_db():
                 audience_18_24_percent INTEGER,
                 audience_25_35_percent INTEGER,
                 audience_35_plus_percent INTEGER,
+                russia_audience_percent INTEGER,
                 
                 -- Пол аудитории
                 female_percent INTEGER,
@@ -92,6 +93,26 @@ async def init_db():
                 avg_views INTEGER,
                 avg_likes INTEGER,
                 engagement_rate REAL,
+
+                -- Telegram-специфика
+                tg_avg_post_reach_day INTEGER,
+                tg_avg_post_reach_week INTEGER,
+                tg_avg_post_reach_month INTEGER,
+                tg_price_photo_day INTEGER,
+                tg_price_photo_week INTEGER,
+                tg_price_photo_month INTEGER,
+                tg_price_video_day INTEGER,
+                tg_price_video_week INTEGER,
+                tg_price_video_month INTEGER,
+
+                -- YouTube-специфика
+                yt_shorts_enabled BOOLEAN,
+                yt_shorts_avg_reach INTEGER,
+                yt_price_shorts INTEGER,
+                yt_horizontal_enabled BOOLEAN,
+                yt_horizontal_avg_reach INTEGER,
+                yt_price_preroll INTEGER,
+                yt_price_integration_first_half INTEGER,
 
                 -- Скриншоты/фотографии статистики (JSON массив путей или URL)
                 stats_images TEXT,
@@ -277,6 +298,10 @@ async def init_db():
             if 'audience_35_plus_percent' not in columns:
                 await db.execute("ALTER TABLE bloggers ADD COLUMN audience_35_plus_percent INTEGER")
                 logger.info("Added audience_35_plus_percent column to bloggers table")
+
+            if 'russia_audience_percent' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN russia_audience_percent INTEGER")
+                logger.info("Added russia_audience_percent column to bloggers table")
             
             if 'female_percent' not in columns:
                 await db.execute("ALTER TABLE bloggers ADD COLUMN female_percent INTEGER")
@@ -362,6 +387,58 @@ async def init_db():
             if 'reels_reach_max' not in columns:
                 await db.execute("ALTER TABLE bloggers ADD COLUMN reels_reach_max INTEGER")
                 logger.info("Added reels_reach_max column to bloggers table")
+
+            # Telegram new fields
+            if 'tg_avg_post_reach_day' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN tg_avg_post_reach_day INTEGER")
+                logger.info("Added tg_avg_post_reach_day column to bloggers table")
+            if 'tg_avg_post_reach_week' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN tg_avg_post_reach_week INTEGER")
+                logger.info("Added tg_avg_post_reach_week column to bloggers table")
+            if 'tg_avg_post_reach_month' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN tg_avg_post_reach_month INTEGER")
+                logger.info("Added tg_avg_post_reach_month column to bloggers table")
+            if 'tg_price_photo_day' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN tg_price_photo_day INTEGER")
+                logger.info("Added tg_price_photo_day column to bloggers table")
+            if 'tg_price_photo_week' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN tg_price_photo_week INTEGER")
+                logger.info("Added tg_price_photo_week column to bloggers table")
+            if 'tg_price_photo_month' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN tg_price_photo_month INTEGER")
+                logger.info("Added tg_price_photo_month column to bloggers table")
+            if 'tg_price_video_day' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN tg_price_video_day INTEGER")
+                logger.info("Added tg_price_video_day column to bloggers table")
+            if 'tg_price_video_week' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN tg_price_video_week INTEGER")
+                logger.info("Added tg_price_video_week column to bloggers table")
+            if 'tg_price_video_month' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN tg_price_video_month INTEGER")
+                logger.info("Added tg_price_video_month column to bloggers table")
+
+            # YouTube new fields
+            if 'yt_shorts_enabled' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN yt_shorts_enabled BOOLEAN")
+                logger.info("Added yt_shorts_enabled column to bloggers table")
+            if 'yt_shorts_avg_reach' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN yt_shorts_avg_reach INTEGER")
+                logger.info("Added yt_shorts_avg_reach column to bloggers table")
+            if 'yt_price_shorts' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN yt_price_shorts INTEGER")
+                logger.info("Added yt_price_shorts column to bloggers table")
+            if 'yt_horizontal_enabled' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN yt_horizontal_enabled BOOLEAN")
+                logger.info("Added yt_horizontal_enabled column to bloggers table")
+            if 'yt_horizontal_avg_reach' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN yt_horizontal_avg_reach INTEGER")
+                logger.info("Added yt_horizontal_avg_reach column to bloggers table")
+            if 'yt_price_preroll' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN yt_price_preroll INTEGER")
+                logger.info("Added yt_price_preroll column to bloggers table")
+            if 'yt_price_integration_first_half' not in columns:
+                await db.execute("ALTER TABLE bloggers ADD COLUMN yt_price_integration_first_half INTEGER")
+                logger.info("Added yt_price_integration_first_half column to bloggers table")
                 
         except Exception as e:
             logger.error(f"Error during migration: {e}")
@@ -603,10 +680,23 @@ async def create_blogger(
                 subscribers_count, 
                 stories_reach_min, stories_reach_max,
                 reels_reach_min, reels_reach_max,
+                
+                audience_13_17_percent, audience_18_24_percent, audience_25_35_percent, audience_35_plus_percent,
+                russia_audience_percent, female_percent, male_percent,
+                
+                has_reviews, is_registered_rkn, official_payment_possible,
+                
+                tg_avg_post_reach_day, tg_avg_post_reach_week, tg_avg_post_reach_month,
+                tg_price_photo_day, tg_price_photo_week, tg_price_photo_month,
+                tg_price_video_day, tg_price_video_week, tg_price_video_month,
+                
+                yt_shorts_enabled, yt_shorts_avg_reach, yt_price_shorts,
+                yt_horizontal_enabled, yt_horizontal_avg_reach, yt_price_preroll, yt_price_integration_first_half,
+                
                 stats_images,
                 description
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 seller_id,
@@ -621,6 +711,37 @@ async def create_blogger(
                 kwargs.get("stories_reach_max"),
                 kwargs.get("reels_reach_min"),
                 kwargs.get("reels_reach_max"),
+                
+                kwargs.get("audience_13_17_percent"),
+                kwargs.get("audience_18_24_percent"),
+                kwargs.get("audience_25_35_percent"),
+                kwargs.get("audience_35_plus_percent"),
+                kwargs.get("russia_audience_percent"),
+                kwargs.get("female_percent"),
+                kwargs.get("male_percent"),
+                
+                kwargs.get("has_reviews"),
+                kwargs.get("is_registered_rkn"),
+                kwargs.get("official_payment_possible"),
+                
+                kwargs.get("tg_avg_post_reach_day"),
+                kwargs.get("tg_avg_post_reach_week"),
+                kwargs.get("tg_avg_post_reach_month"),
+                kwargs.get("tg_price_photo_day"),
+                kwargs.get("tg_price_photo_week"),
+                kwargs.get("tg_price_photo_month"),
+                kwargs.get("tg_price_video_day"),
+                kwargs.get("tg_price_video_week"),
+                kwargs.get("tg_price_video_month"),
+                
+                kwargs.get("yt_shorts_enabled"),
+                kwargs.get("yt_shorts_avg_reach"),
+                kwargs.get("yt_price_shorts"),
+                kwargs.get("yt_horizontal_enabled"),
+                kwargs.get("yt_horizontal_avg_reach"),
+                kwargs.get("yt_price_preroll"),
+                kwargs.get("yt_price_integration_first_half"),
+                
                 json.dumps(kwargs.get("stats_images", [])),
                 kwargs.get("description"),
             ),
@@ -679,6 +800,37 @@ async def get_blogger(blogger_id: int) -> Optional[Blogger]:
                 stories_reach_max=row['stories_reach_max'] if 'stories_reach_max' in row.keys() else None,
                 reels_reach_min=row['reels_reach_min'] if 'reels_reach_min' in row.keys() else None,
                 reels_reach_max=row['reels_reach_max'] if 'reels_reach_max' in row.keys() else None,
+                
+                audience_13_17_percent=row['audience_13_17_percent'] if 'audience_13_17_percent' in row.keys() else None,
+                audience_18_24_percent=row['audience_18_24_percent'] if 'audience_18_24_percent' in row.keys() else None,
+                audience_25_35_percent=row['audience_25_35_percent'] if 'audience_25_35_percent' in row.keys() else None,
+                audience_35_plus_percent=row['audience_35_plus_percent'] if 'audience_35_plus_percent' in row.keys() else None,
+                russia_audience_percent=row['russia_audience_percent'] if 'russia_audience_percent' in row.keys() else None,
+                female_percent=row['female_percent'] if 'female_percent' in row.keys() else None,
+                male_percent=row['male_percent'] if 'male_percent' in row.keys() else None,
+                
+                has_reviews=bool(row['has_reviews']) if 'has_reviews' in row.keys() else None,
+                is_registered_rkn=bool(row['is_registered_rkn']) if 'is_registered_rkn' in row.keys() else None,
+                official_payment_possible=bool(row['official_payment_possible']) if 'official_payment_possible' in row.keys() else None,
+                
+                tg_avg_post_reach_day=row['tg_avg_post_reach_day'] if 'tg_avg_post_reach_day' in row.keys() else None,
+                tg_avg_post_reach_week=row['tg_avg_post_reach_week'] if 'tg_avg_post_reach_week' in row.keys() else None,
+                tg_avg_post_reach_month=row['tg_avg_post_reach_month'] if 'tg_avg_post_reach_month' in row.keys() else None,
+                tg_price_photo_day=row['tg_price_photo_day'] if 'tg_price_photo_day' in row.keys() else None,
+                tg_price_photo_week=row['tg_price_photo_week'] if 'tg_price_photo_week' in row.keys() else None,
+                tg_price_photo_month=row['tg_price_photo_month'] if 'tg_price_photo_month' in row.keys() else None,
+                tg_price_video_day=row['tg_price_video_day'] if 'tg_price_video_day' in row.keys() else None,
+                tg_price_video_week=row['tg_price_video_week'] if 'tg_price_video_week' in row.keys() else None,
+                tg_price_video_month=row['tg_price_video_month'] if 'tg_price_video_month' in row.keys() else None,
+                
+                yt_shorts_enabled=bool(row['yt_shorts_enabled']) if 'yt_shorts_enabled' in row.keys() and row['yt_shorts_enabled'] is not None else None,
+                yt_shorts_avg_reach=row['yt_shorts_avg_reach'] if 'yt_shorts_avg_reach' in row.keys() else None,
+                yt_price_shorts=row['yt_price_shorts'] if 'yt_price_shorts' in row.keys() else None,
+                yt_horizontal_enabled=bool(row['yt_horizontal_enabled']) if 'yt_horizontal_enabled' in row.keys() and row['yt_horizontal_enabled'] is not None else None,
+                yt_horizontal_avg_reach=row['yt_horizontal_avg_reach'] if 'yt_horizontal_avg_reach' in row.keys() else None,
+                yt_price_preroll=row['yt_price_preroll'] if 'yt_price_preroll' in row.keys() else None,
+                yt_price_integration_first_half=row['yt_price_integration_first_half'] if 'yt_price_integration_first_half' in row.keys() else None,
+                
                 description=row['description'],
                 created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else datetime.now(),
                 updated_at=datetime.fromisoformat(row['updated_at']) if row['updated_at'] else datetime.now()
@@ -735,6 +887,37 @@ async def get_user_bloggers(seller_id: int) -> List[Blogger]:
                 stories_reach_max=row['stories_reach_max'] if 'stories_reach_max' in row.keys() else None,
                 reels_reach_min=row['reels_reach_min'] if 'reels_reach_min' in row.keys() else None,
                 reels_reach_max=row['reels_reach_max'] if 'reels_reach_max' in row.keys() else None,
+                
+                audience_13_17_percent=row['audience_13_17_percent'] if 'audience_13_17_percent' in row.keys() else None,
+                audience_18_24_percent=row['audience_18_24_percent'] if 'audience_18_24_percent' in row.keys() else None,
+                audience_25_35_percent=row['audience_25_35_percent'] if 'audience_25_35_percent' in row.keys() else None,
+                audience_35_plus_percent=row['audience_35_plus_percent'] if 'audience_35_plus_percent' in row.keys() else None,
+                russia_audience_percent=row['russia_audience_percent'] if 'russia_audience_percent' in row.keys() else None,
+                female_percent=row['female_percent'] if 'female_percent' in row.keys() else None,
+                male_percent=row['male_percent'] if 'male_percent' in row.keys() else None,
+                
+                has_reviews=bool(row['has_reviews']) if 'has_reviews' in row.keys() else None,
+                is_registered_rkn=bool(row['is_registered_rkn']) if 'is_registered_rkn' in row.keys() else None,
+                official_payment_possible=bool(row['official_payment_possible']) if 'official_payment_possible' in row.keys() else None,
+                
+                tg_avg_post_reach_day=row['tg_avg_post_reach_day'] if 'tg_avg_post_reach_day' in row.keys() else None,
+                tg_avg_post_reach_week=row['tg_avg_post_reach_week'] if 'tg_avg_post_reach_week' in row.keys() else None,
+                tg_avg_post_reach_month=row['tg_avg_post_reach_month'] if 'tg_avg_post_reach_month' in row.keys() else None,
+                tg_price_photo_day=row['tg_price_photo_day'] if 'tg_price_photo_day' in row.keys() else None,
+                tg_price_photo_week=row['tg_price_photo_week'] if 'tg_price_photo_week' in row.keys() else None,
+                tg_price_photo_month=row['tg_price_photo_month'] if 'tg_price_photo_month' in row.keys() else None,
+                tg_price_video_day=row['tg_price_video_day'] if 'tg_price_video_day' in row.keys() else None,
+                tg_price_video_week=row['tg_price_video_week'] if 'tg_price_video_week' in row.keys() else None,
+                tg_price_video_month=row['tg_price_video_month'] if 'tg_price_video_month' in row.keys() else None,
+                
+                yt_shorts_enabled=bool(row['yt_shorts_enabled']) if 'yt_shorts_enabled' in row.keys() and row['yt_shorts_enabled'] is not None else None,
+                yt_shorts_avg_reach=row['yt_shorts_avg_reach'] if 'yt_shorts_avg_reach' in row.keys() else None,
+                yt_price_shorts=row['yt_price_shorts'] if 'yt_price_shorts' in row.keys() else None,
+                yt_horizontal_enabled=bool(row['yt_horizontal_enabled']) if 'yt_horizontal_enabled' in row.keys() and row['yt_horizontal_enabled'] is not None else None,
+                yt_horizontal_avg_reach=row['yt_horizontal_avg_reach'] if 'yt_horizontal_avg_reach' in row.keys() else None,
+                yt_price_preroll=row['yt_price_preroll'] if 'yt_price_preroll' in row.keys() else None,
+                yt_price_integration_first_half=row['yt_price_integration_first_half'] if 'yt_price_integration_first_half' in row.keys() else None,
+                
                 description=row['description'],
                 created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else datetime.now(),
                 updated_at=datetime.fromisoformat(row['updated_at']) if row['updated_at'] else datetime.now()
@@ -867,12 +1050,14 @@ async def search_bloggers(platforms: List[str] = None, categories: List[str] = N
                     audience_18_24_percent=row['audience_18_24_percent'],
                     audience_25_35_percent=row['audience_25_35_percent'],
                     audience_35_plus_percent=row['audience_35_plus_percent'],
+                    russia_audience_percent=row['russia_audience_percent'] if 'russia_audience_percent' in row.keys() else None,
                     female_percent=row['female_percent'],
                     male_percent=row['male_percent'],
                     categories=categories_data,
                     price_stories=row['price_stories'],
                     price_post=row['price_post'],
                     price_video=row['price_video'],
+                    price_reels=row['price_reels'] if 'price_reels' in row.keys() else None,
                     has_reviews=bool(row['has_reviews']),
                     is_registered_rkn=bool(row['is_registered_rkn']),
                     official_payment_possible=bool(row['official_payment_possible']),
@@ -881,6 +1066,25 @@ async def search_bloggers(platforms: List[str] = None, categories: List[str] = N
                     avg_likes=row['avg_likes'],
                     engagement_rate=row['engagement_rate'],
                     stats_images=json.loads(row['stats_images']) if row['stats_images'] else [],
+                    
+                    tg_avg_post_reach_day=row['tg_avg_post_reach_day'] if 'tg_avg_post_reach_day' in row.keys() else None,
+                    tg_avg_post_reach_week=row['tg_avg_post_reach_week'] if 'tg_avg_post_reach_week' in row.keys() else None,
+                    tg_avg_post_reach_month=row['tg_avg_post_reach_month'] if 'tg_avg_post_reach_month' in row.keys() else None,
+                    tg_price_photo_day=row['tg_price_photo_day'] if 'tg_price_photo_day' in row.keys() else None,
+                    tg_price_photo_week=row['tg_price_photo_week'] if 'tg_price_photo_week' in row.keys() else None,
+                    tg_price_photo_month=row['tg_price_photo_month'] if 'tg_price_photo_month' in row.keys() else None,
+                    tg_price_video_day=row['tg_price_video_day'] if 'tg_price_video_day' in row.keys() else None,
+                    tg_price_video_week=row['tg_price_video_week'] if 'tg_price_video_week' in row.keys() else None,
+                    tg_price_video_month=row['tg_price_video_month'] if 'tg_price_video_month' in row.keys() else None,
+                    
+                    yt_shorts_enabled=bool(row['yt_shorts_enabled']) if 'yt_shorts_enabled' in row.keys() and row['yt_shorts_enabled'] is not None else None,
+                    yt_shorts_avg_reach=row['yt_shorts_avg_reach'] if 'yt_shorts_avg_reach' in row.keys() else None,
+                    yt_price_shorts=row['yt_price_shorts'] if 'yt_price_shorts' in row.keys() else None,
+                    yt_horizontal_enabled=bool(row['yt_horizontal_enabled']) if 'yt_horizontal_enabled' in row.keys() and row['yt_horizontal_enabled'] is not None else None,
+                    yt_horizontal_avg_reach=row['yt_horizontal_avg_reach'] if 'yt_horizontal_avg_reach' in row.keys() else None,
+                    yt_price_preroll=row['yt_price_preroll'] if 'yt_price_preroll' in row.keys() else None,
+                    yt_price_integration_first_half=row['yt_price_integration_first_half'] if 'yt_price_integration_first_half' in row.keys() else None,
+                    
                     description=row['description'],
                     created_at=datetime.fromisoformat(row['created_at']),
                     updated_at=datetime.fromisoformat(row['updated_at'])
@@ -915,17 +1119,33 @@ async def search_bloggers(platforms: List[str] = None, categories: List[str] = N
         return []
 
 
-async def update_blogger(blogger_id: int, seller_id: int, **kwargs) -> bool:
+async def update_blogger(blogger_id: int, **kwargs) -> bool:
     """Обновление данных блогера"""
     # Список полей, которые можно обновлять
     allowed_fields = [
         'name', 'url', 'platforms', 'categories',
-        'price_stories', 'price_post', 'price_video',
-        'has_reviews', 'description', 'stats_images'
+        'price_stories', 'price_post', 'price_video', 'price_reels',
+        'has_reviews', 'description', 'stats_images',
+        'subscribers_count',
+        'stories_reach_min', 'stories_reach_max', 'reels_reach_min', 'reels_reach_max',
+        'audience_13_17_percent', 'audience_18_24_percent', 'audience_25_35_percent', 'audience_35_plus_percent',
+        'russia_audience_percent', 'female_percent', 'male_percent',
+        'is_registered_rkn', 'official_payment_possible',
+        'tg_avg_post_reach_day', 'tg_avg_post_reach_week', 'tg_avg_post_reach_month',
+        'tg_price_photo_day', 'tg_price_photo_week', 'tg_price_photo_month',
+        'tg_price_video_day', 'tg_price_video_week', 'tg_price_video_month',
+        'yt_shorts_enabled', 'yt_shorts_avg_reach', 'yt_price_shorts',
+        'yt_horizontal_enabled', 'yt_horizontal_avg_reach', 'yt_price_preroll', 'yt_price_integration_first_half'
     ]
     
     # Фильтруем только разрешенные поля
     updates = {k: v for k, v in kwargs.items() if k in allowed_fields}
+
+    if 'platforms' in updates and isinstance(updates['platforms'], list):
+        updates['platforms'] = json.dumps([p.value if isinstance(p, Platform) else p for p in updates['platforms']])
+
+    if 'categories' in updates and isinstance(updates['categories'], list):
+        updates['categories'] = json.dumps([c.value if isinstance(c, BlogCategory) else c for c in updates['categories']])
 
     if 'stats_images' in updates:
         updates['stats_images'] = json.dumps(updates['stats_images'])
@@ -935,9 +1155,9 @@ async def update_blogger(blogger_id: int, seller_id: int, **kwargs) -> bool:
     
     # Строим SQL запрос
     set_clause = ", ".join([f"{field} = ?" for field in updates.keys()])
-    query = f"UPDATE bloggers SET {set_clause}, updated_at = ? WHERE id = ? AND seller_id = ?"
+    query = f"UPDATE bloggers SET {set_clause}, updated_at = ? WHERE id = ?"
     
-    params = list(updates.values()) + [datetime.now().isoformat(), blogger_id, seller_id]
+    params = list(updates.values()) + [datetime.now().isoformat(), blogger_id]
     
     async with aiosqlite.connect(DATABASE_PATH) as db:
         cursor = await db.execute(query, params)
@@ -945,12 +1165,12 @@ async def update_blogger(blogger_id: int, seller_id: int, **kwargs) -> bool:
         return cursor.rowcount > 0
 
 
-async def delete_blogger(blogger_id: int, seller_id: int) -> bool:
+async def delete_blogger(blogger_id: int) -> bool:
     """Удаление блогера"""
     async with aiosqlite.connect(DATABASE_PATH) as db:
         cursor = await db.execute(
-            "DELETE FROM bloggers WHERE id = ? AND seller_id = ?",
-            (blogger_id, seller_id)
+            "DELETE FROM bloggers WHERE id = ?",
+            (blogger_id,)
         )
         await db.commit()
         return cursor.rowcount > 0

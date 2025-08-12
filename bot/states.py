@@ -19,6 +19,20 @@ class SellerStates(StatesGroup):
     
     # Статистика
     waiting_for_subscribers_count = State()  # Количество подписчиков
+
+    # Демография
+    waiting_for_audience_13_17 = State()
+    waiting_for_audience_18_24 = State()
+    waiting_for_audience_25_35 = State()
+    waiting_for_audience_35_plus = State()
+    waiting_for_female_percent = State()
+    waiting_for_male_percent = State()
+    waiting_for_russia_percent = State()
+
+    # Флаги соответствия
+    waiting_for_is_registered_rkn = State()
+    waiting_for_official_payment_possible = State()
+    waiting_for_has_reviews = State()
     
     # Охваты сторис (вилка)
     waiting_for_stories_reach_min = State()  # Минимальный охват сторис
@@ -33,6 +47,26 @@ class SellerStates(StatesGroup):
     
     # Цена рилс
     waiting_for_price_reels = State()  # Цена за рилс
+
+    # Telegram специфичные поля
+    waiting_for_tg_avg_reach_day = State()
+    waiting_for_tg_avg_reach_week = State()
+    waiting_for_tg_avg_reach_month = State()
+    waiting_for_tg_price_photo_day = State()
+    waiting_for_tg_price_photo_week = State()
+    waiting_for_tg_price_photo_month = State()
+    waiting_for_tg_price_video_day = State()
+    waiting_for_tg_price_video_week = State()
+    waiting_for_tg_price_video_month = State()
+
+    # YouTube специфичные поля
+    waiting_for_yt_shorts_enabled = State()
+    waiting_for_yt_shorts_avg_reach = State()
+    waiting_for_yt_price_shorts = State()
+    waiting_for_yt_horizontal_enabled = State()
+    waiting_for_yt_horizontal_avg_reach = State()
+    waiting_for_yt_price_preroll = State()
+    waiting_for_yt_price_integration_first_half = State()
     
     # Статистика - фото пруфы
     waiting_for_stats_photos = State()  # Загрузка фото статистики

@@ -129,6 +129,7 @@ class Blogger:
     audience_18_24_percent: Optional[int] = None  # % аудитории 18-24 лет
     audience_25_35_percent: Optional[int] = None  # % аудитории 25-35 лет
     audience_35_plus_percent: Optional[int] = None  # % аудитории 35+ лет
+    russia_audience_percent: Optional[int] = None  # % аудитории из России
     
     # Пол аудитории
     female_percent: Optional[int] = None  # % женской аудитории
@@ -138,20 +139,48 @@ class Blogger:
     categories: List[BlogCategory] = field(default_factory=list)  # Список категорий
     
     # Цены
-    price_stories: Optional[int] = None  # Цена за 4 истории
-    price_reels: Optional[int] = None  # Цена за рилс
+    price_stories: Optional[int] = None  # Цена за 4 истории (Instagram)
+    price_reels: Optional[int] = None  # Цена за рилс (Instagram)
+    price_post: Optional[int] = None  # Общая цена за пост (универсально)
+    price_video: Optional[int] = None  # Общая цена за видео (универсально)
     
     # Статистика (будет разной для разных платформ)
     subscribers_count: Optional[int] = None
+    avg_views: Optional[int] = None
+    avg_likes: Optional[int] = None
+    engagement_rate: Optional[float] = None
     
-    # Охваты сторис (вилка)
+    # Охваты сторис/рилс (Instagram)
     stories_reach_min: Optional[int] = None  # Минимальный охват сторис
     stories_reach_max: Optional[int] = None  # Максимальный охват сторис
-    
-    # Охваты рилс (вилка)
     reels_reach_min: Optional[int] = None  # Минимальный охват рилс
     reels_reach_max: Optional[int] = None  # Максимальный охват рилс
 
+    # Telegram-специфика
+    tg_avg_post_reach_day: Optional[int] = None
+    tg_avg_post_reach_week: Optional[int] = None
+    tg_avg_post_reach_month: Optional[int] = None
+    tg_price_photo_day: Optional[int] = None
+    tg_price_photo_week: Optional[int] = None
+    tg_price_photo_month: Optional[int] = None
+    tg_price_video_day: Optional[int] = None
+    tg_price_video_week: Optional[int] = None
+    tg_price_video_month: Optional[int] = None
+
+    # YouTube-специфика
+    yt_shorts_enabled: Optional[bool] = None
+    yt_shorts_avg_reach: Optional[int] = None
+    yt_price_shorts: Optional[int] = None
+    yt_horizontal_enabled: Optional[bool] = None
+    yt_horizontal_avg_reach: Optional[int] = None
+    yt_price_preroll: Optional[int] = None
+    yt_price_integration_first_half: Optional[int] = None
+ 
+    # Доп. признаки
+    has_reviews: Optional[bool] = None
+    is_registered_rkn: Optional[bool] = None
+    official_payment_possible: Optional[bool] = None
+    
     # Ссылки на изображения со статистикой
     stats_images: List[str] = field(default_factory=list)
     
